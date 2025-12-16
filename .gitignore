@@ -45,3 +45,13 @@ yarn-error.log*
 next-env.d.ts
 
 /lib/generated/prisma
+
+# database files
+*.db
+*.db-journal
+dev.db
+prisma/dev.db
+
+# storage (uploaded files)
+/storage/*
+!/storage/.gitkeep
