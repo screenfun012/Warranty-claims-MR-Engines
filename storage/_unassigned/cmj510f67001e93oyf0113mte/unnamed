@@ -1,0 +1,31 @@
+Return-path: <claims@mrgroup.rs>
+Received: from [178.220.208.204] (port=61178 helo=Nikolas-MacBook-Air.local)
+	by host122.dwhost.net with esmtpsa  (TLS1.3) tls TLS_AES_256_GCM_SHA384
+	(Exim 4.98.2)
+	(envelope-from <claims@mrgroup.rs>)
+	id 1vUaaX-000000070Vx-39ZL
+	for cpanel@mrgroup.rs;
+	Sun, 14 Dec 2025 02:07:52 +0100
+From: claims@mrgroup.rs
+To: cpanel@mrgroup.rs
+Subject: Your WARRANTY claim is being processed
+Message-ID: <2936c0f8-18eb-cdd4-f43c-6867343cd8cd@mrgroup.rs>
+Date: Sun, 14 Dec 2025 01:07:51 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative;
+ boundary="--_NmP-ff7010014dfa156f-Part_1"
+
+----_NmP-ff7010014dfa156f-Part_1
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 7bit
+
+Your warranty claim is being processed. We will get back to you soon.
+----_NmP-ff7010014dfa156f-Part_1
+Content-Type: text/html; charset=utf-8
+Content-Transfer-Encoding: quoted-printable
+
+
+      <p>Your warranty claim is being processed. We will get back to you =
+soon.</p>
+   =20
+----_NmP-ff7010014dfa156f-Part_1--

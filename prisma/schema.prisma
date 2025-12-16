@@ -1,0 +1,202 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite doesn't support enums, using String with @default instead
+
+model User {
+  id              String   @id @default(cuid())
+  fullName        String
+  email           String   @unique
+  role            String @default("OPERATOR") // ADMIN, OPERATOR, TECHNICIAN, WORKER
+  claimsAssigned  Claim[]  @relation("ClaimAssignedTo")
+  workOrders      WorkOrder[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  country   String?
+  notes     String?
+  claims    Claim[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model WorkOrder {
+  id            String   @id @default(cuid())
+  workOrderCode String   @unique
+  engineType    String?
+  mrEngineCode  String?
+  workerId      String?
+  worker        User?    @relation(fields: [workerId], references: [id])
+  assemblyDate  DateTime?
+  nasFolderPath String?
+  claims        Claim[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Claim {
+  id                   String          @id @default(cuid())
+  claimCodeRaw         String?
+  claimPrefix          String?
+  claimNumber          Int?
+  claimYear            Int?
+  status               String          @default("NEW") // NEW, IN_ANALYSIS, WAITING_CUSTOMER, APPROVED, REJECTED, CLOSED
+  claimAcceptanceStatus String?        // ACCEPTED, REJECTED, PENDING
+  customerId           String?
+  customer             Customer?       @relation(fields: [customerId], references: [id])
+  workOrderId          String?
+  workOrder            WorkOrder?      @relation(fields: [workOrderId], references: [id])
+  engineType           String?
+  mrEngineCode         String?
+  customerReference    String?
+  invoiceNumber        String?
+  assignedToId         String?
+  assignedTo           User?           @relation("ClaimAssignedTo", fields: [assignedToId], references: [id])
+  serverFolderPath     String?
+  summarySr            String?
+  summaryEn            String?
+  emailThreads         EmailThread[]
+  attachments          Attachment[]
+  clientDocuments      ClientDocument[]
+  photos               Photo[]
+  reportSections       ReportSection[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model EmailThread {
+  id              String        @id @default(cuid())
+  claimId         String?
+  claim           Claim?        @relation(fields: [claimId], references: [id])
+  subjectOriginal String
+  originalSender  String?
+  forwardedBy     String?
+  viewedAt        DateTime?     // When the thread was last viewed/opened
+  messages        EmailMessage[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model EmailMessage {
+  id             String       @id @default(cuid())
+  emailThreadId  String
+  emailThread    EmailThread  @relation(fields: [emailThreadId], references: [id], onDelete: Cascade)
+  direction      String // INBOUND, OUTBOUND
+  from           String
+  to             String
+  cc             String?
+  subject        String
+  bodyText       String?
+  bodyHtml       String?
+  messageId      String?
+  inReplyTo      String?
+  date           DateTime
+  rawSourcePath  String?
+  attachments    Attachment[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Attachment {
+  id             String        @id @default(cuid())
+  emailMessageId String?
+  emailMessage   EmailMessage? @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+  claimId        String?
+  claim          Claim?        @relation(fields: [claimId], references: [id])
+  fileName       String
+  mimeType       String
+  filePath       String
+  isInline       Boolean @default(false)
+  isProbablyLogo Boolean @default(false)
+  isRelevant     Boolean @default(true)
+  source         String @default("CLIENT") // CLIENT, INTERNAL_TEARDOWN, OTHER
+  textOriginal   String? // Extracted text from PDF
+  textSr         String? // Serbian translation
+  textEn         String? // English translation
+  clientDocument ClientDocument?
+  photo          Photo?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ClientDocument {
+  id               String   @id @default(cuid())
+  claimId          String
+  claim            Claim    @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  attachmentId     String?  @unique
+  attachment       Attachment? @relation(fields: [attachmentId], references: [id])
+  originalLanguage String?
+  detectedLanguage String?
+  textOriginal     String
+  textSr           String?
+  textEn           String?
+  documentType     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Photo {
+  id            String      @id @default(cuid())
+  claimId       String
+  claim         Claim       @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  attachmentId  String?     @unique
+  attachment    Attachment? @relation(fields: [attachmentId], references: [id])
+  internalUpload Boolean  @default(false)
+  indexNo       Int?
+  groupLabel    String?
+  captionSr     String?
+  captionEn     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ReportSection {
+  id          String         @id @default(cuid())
+  claimId     String
+  claim       Claim          @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  sectionType String // IDENTIFICATION, GENERAL, FINDINGS, EXPLANATION, CONCLUSION, OTHER
+  orderIndex  Int
+  textSr      String?
+  textEn      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model MailSyncState {
+  id          String   @id @default("default")
+  lastUid     String?
+  lastSyncedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model EmailConfig {
+  id          String   @id @default("default")
+  imapHost    String
+  imapPort    Int      @default(993)
+  imapUser    String
+  imapPass    String   // encrypted in production
+  imapTls     Boolean  @default(true)
+  smtpHost    String
+  smtpPort    Int      @default(587)
+  smtpUser    String
+  smtpPass    String   // encrypted in production
+  smtpTls     Boolean  @default(true)
+  rememberCredentials Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
