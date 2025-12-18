@@ -1,11 +1,11 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Button } from "@/components/ui/button";
 import { Languages } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { FileViewerModal } from "@/components/file-viewer-modal";
 
 interface ClaimPhotosProps {
   claim: any;
@@ -16,6 +16,8 @@ export function ClaimPhotos({ claim, isReadOnly = false }: ClaimPhotosProps) {
   const [translating, setTranslating] = useState<string | null>(null);
   const [sourceLang, setSourceLang] = useState<Record<string, string>>({});
   const [targetLang, setTargetLang] = useState<Record<string, string>>({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const handleTranslate = async (photoId: string, photo: any) => {
     const srcLang = sourceLang[photoId] || "SR";
@@ -61,19 +63,28 @@ export function ClaimPhotos({ claim, isReadOnly = false }: ClaimPhotosProps) {
     );
   }
 
+  const photosWithAttachments = claim.photos.filter((photo: any) => photo.attachment);
+
+  const handleImageClick = (index: number) => {
+    setViewerIndex(index);
+    setViewerOpen(true);
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {claim.photos.map((photo: any) => (
-        <Card key={photo.id} className="p-4">
-          {photo.attachment && (
-            <AspectRatio ratio={16 / 9} className="mb-2">
-              <img
-                src={`/api/files/${photo.attachment.id}`}
-                alt={photo.captionSr || "Photo"}
-                className="w-full h-full object-cover rounded"
-              />
-            </AspectRatio>
-          )}
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {claim.photos.map((photo: any, index: number) => (
+          <Card key={photo.id} className="p-4 flex flex-col">
+            {photo.attachment && (
+              <div className="mb-2 rounded-lg overflow-hidden bg-muted/50">
+                <img
+                  src={`/api/files/${photo.attachment.id}`}
+                  alt={photo.captionSr || "Photo"}
+                  className="w-full h-auto max-h-[200px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => handleImageClick(photosWithAttachments.findIndex((p: any) => p.id === photo.id))}
+                />
+              </div>
+            )}
           {photo.groupLabel && (
             <p className="text-sm font-medium mb-1">{photo.groupLabel}</p>
           )}
@@ -125,7 +136,20 @@ export function ClaimPhotos({ claim, isReadOnly = false }: ClaimPhotosProps) {
           )}
         </Card>
       ))}
-    </div>
+      </div>
+
+      <FileViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        files={photosWithAttachments.map((photo: any) => ({
+          id: photo.attachment.id,
+          url: `/api/files/${photo.attachment.id}`,
+          fileName: photo.attachment.fileName || `Photo ${photo.id}`,
+          mimeType: photo.attachment.mimeType,
+        }))}
+        initialIndex={viewerIndex}
+      />
+    </>
   );
 }
 

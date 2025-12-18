@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -222,53 +222,31 @@ export default function ClaimsPage() {
         </div>
       </Card>
 
-      <Card>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Claim Code</TableHead>
-              <TableHead>Prefix</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Engine Type</TableHead>
-              <TableHead>Engine Code</TableHead>
-              <TableHead>Assigned To</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {claims.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground">
-                  No claims found
-                </TableCell>
-              </TableRow>
-            ) : (
-              claims.map((claim) => (
-                <TableRow
-                  key={claim.id}
-                  className="cursor-pointer"
-                  onClick={() => router.push(`/claims/${claim.id}`)}
-                >
-                  <TableCell className="font-medium">
-                    {claim.claimCodeRaw || "Unassigned"}
-                  </TableCell>
-                  <TableCell>{claim.claimPrefix || "-"}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />
-                  </TableCell>
-                  <TableCell>{claim.customer?.name || "-"}</TableCell>
-                  <TableCell>{claim.engineType || "-"}</TableCell>
-                  <TableCell>{claim.mrEngineCode || "-"}</TableCell>
-                  <TableCell>{claim.assignedTo?.fullName || "-"}</TableCell>
-                  <TableCell>
-                    {new Date(claim.createdAt).toLocaleDateString()}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+      <Card className="p-4">
+        <ResponsiveTable
+          headers={[
+            { key: "claimCode", label: "Claim Code" },
+            { key: "prefix", label: "Prefix" },
+            { key: "status", label: "Status" },
+            { key: "customer", label: "Customer" },
+            { key: "engineType", label: "Engine Type" },
+            { key: "engineCode", label: "Engine Code" },
+            { key: "assignedTo", label: "Assigned To" },
+            { key: "created", label: "Created" },
+          ]}
+          data={claims.map((claim) => ({
+            claimCode: <span className="font-medium">{claim.claimCodeRaw || "Unassigned"}</span>,
+            prefix: claim.claimPrefix || "-",
+            status: <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />,
+            customer: claim.customer?.name || "-",
+            engineType: claim.engineType || "-",
+            engineCode: claim.mrEngineCode || "-",
+            assignedTo: claim.assignedTo?.fullName || "-",
+            created: new Date(claim.createdAt).toLocaleDateString(),
+          }))}
+          emptyMessage="No claims found"
+          onRowClick={(row, index) => router.push(`/claims/${claims[index].id}`)}
+        />
       </Card>
     </div>
   );

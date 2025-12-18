@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { Languages, FileText, Mail, Image as ImageIcon, Wrench, CheckCircle2, Loader2, XCircle, Circle } from "lucide-react";
+import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search } from "lucide-react";
 
 // This is a large component - importing sub-components
 import { ClaimMetadata } from "./ClaimMetadata";
@@ -90,7 +90,9 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function ClaimDetailPage() {
-  const params = useParams();
+  // Extract id from params to avoid enumeration issues in dev tools
+  const params = useParams<{ id: string }>();
+  const claimId = params.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
   const [claim, setClaim] = useState<Claim | null>(null);
@@ -104,16 +106,16 @@ export default function ClaimDetailPage() {
         setLoading(true);
       }
       
-      const claimId = claimIdRef.current || (params.id as string);
-      if (!claimId) {
-        console.error("No claim ID in params");
+      const currentClaimId = claimIdRef.current || claimId;
+      if (!currentClaimId) {
+        console.error("No claim ID available");
         setClaim(null);
         setLoading(false);
         return;
       }
 
-      console.log(`[fetchClaim] Fetching claim ${claimId} (attempt ${retryCount + 1}, type: ${typeof claimId})`);
-      const res = await fetch(`/api/claims/${claimId}`);
+      console.log(`[fetchClaim] Fetching claim ${currentClaimId} (attempt ${retryCount + 1}, type: ${typeof currentClaimId})`);
+      const res = await fetch(`/api/claims/${currentClaimId}`);
       
       if (!res.ok) {
         const errorText = await res.text();
@@ -166,10 +168,9 @@ export default function ClaimDetailPage() {
     }
   };
 
-  // Update claimIdRef when params.id changes
+  // Update claimIdRef when claimId changes
   useEffect(() => {
-    const claimId = params.id as string;
-    console.log(`[ClaimDetailPage] params.id changed to: ${claimId}`);
+    console.log(`[ClaimDetailPage] claimId changed to: ${claimId}`);
     
     if (claimId) {
       claimIdRef.current = claimId;
@@ -178,7 +179,7 @@ export default function ClaimDetailPage() {
       fetchClaim();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [claimId]);
 
   // Refresh claim when refresh parameter is present (e.g., after linking from inbox)
   useEffect(() => {
@@ -214,17 +215,56 @@ export default function ClaimDetailPage() {
       // Otherwise, treat it as a partial update
       const updateData = { ...updates } as Partial<Claim>;
       
-      console.log('[updateClaim] Partial update. claimAcceptanceStatus:', updateData.claimAcceptanceStatus, 'Current:', claim?.claimAcceptanceStatus);
+      // Remove customer object from updateData if present (we only update customerId)
+      if ('customer' in updateData) {
+        delete (updateData as any).customer;
+      }
+      
+      console.log('[updateClaim] Partial update. Data:', updateData);
       
       // Update claim state immediately (optimistic update) - this makes header update instantly
       if (claim) {
         const updatedClaim = { ...claim, ...updateData } as Claim;
-        console.log('[updateClaim] Setting claim state. New claimAcceptanceStatus:', updatedClaim.claimAcceptanceStatus);
         setClaim(updatedClaim);
       }
       
-      // Note: API request for claimAcceptanceStatus is handled by ClaimEmails component
-      // We only need to update the state here for immediate UI feedback
+      // Send API request to save changes to database
+      // Skip API call for claimAcceptanceStatus as it's handled by ClaimEmails component
+      if (!('claimAcceptanceStatus' in updateData)) {
+        try {
+          const res = await fetch(`/api/claims/${claimId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(updateData),
+          });
+
+          if (!res.ok) {
+            console.error('[updateClaim] API error:', res.status);
+            // Revert optimistic update on error
+            if (claim) {
+              setClaim(claim);
+            }
+            throw new Error(`API error: ${res.status}`);
+          }
+
+          const data = await res.json();
+          if (data.claim) {
+            // Preserve claimAcceptanceStatus from current claim when updating
+            const preservedClaim = {
+              ...data.claim,
+              claimAcceptanceStatus: claim?.claimAcceptanceStatus ?? data.claim.claimAcceptanceStatus,
+            };
+            // Update with server response to ensure consistency
+            setClaim(preservedClaim);
+          }
+        } catch (error) {
+          console.error("Error saving claim update:", error);
+          // Revert optimistic update on error
+          if (claim) {
+            setClaim(claim);
+          }
+        }
+      }
     } catch (error) {
       console.error("Error updating claim:", error);
     }
@@ -247,53 +287,60 @@ export default function ClaimDetailPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">
-            {claim.claimCodeRaw || "Unassigned Claim"}
-          </h1>
-          <div className="flex items-center gap-3">
-            <StatusBadge status={claim.status} />
-            {(() => {
-              console.log('[Header] Rendering. claimAcceptanceStatus:', claim.claimAcceptanceStatus);
-              return claim.claimAcceptanceStatus && (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED") && (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
-                  {claim.claimAcceptanceStatus === "ACCEPTED" ? (
-                    <>
-                      <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Prihvaćeno</span>
-                    </>
-                  ) : (
-                    <>
-                      <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 fill-red-600 dark:fill-red-400" />
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Odbijeno</span>
-                    </>
-                  )}
-                </div>
-              );
-            })()}
+    <div className="p-4 sm:p-8">
+      <div className="flex flex-col gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+              {claim.claimCodeRaw || "Unassigned Claim"}
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <StatusBadge status={claim.status} />
+              {(() => {
+                console.log('[Header] Rendering. claimAcceptanceStatus:', claim.claimAcceptanceStatus);
+                return claim.claimAcceptanceStatus && (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED") && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
+                    {claim.claimAcceptanceStatus === "ACCEPTED" ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Prihvaćeno</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 fill-red-600 dark:fill-red-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Odbijeno</span>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/claims")}>
-            Back to Claims
-          </Button>
-          {/* TODO: Add super admin check - only show delete button for super admin */}
-          {claim.status === "CLOSED" && (
+          <div className="flex flex-col sm:flex-row gap-2 sm:shrink-0">
             <Button 
-              variant="destructive" 
-              onClick={async () => {
-                if (!confirm("Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna.")) {
-                  return;
-                }
-                // TODO: Add API call to delete claim (only for super admin)
-                alert("Brisanje reklamacija je trenutno onemogućeno. Kontaktirajte super admin-a.");
-              }}
+              variant="outline" 
+              onClick={() => router.push("/claims")}
+              className="w-full sm:w-auto"
             >
-              Delete Claim
+              Back to Claims
             </Button>
-          )}
+            {/* TODO: Add super admin check - only show delete button for super admin */}
+            {claim.status === "CLOSED" && (
+              <Button 
+                variant="destructive" 
+                onClick={async () => {
+                  if (!confirm("Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna.")) {
+                    return;
+                  }
+                  // TODO: Add API call to delete claim (only for super admin)
+                  alert("Brisanje reklamacija je trenutno onemogućeno. Kontaktirajte super admin-a.");
+                }}
+                className="w-full sm:w-auto"
+              >
+                Delete Claim
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -311,12 +358,27 @@ export default function ClaimDetailPage() {
         </div>
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="emails">Emails</TabsTrigger>
-              <TabsTrigger value="documents">Documents</TabsTrigger>
-              <TabsTrigger value="findings">Findings</TabsTrigger>
-              <TabsTrigger value="photos">Photos</TabsTrigger>
+            <TabsList className="flex flex-wrap w-full gap-1 sm:grid sm:grid-cols-5">
+              <TabsTrigger value="overview" className="flex-1 sm:flex-none px-2 sm:px-3" title="Overview">
+                <LayoutDashboard className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline text-xs sm:text-sm">Overview</span>
+              </TabsTrigger>
+              <TabsTrigger value="emails" className="flex-1 sm:flex-none px-2 sm:px-3" title="Emails">
+                <Mail className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline text-xs sm:text-sm">Emails</span>
+              </TabsTrigger>
+              <TabsTrigger value="documents" className="flex-1 sm:flex-none px-2 sm:px-3" title="Documents">
+                <FileText className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline text-xs sm:text-sm">Documents</span>
+              </TabsTrigger>
+              <TabsTrigger value="findings" className="flex-1 sm:flex-none px-2 sm:px-3" title="Findings">
+                <Search className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline text-xs sm:text-sm">Findings</span>
+              </TabsTrigger>
+              <TabsTrigger value="photos" className="flex-1 sm:flex-none px-2 sm:px-3" title="Photos">
+                <ImageIcon className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline text-xs sm:text-sm">Photos</span>
+              </TabsTrigger>
             </TabsList>
             <TabsContent value="overview">
               <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />

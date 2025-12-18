@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Languages, FileText } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { FileViewerModal } from "@/components/file-viewer-modal";
 
 interface ClaimClientDocumentsProps {
   claim: any;
@@ -18,6 +19,8 @@ export function ClaimClientDocuments({ claim, isReadOnly = false }: ClaimClientD
   const [translating, setTranslating] = useState<{ docId: string; lang: string; sourceLang: string } | null>(null);
   const [sourceLang, setSourceLang] = useState<Record<string, string>>({});
   const [targetLang, setTargetLang] = useState<Record<string, string>>({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   const handleExtractPdf = async (attachmentId: string) => {
     setExtracting(attachmentId);
@@ -102,7 +105,14 @@ export function ClaimClientDocuments({ claim, isReadOnly = false }: ClaimClientD
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(`/api/files/${doc.attachment.id}`, "_blank")}
+                  onClick={() => {
+                    const pdfDocs = claim.clientDocuments.filter((d: any) => 
+                      d.attachment?.mimeType.includes("pdf")
+                    );
+                    const index = pdfDocs.findIndex((d: any) => d.id === doc.id);
+                    setViewerIndex(index >= 0 ? index : 0);
+                    setViewerOpen(true);
+                  }}
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Preview PDF
@@ -233,6 +243,20 @@ export function ClaimClientDocuments({ claim, isReadOnly = false }: ClaimClientD
           )}
         </Card>
       ))}
+      
+      <FileViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        files={claim.clientDocuments
+          .filter((doc: any) => doc.attachment?.mimeType.includes("pdf"))
+          .map((doc: any) => ({
+            id: doc.attachment.id,
+            url: `/api/files/${doc.attachment.id}`,
+            fileName: doc.attachment.fileName || `Document ${doc.id}`,
+            mimeType: doc.attachment.mimeType,
+          }))}
+        initialIndex={viewerIndex}
+      />
     </div>
   );
 }

@@ -109,6 +109,17 @@ export async function GET(
       (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
       console.log(`[GET /api/claims/${id}] Fetched claimAcceptanceStatus from DB:`, statusResult[0].claimAcceptanceStatus);
     }
+    
+    // Also fetch claimAcceptanceStatus in PATCH response
+    if (claim) {
+      const patchStatusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
+        `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
+        id
+      );
+      if (patchStatusResult && patchStatusResult.length > 0) {
+        (claim as any).claimAcceptanceStatus = patchStatusResult[0].claimAcceptanceStatus;
+      }
+    }
 
     console.log(`[GET /api/claims/${id}] Successfully fetched claim. claimAcceptanceStatus:`, claim.claimAcceptanceStatus);
     return NextResponse.json({ claim });
@@ -426,6 +437,17 @@ export async function PATCH(
       }
     }
     
+    // Always explicitly fetch claimAcceptanceStatus to ensure it's included in response
+    if (claim) {
+      const statusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
+        `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
+        id
+      );
+      if (statusResult && statusResult.length > 0) {
+        (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
+      }
+    }
+
     console.log(`[PATCH /api/claims/${id}] Final claim.claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
 
     console.log(`[PATCH /api/claims/${id}] Successfully updated claim. claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);

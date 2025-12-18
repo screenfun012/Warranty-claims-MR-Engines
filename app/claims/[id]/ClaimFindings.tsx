@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,11 +16,36 @@ interface ClaimFindingsProps {
 
 export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFindingsProps) {
   const [sections, setSections] = useState<any[]>(claim.reportSections || []);
+  const [pendingSaves, setPendingSaves] = useState<Map<string, string>>(new Map());
+  const saveTimeouts = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Update sections when claim changes
   useEffect(() => {
     setSections(claim.reportSections || []);
   }, [claim.reportSections]);
+
+  // Save pending changes when component unmounts or tab changes
+  useEffect(() => {
+    const currentPendingSaves = new Map(pendingSaves);
+    const currentClaimId = claim.id;
+    
+    return () => {
+      // Clear all timeouts
+      saveTimeouts.current.forEach(timeout => clearTimeout(timeout));
+      saveTimeouts.current.clear();
+      
+      // Save any pending changes immediately
+      currentPendingSaves.forEach((text, sectionId) => {
+        fetch(`/api/claims/${currentClaimId}/report-sections/${sectionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ textSr: text }),
+        }).catch(error => {
+          console.error("Error saving section on unmount:", error);
+        });
+      });
+    };
+  }, [pendingSaves, claim.id]);
 
   const sectionsByType = sections.reduce((acc: any, section: any) => {
     if (!acc[section.sectionType]) {
@@ -111,57 +137,112 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                     onChange={(e) => {
                       if (isReadOnly) return;
                       const newText = e.target.value;
+                      const sectionId = section.id;
+                      
                       // Optimistic update
                       setSections(prev => prev.map(s => 
-                        s.id === section.id ? { ...s, textSr: newText } : s
+                        s.id === sectionId ? { ...s, textSr: newText } : s
                       ));
+                      
+                      // Clear existing timeout for this section
+                      const existingTimeout = saveTimeouts.current.get(sectionId);
+                      if (existingTimeout) {
+                        clearTimeout(existingTimeout);
+                      }
+                      
+                      // Set pending save
+                      setPendingSaves(prev => new Map(prev).set(sectionId, newText));
+                      
+                      // Debounce save - save after 1 second of no typing
+                      const timeout = setTimeout(async () => {
+                        try {
+                          const res = await fetch(`/api/claims/${claim.id}/report-sections/${sectionId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ textSr: newText }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            // Update local state with saved data
+                            setSections(prev => prev.map(s => 
+                              s.id === sectionId ? { ...s, textSr: data.section.textSr || "" } : s
+                            ));
+                            // Remove from pending saves
+                            setPendingSaves(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(sectionId);
+                              return newMap;
+                            });
+                            // Update parent claim state
+                            if (onUpdate) {
+                              const claimRes = await fetch(`/api/claims/${claim.id}`);
+                              if (claimRes.ok) {
+                                const claimData = await claimRes.json();
+                                onUpdate({ reportSections: claimData.claim.reportSections });
+                              }
+                            }
+                          } else {
+                            const errorData = await res.json();
+                            console.error("Error updating section:", errorData.error);
+                            // Revert optimistic update
+                            setSections(prev => prev.map(s => 
+                              s.id === sectionId ? { ...s, textSr: section.textSr || "" } : s
+                            ));
+                          }
+                        } catch (error) {
+                          console.error("Error updating section:", error);
+                          // Revert optimistic update
+                          setSections(prev => prev.map(s => 
+                            s.id === sectionId ? { ...s, textSr: section.textSr || "" } : s
+                          ));
+                        }
+                        saveTimeouts.current.delete(sectionId);
+                      }, 1000);
+                      
+                      saveTimeouts.current.set(sectionId, timeout);
                     }}
                     onBlur={async (e) => {
                       if (isReadOnly) return;
+                      const sectionId = section.id;
                       const newText = e.target.value;
-                      const originalText = section.textSr || "";
                       
-                      // If text hasn't changed, don't make API call
-                      if (newText === originalText) {
-                        return;
+                      // Clear timeout and save immediately
+                      const existingTimeout = saveTimeouts.current.get(sectionId);
+                      if (existingTimeout) {
+                        clearTimeout(existingTimeout);
+                        saveTimeouts.current.delete(sectionId);
                       }
                       
-                      try {
-                        const res = await fetch(`/api/claims/${claim.id}/report-sections/${section.id}`, {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ textSr: newText }),
-                        });
-                        if (res.ok) {
-                          // Update local state with saved data
-                          const data = await res.json();
-                          setSections(prev => prev.map(s => 
-                            s.id === section.id ? { ...s, textSr: data.section.textSr || "" } : s
-                          ));
-                          // Refresh claim data to ensure consistency
-                          if (onUpdate) {
-                            const claimRes = await fetch(`/api/claims/${claim.id}`);
-                            if (claimRes.ok) {
-                              const claimData = await claimRes.json();
-                              onUpdate({ reportSections: claimData.claim.reportSections });
+                      // Save immediately on blur
+                      const pendingText = pendingSaves.get(sectionId) || newText;
+                      if (pendingText !== (section.textSr || "")) {
+                        try {
+                          const res = await fetch(`/api/claims/${claim.id}/report-sections/${sectionId}`, {
+                            method: "PATCH",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ textSr: pendingText }),
+                          });
+                          if (res.ok) {
+                            const data = await res.json();
+                            setSections(prev => prev.map(s => 
+                              s.id === sectionId ? { ...s, textSr: data.section.textSr || "" } : s
+                            ));
+                            setPendingSaves(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(sectionId);
+                              return newMap;
+                            });
+                            if (onUpdate) {
+                              const claimRes = await fetch(`/api/claims/${claim.id}`);
+                              if (claimRes.ok) {
+                                const claimData = await claimRes.json();
+                                onUpdate({ reportSections: claimData.claim.reportSections });
+                              }
                             }
                           }
-                        } else {
-                          const errorData = await res.json();
-                          console.error("Error updating section:", errorData.error);
-                          alert("Failed to update section: " + (errorData.error || "Unknown error"));
-                          // Revert optimistic update
-                          setSections(prev => prev.map(s => 
-                            s.id === section.id ? { ...s, textSr: originalText } : s
-                          ));
+                        } catch (error) {
+                          console.error("Error saving section on blur:", error);
                         }
-                      } catch (error) {
-                        console.error("Error updating section:", error);
-                        alert("Failed to update section");
-                        // Revert optimistic update
-                        setSections(prev => prev.map(s => 
-                          s.id === section.id ? { ...s, textSr: originalText } : s
-                        ));
                       }
                     }}
                     placeholder="Unesi zapazanja..."

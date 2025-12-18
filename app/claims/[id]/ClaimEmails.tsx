@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, Paperclip } from "lucide-react";
+import { Upload, X, Paperclip, FileText, Image as ImageIcon } from "lucide-react";
+import { FileViewerModal } from "@/components/file-viewer-modal";
 
 interface ClaimEmailsProps {
   claim: any;
@@ -35,6 +36,8 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       ? claim.claimAcceptanceStatus 
       : ""
   );
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerIndex, setViewerIndex] = useState(0);
 
   // Sync local state with claim prop when claim ID changes
   const prevClaimIdRef = useRef<string | null>(null);
@@ -224,26 +227,69 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     <div className="space-y-4">
       {claim.emailThreads && claim.emailThreads.length > 0 ? (
         claim.emailThreads.map((thread: any) => (
-        <Card key={thread.id} className="p-4">
-          <h3 className="font-semibold mb-2">{thread.subjectOriginal}</h3>
+        <Card key={thread.id} className="p-3 sm:p-4">
+          <h3 className="font-semibold mb-2 text-sm sm:text-base break-words">{thread.subjectOriginal}</h3>
           <div className="space-y-3">
             {thread.messages.map((message: any) => (
-              <div key={message.id} className="border-l-2 pl-4">
-                <div className="flex justify-between mb-1">
-                  <div>
-                    <strong>{message.from}</strong>
-                    <Badge variant={message.direction === "INBOUND" ? "default" : "secondary"} className="ml-2">
+              <div key={message.id} className="border-l-2 pl-2 sm:pl-4">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-0 mb-1">
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                    <strong className="text-xs sm:text-sm break-all">{message.from}</strong>
+                    <Badge variant={message.direction === "INBOUND" ? "default" : "secondary"} className="text-xs shrink-0">
                       {message.direction}
                     </Badge>
                   </div>
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-xs sm:text-sm text-muted-foreground shrink-0">
                     {new Date(message.date).toLocaleString()}
                   </span>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{message.bodyText || ""}</p>
+                <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{message.bodyText || ""}</p>
                 {message.attachments && message.attachments.length > 0 && (
-                  <div className="mt-2 text-sm text-muted-foreground">
-                    {message.attachments.length} attachment(s)
+                  <div className="mt-2 space-y-1">
+                    <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">
+                      {message.attachments.length} attachment(s):
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                      {message.attachments.map((attachment: any, attIndex: number) => {
+                        const allAttachments = claim.emailThreads?.flatMap((t: any) => 
+                          t.messages?.flatMap((m: any) => m.attachments || []) || []
+                        ) || [];
+                        const globalIndex = allAttachments.findIndex((a: any) => 
+                          a.id === attachment.id
+                        );
+                        
+                        const isImage = attachment.mimeType?.startsWith("image/") || 
+                                       /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(attachment.fileName || "");
+                        const isPdf = attachment.mimeType?.includes("pdf") || 
+                                     /\.pdf$/i.test(attachment.fileName || "");
+                        
+                        const fileName = attachment.fileName || `Attachment ${attIndex + 1}`;
+                        const truncatedFileName = fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName;
+                        
+                        return (
+                          <Button
+                            key={attachment.id}
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-auto py-1.5 px-2 sm:px-3"
+                            onClick={() => {
+                              setViewerIndex(globalIndex >= 0 ? globalIndex : 0);
+                              setViewerOpen(true);
+                            }}
+                            title={fileName}
+                          >
+                            {isImage ? (
+                              <ImageIcon className="h-3 w-3 mr-1 shrink-0" />
+                            ) : isPdf ? (
+                              <FileText className="h-3 w-3 mr-1 shrink-0" />
+                            ) : (
+                              <Paperclip className="h-3 w-3 mr-1 shrink-0" />
+                            )}
+                            <span className="truncate max-w-[120px] sm:max-w-none">{truncatedFileName}</span>
+                          </Button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -258,9 +304,9 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       )}
 
       {!isReadOnly && (
-      <Card className="p-4">
-        <h3 className="font-semibold mb-4">Send Reply</h3>
-        <div className="space-y-4">
+      <Card className="p-3 sm:p-4">
+        <h3 className="font-semibold mb-4 text-sm sm:text-base">Send Reply</h3>
+        <div className="space-y-3 sm:space-y-4">
           <div>
             <Label>To</Label>
             <Input
@@ -292,7 +338,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           </div>
 
           <div>
-            <Label>Attachments</Label>
+            <Label htmlFor="file-upload">Attachments</Label>
             <div className="mt-2">
               <Input
                 type="file"
@@ -301,6 +347,8 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                 disabled={uploading}
                 className="hidden"
                 id="file-upload"
+                aria-label="Upload files"
+                title="Upload files"
               />
               <Button
                 type="button"
@@ -338,16 +386,17 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
             </div>
           </div>
 
-          <div className="flex items-center gap-4 pt-2 border-t">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 pt-2 border-t">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="accepted"
+                aria-label="Prihvaćeno"
                 checked={claimAcceptanceStatus === "ACCEPTED"}
                 onChange={() => handleAcceptanceStatusChange("ACCEPTED")}
                 className="h-4 w-4"
               />
-              <Label htmlFor="accepted" className="cursor-pointer font-normal">
+              <Label htmlFor="accepted" className="cursor-pointer font-normal text-sm">
                 Prihvaćeno
               </Label>
             </div>
@@ -355,11 +404,12 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
               <input
                 type="checkbox"
                 id="rejected"
+                aria-label="Odbijeno"
                 checked={claimAcceptanceStatus === "REJECTED"}
                 onChange={() => handleAcceptanceStatusChange("REJECTED")}
                 className="h-4 w-4"
               />
-              <Label htmlFor="rejected" className="cursor-pointer font-normal">
+              <Label htmlFor="rejected" className="cursor-pointer font-normal text-sm">
                 Odbijeno
               </Label>
             </div>
@@ -371,6 +421,23 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         </div>
       </Card>
       )}
+
+      <FileViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        files={(claim.emailThreads || [])
+          .flatMap((thread: any) => 
+            (thread.messages || []).flatMap((message: any) => 
+              (message.attachments || []).map((attachment: any) => ({
+                id: attachment.id,
+                url: `/api/files/${attachment.id}`,
+                fileName: attachment.fileName || `Attachment ${attachment.id}`,
+                mimeType: attachment.mimeType,
+              }))
+            )
+          )}
+        initialIndex={viewerIndex}
+      />
     </div>
   );
 }

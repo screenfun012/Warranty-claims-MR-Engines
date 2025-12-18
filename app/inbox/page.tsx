@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -160,85 +160,90 @@ export default function InboxPage() {
             }}
           />
         ) : (
-          <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Original Sender</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Linked Claim</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {threads.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
-                      No email threads found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  threads.map((thread) => {
-                    const lastMessage = thread.messages[thread.messages.length - 1];
-                    const isUnread = !thread.viewedAt;
-                    return (
-                      <TableRow key={thread.id} className={isUnread ? "font-bold" : ""}>
-                        <TableCell>
-                          {lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-"}
-                        </TableCell>
-                        <TableCell>{thread.originalSender || "-"}</TableCell>
-                        <TableCell>{thread.subjectOriginal}</TableCell>
-                        <TableCell>
-                          {thread.claim ? (
-                            <Badge 
-                              variant="secondary"
-                              className="cursor-pointer"
-                              onClick={() => router.push(`/claims/${thread.claim!.id}`)}
-                            >
-                              {thread.claim.claimCodeRaw || "View Claim"}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">Unassigned</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={async () => {
-                              // Mark thread as viewed when opened
-                              if (!thread.viewedAt) {
-                                try {
-                                  const res = await fetch(`/api/inbox/${thread.id}/mark-viewed`, {
-                                    method: "POST",
-                                  });
-                                  if (res.ok) {
-                                    // Update thread in local state immediately
-                                    setThreads(prevThreads => 
-                                      prevThreads.map(t => 
-                                        t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
-                                      )
-                                    );
-                                    // Trigger sidebar refresh
-                                    window.dispatchEvent(new Event('inbox-updated'));
-                                  }
-                                } catch (error) {
-                                  console.error("Error marking thread as viewed:", error);
-                                }
-                              }
-                              setSelectedThread(thread);
-                            }}
-                          >
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
+          <Card className="p-4">
+            <ResponsiveTable
+              headers={[
+                { key: "date", label: "Date" },
+                { key: "sender", label: "Original Sender" },
+                { key: "subject", label: "Subject" },
+                { key: "claim", label: "Linked Claim" },
+                { key: "actions", label: "Actions" },
+              ]}
+              data={threads.map((thread) => {
+                const lastMessage = thread.messages[thread.messages.length - 1];
+                const isUnread = !thread.viewedAt;
+                return {
+                  date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
+                  sender: <span className={isUnread ? "font-bold" : ""}>{thread.originalSender || "-"}</span>,
+                  subject: <span className={isUnread ? "font-bold" : ""}>{thread.subjectOriginal}</span>,
+                  claim: thread.claim ? (
+                    <Badge 
+                      variant="secondary"
+                      className="cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        router.push(`/claims/${thread.claim!.id}`);
+                      }}
+                    >
+                      {thread.claim.claimCodeRaw || "View Claim"}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Unassigned</Badge>
+                  ),
+                  actions: (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        // Mark thread as viewed when opened
+                        if (!thread.viewedAt) {
+                          try {
+                            const res = await fetch(`/api/inbox/${thread.id}/mark-viewed`, {
+                              method: "POST",
+                            });
+                            if (res.ok) {
+                              // Update thread in local state immediately
+                              setThreads(prevThreads => 
+                                prevThreads.map(t => 
+                                  t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
+                                )
+                              );
+                              // Trigger sidebar refresh
+                              window.dispatchEvent(new Event('inbox-updated'));
+                            }
+                          } catch (error) {
+                            console.error("Error marking thread as viewed:", error);
+                          }
+                        }
+                        setSelectedThread(thread);
+                      }}
+                    >
+                      View
+                    </Button>
+                  ),
+                };
+              })}
+              emptyMessage="No email threads found"
+              onRowClick={(row, index) => {
+                const thread = threads[index];
+                if (!thread.viewedAt) {
+                  fetch(`/api/inbox/${thread.id}/mark-viewed`, {
+                    method: "POST",
+                  }).then((res) => {
+                    if (res.ok) {
+                      setThreads(prevThreads => 
+                        prevThreads.map(t => 
+                          t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
+                        )
+                      );
+                      window.dispatchEvent(new Event('inbox-updated'));
+                    }
+                  }).catch(console.error);
+                }
+                setSelectedThread(thread);
+              }}
+            />
           </Card>
         )}
       </div>

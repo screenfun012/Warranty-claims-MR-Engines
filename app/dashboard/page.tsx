@@ -152,52 +152,62 @@ export default function DashboardPage() {
       {/* Main Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col h-full">
+            <div className="h-10 mb-4">
               <p className="text-sm font-medium text-muted-foreground">Ukupno reklamacija</p>
-              <p className="text-3xl font-bold mt-2">{stats.totalClaims}</p>
             </div>
-            <FileText className="h-8 w-8 text-muted-foreground" />
+            <div className="flex items-end justify-between flex-1">
+              <p className="text-3xl font-bold">{stats.totalClaims}</p>
+              <FileText className="h-8 w-8 text-muted-foreground" />
+            </div>
           </div>
         </Card>
 
         <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col h-full">
+            <div className="h-10 mb-4">
               <p className="text-sm font-medium text-muted-foreground">Rešene reklamacije</p>
-              <p className="text-3xl font-bold mt-2">{stats.resolvedCount}</p>
             </div>
-            <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="flex items-end justify-between flex-1">
+              <p className="text-3xl font-bold">{stats.resolvedCount}</p>
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
           </div>
         </Card>
 
         <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col h-full">
+            <div className="h-10 mb-4">
               <p className="text-sm font-medium text-muted-foreground">Prihvaćene reklamacije</p>
-              <p className="text-3xl font-bold mt-2">{stats.approvedCount}</p>
             </div>
-            <CheckCircle className="h-8 w-8 text-blue-600" />
+            <div className="flex items-end justify-between flex-1">
+              <p className="text-3xl font-bold">{stats.approvedCount}</p>
+              <CheckCircle className="h-8 w-8 text-blue-600" />
+            </div>
           </div>
         </Card>
 
         <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col h-full">
+            <div className="h-10 mb-4">
               <p className="text-sm font-medium text-muted-foreground">Odbijene reklamacije</p>
-              <p className="text-3xl font-bold mt-2">{stats.rejectedCount}</p>
             </div>
-            <XCircle className="h-8 w-8 text-red-600" />
+            <div className="flex items-end justify-between flex-1">
+              <p className="text-3xl font-bold">{stats.rejectedCount}</p>
+              <XCircle className="h-8 w-8 text-red-600" />
+            </div>
           </div>
         </Card>
 
         <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="flex flex-col h-full">
+            <div className="h-10 mb-4">
               <p className="text-sm font-medium text-muted-foreground">U procesu</p>
-              <p className="text-3xl font-bold mt-2">{stats.inProcessCount}</p>
             </div>
-            <Clock className="h-8 w-8 text-yellow-600" />
+            <div className="flex items-end justify-between flex-1">
+              <p className="text-3xl font-bold">{stats.inProcessCount}</p>
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
           </div>
         </Card>
       </div>
