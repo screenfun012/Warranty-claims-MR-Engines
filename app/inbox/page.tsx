@@ -7,6 +7,9 @@ import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Progress } from "@/components/ui/progress";
+import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -68,6 +71,7 @@ export default function InboxPage() {
   const [threads, setThreads] = useState<EmailThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [syncProgress, setSyncProgress] = useState(0);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
 
   useEffect(() => {
@@ -103,23 +107,46 @@ export default function InboxPage() {
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncProgress(0);
+    
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setSyncProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
     try {
       const res = await fetch("/api/admin/mail/sync-now", { method: "POST" });
       if (!res.ok) {
         const text = await res.text();
         console.error("Sync API error:", res.status, text);
+        clearInterval(progressInterval);
+        setSyncProgress(0);
         alert(`Sync failed: ${res.status} ${text.substring(0, 100)}`);
         return;
       }
       const data = await res.json();
-      if (data.success) {
-        alert(`Synced: ${data.newMessages} new messages, ${data.newThreads} new threads`);
-        fetchThreads();
-      } else {
-        alert("Sync failed: " + data.error);
-      }
+      clearInterval(progressInterval);
+      setSyncProgress(100);
+      
+      setTimeout(() => {
+        if (data.success) {
+          alert(`Synced: ${data.newMessages} new messages, ${data.newThreads} new threads`);
+          fetchThreads();
+        } else {
+          alert("Sync failed: " + data.error);
+        }
+        setSyncProgress(0);
+      }, 500);
     } catch (error) {
       console.error("Error syncing:", error);
+      clearInterval(progressInterval);
+      setSyncProgress(0);
       alert("Sync failed: " + (error instanceof Error ? error.message : "Unknown error"));
     } finally {
       setSyncing(false);
@@ -129,7 +156,20 @@ export default function InboxPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <p>Loading...</p>
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-10 w-40" />
+        </div>
+        <Card className="p-4">
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     );
   }
@@ -138,9 +178,21 @@ export default function InboxPage() {
     <div className="p-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Inbox</h1>
-          <Button onClick={handleSync} disabled={syncing}>
+          <Button 
+            onClick={handleSync} 
+            disabled={syncing} 
+            className="bg-primary hover:bg-primary/90 relative overflow-hidden"
+          >
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            Sync emails now
+            {syncing ? "Sinhronizacija..." : "Sync emails now"}
+            {syncing && syncProgress > 0 && (
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-foreground/20">
+                <div 
+                  className="h-full bg-primary-foreground/40 transition-all duration-300"
+                  style={{ width: `${syncProgress}%` }}
+                />
+              </div>
+            )}
           </Button>
         </div>
 
@@ -160,7 +212,7 @@ export default function InboxPage() {
             }}
           />
         ) : (
-          <Card className="p-4">
+          <Card className="p-4 hover:shadow-md transition-shadow">
             <ResponsiveTable
               headers={[
                 { key: "date", label: "Date" },
@@ -172,10 +224,32 @@ export default function InboxPage() {
               data={threads.map((thread) => {
                 const lastMessage = thread.messages[thread.messages.length - 1];
                 const isUnread = !thread.viewedAt;
+                const isUnassigned = !thread.claimId; // Novo samo ako nije povezan sa claim-om
+                const showNewBadge = isUnassigned && isUnread;
                 return {
                   date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
-                  sender: <span className={isUnread ? "font-bold" : ""}>{thread.originalSender || "-"}</span>,
-                  subject: <span className={isUnread ? "font-bold" : ""}>{thread.subjectOriginal}</span>,
+                  sender: (
+                    <div className="flex items-center gap-2">
+                      {isUnread && (
+                        <div className="h-2 w-2 bg-primary rounded-full animate-pulse shrink-0" />
+                      )}
+                      <span className={isUnread ? "font-bold" : ""}>
+                        {thread.originalSender || "-"}
+                      </span>
+                    </div>
+                  ),
+                  subject: (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={isUnread ? "font-bold truncate" : "truncate"}>
+                        {thread.subjectOriginal}
+                      </span>
+                      {showNewBadge && (
+                        <Badge variant="destructive" className="shrink-0 animate-pulse">
+                          Novo
+                        </Badge>
+                      )}
+                    </div>
+                  ),
                   claim: thread.claim ? (
                     <Badge 
                       variant="secondary"
@@ -451,7 +525,9 @@ function ThreadDetail({
         <Button onClick={onBack} variant="ghost" className="mb-4">
           ← Back
         </Button>
-        <p>Loading thread...</p>
+        <div className="flex items-center justify-center min-h-[300px]">
+          <Spinner size="lg" text="Učitavanje email thread-a..." />
+        </div>
       </div>
     );
   }
@@ -462,7 +538,7 @@ function ThreadDetail({
         ← Back
       </Button>
       
-      <Card className="p-6 mb-4">
+      <Card className="p-6 mb-4 hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold">{fullThread.subjectOriginal}</h2>
           {fullThread.claim && (
@@ -492,7 +568,7 @@ function ThreadDetail({
         </div>
 
         {showCreateClaim && (
-          <Card className="p-4 mb-4 bg-muted">
+          <Card className="p-4 mb-4 bg-muted/50 border border-border">
             <p className="mb-2">Create a new claim from this email thread?</p>
             <div className="flex gap-2">
               <Button onClick={handleCreateClaim} size="sm">Yes, Create Claim</Button>
@@ -502,7 +578,7 @@ function ThreadDetail({
         )}
 
         {showLinkClaim && (
-          <Card className="p-4 mb-4 bg-muted">
+          <Card className="p-4 mb-4 bg-muted/50 border border-border">
             <Label className="mb-2 block">Select claim to link:</Label>
             <Select onValueChange={handleLinkClaim}>
               <SelectTrigger>
@@ -525,8 +601,15 @@ function ThreadDetail({
       </Card>
 
       <div className="space-y-4">
-        {fullThread.messages.map((message) => (
-          <Card key={message.id} className="p-4">
+        {fullThread.messages.map((message, index) => (
+          <Card 
+            key={message.id} 
+            className={`p-4 hover:shadow-md transition-all ${
+              index === fullThread.messages.length - 1 && !fullThread.viewedAt
+                ? "bg-primary/5 border-l-2 border-l-primary animate-in fade-in slide-in-from-left-2"
+                : ""
+            }`}
+          >
             <div className="flex justify-between mb-2">
               <div>
                 <strong>From:</strong> {message.from}
@@ -558,7 +641,7 @@ function ThreadDetail({
               )}
             </div>
             {message.attachments && message.attachments.length > 0 && (
-              <div className="mt-4 border-t pt-4">
+              <div className="mt-4 pt-4">
                 <h4 className="font-semibold mb-4 flex items-center gap-2">
                   <Paperclip className="h-4 w-4" />
                   Attachments ({message.attachments.length})

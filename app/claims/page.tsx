@@ -8,7 +8,9 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckCircle2, Loader2, XCircle, Circle } from "lucide-react";
+import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { StatusSpinner } from "@/components/ui/status-spinner";
 
 interface Claim {
   id: string;
@@ -35,11 +37,11 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
   const getIcon = () => {
     switch (status) {
       case "NEW":
-        return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400" />;
+        return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400 animate-pulse" />;
       case "IN_ANALYSIS":
-        return <Loader2 className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 animate-spin" />;
+        return <StatusSpinner color="amber" />;
       case "WAITING_CUSTOMER":
-        return <Loader2 className="h-3.5 w-3.5 text-yellow-500 dark:text-yellow-400 animate-spin" />;
+        return <StatusSpinner color="yellow" />;
       case "CLOSED":
       case "APPROVED":
         return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 dark:text-green-400 fill-green-500 dark:fill-green-400" />;
@@ -59,11 +61,29 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
     return null;
   };
 
+  const getStatusColor = () => {
+    switch (status) {
+      case "NEW":
+        return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20";
+      case "IN_ANALYSIS":
+        return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
+      case "WAITING_CUSTOMER":
+        return "border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20";
+      case "CLOSED":
+      case "APPROVED":
+        return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20";
+      case "REJECTED":
+        return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20";
+      default:
+        return "border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800";
+    }
+  };
+
   return (
     <div className="flex items-center gap-2">
       <Badge 
         variant="outline" 
-        className="bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md"
+        className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
       >
         {getIcon()}
         <span className="text-sm font-medium">
@@ -71,7 +91,11 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
         </span>
       </Badge>
       {acceptanceStatus && (acceptanceStatus === "ACCEPTED" || acceptanceStatus === "REJECTED") && (
-        <div className="flex items-center gap-1 px-2 py-0.5 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
+        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all ${
+          acceptanceStatus === "ACCEPTED" 
+            ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+            : "bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+        }`}>
           {getAcceptanceIcon()}
           <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
             {acceptanceStatus === "ACCEPTED" ? "Prihvaćeno" : "Odbijeno"}
@@ -170,27 +194,53 @@ export default function ClaimsPage() {
   if (loading) {
     return (
       <div className="p-8">
-        <p>Loading...</p>
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-9 w-32" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+        <Card className="p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i}>
+                <Skeleton className="h-4 w-20 mb-2" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </div>
+        </Card>
+        <Card className="p-4">
+          <Skeleton className="h-96 w-full" />
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Claims</h1>
-        <Button onClick={() => router.push("/claims/new")}>
+      <div className="flex items-center justify-between mb-6 animate-in fade-in slide-in-from-top-2">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+            Claims
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Upravljanje svim reklamacijama
+          </p>
+        </div>
+        <Button 
+          onClick={() => router.push("/claims/new")} 
+          className="bg-primary hover:bg-primary/90 transition-all hover:shadow-lg animate-in fade-in slide-in-from-right-4"
+        >
           <Plus className="h-4 w-4 mr-2" />
           New claim
         </Button>
       </div>
 
-      <Card className="p-4 mb-6">
+      <Card className="p-4 mb-6 hover:shadow-md transition-all border border-border animate-in fade-in slide-in-from-top-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
+          <div className="animate-in fade-in slide-in-from-left-4" style={{ animationDelay: "0ms" }}>
             <label className="text-sm font-medium mb-2 block">Status</label>
             <Select value={filters.status || undefined} onValueChange={(value) => setFilters({ ...filters, status: value || "" })}>
-              <SelectTrigger>
+              <SelectTrigger className="transition-all hover:border-primary/50 focus:border-primary">
                 <SelectValue placeholder="All statuses" />
               </SelectTrigger>
               <SelectContent>
@@ -203,26 +253,45 @@ export default function ClaimsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Claim Code</label>
+          <div className="animate-in fade-in slide-in-from-left-4" style={{ animationDelay: "100ms" }}>
+            <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              Claim Code
+            </label>
             <Input
               placeholder="Search by claim code"
               value={textFilters.claimCode}
               onChange={handleClaimCodeChange}
+              className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Customer</label>
+          <div className="animate-in fade-in slide-in-from-left-4" style={{ animationDelay: "200ms" }}>
+            <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+              <Search className="h-3.5 w-3.5 text-muted-foreground" />
+              Customer
+            </label>
             <Input
               placeholder="Pretraži po imenu klijenta"
               value={textFilters.customerId}
               onChange={handleCustomerIdChange}
+              className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
         </div>
       </Card>
 
-      <Card className="p-4">
+      <Card className="p-4 hover:shadow-md transition-all border border-border animate-in fade-in slide-in-from-bottom-4 overflow-hidden">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            <h2 className="text-lg font-semibold">Lista reklamacija</h2>
+            {claims.length > 0 && (
+              <Badge variant="secondary" className="ml-2">
+                {claims.length} {claims.length === 1 ? "reklamacija" : "reklamacija"}
+              </Badge>
+            )}
+          </div>
+        </div>
         <ResponsiveTable
           headers={[
             { key: "claimCode", label: "Claim Code" },
@@ -234,17 +303,43 @@ export default function ClaimsPage() {
             { key: "assignedTo", label: "Assigned To" },
             { key: "created", label: "Created" },
           ]}
-          data={claims.map((claim) => ({
-            claimCode: <span className="font-medium">{claim.claimCodeRaw || "Unassigned"}</span>,
-            prefix: claim.claimPrefix || "-",
+          data={claims.map((claim, index) => ({
+            claimCode: (
+              <span className="font-medium transition-colors group-hover:text-primary">
+                {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
+              </span>
+            ),
+            prefix: <span className="text-muted-foreground">{claim.claimPrefix || "-"}</span>,
             status: <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />,
-            customer: claim.customer?.name || "-",
-            engineType: claim.engineType || "-",
-            engineCode: claim.mrEngineCode || "-",
-            assignedTo: claim.assignedTo?.fullName || "-",
-            created: new Date(claim.createdAt).toLocaleDateString(),
+            customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.name || "-"}</span>,
+            engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
+            engineCode: <span className="text-muted-foreground font-mono text-xs">{claim.mrEngineCode || "-"}</span>,
+            assignedTo: <span className="text-muted-foreground">{claim.assignedTo?.fullName || "-"}</span>,
+            created: (
+              <span className="text-muted-foreground text-xs">
+                {new Date(claim.createdAt).toLocaleDateString()}
+              </span>
+            ),
           }))}
-          emptyMessage="No claims found"
+          emptyMessage={
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="p-4 bg-muted/50 rounded-full mb-4 animate-pulse">
+                <FileText className="h-12 w-12 text-muted-foreground" />
+              </div>
+              <p className="text-lg font-semibold mb-2">No claims found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Try adjusting your filters or create a new claim
+              </p>
+              <Button 
+                onClick={() => router.push("/claims/new")} 
+                variant="outline"
+                className="mt-2"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Claim
+              </Button>
+            </div>
+          }
           onRowClick={(row, index) => router.push(`/claims/${claims[index].id}`)}
         />
       </Card>

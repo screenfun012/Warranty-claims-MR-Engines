@@ -68,11 +68,11 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
   return (
     <div className="space-y-4">
       {Object.entries(sectionsByType).map(([type, sections]: [string, any]) => (
-        <Card key={type} className="p-4">
+        <Card key={type} className="p-4 hover:shadow-md transition-shadow">
           <h3 className="font-semibold mb-4">{type}</h3>
           <div className="space-y-4">
             {sections.map((section: any, index: number) => (
-              <div key={section.id} className="border-l-2 pl-4 space-y-4">
+              <div key={section.id} className="pl-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <Label>Zapazanje {index + 1}</Label>
                   <div className="flex items-center gap-2">

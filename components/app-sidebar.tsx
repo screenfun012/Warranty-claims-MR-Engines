@@ -16,6 +16,12 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
@@ -26,6 +32,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const navigation = [
@@ -39,6 +46,8 @@ export function AppSidebar() {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
 
   useEffect(() => {
     // Check current theme
@@ -89,14 +98,20 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="flex items-center justify-center border-b px-3 py-3 bg-background">
-        <Link href="/" className="flex items-center justify-center w-full h-full min-h-[80px]">
+      <SidebarHeader className="flex items-center justify-center border-b px-3 py-3 bg-background transition-all duration-200">
+        <Link 
+          href="/" 
+          className="flex items-center justify-center w-full h-full min-h-[80px] group/logo transition-all duration-200 hover:opacity-80"
+        >
           <Image
             src={theme === "dark" ? "/images/mr-engines-logo-light.png" : "/images/mr-engines-logo-dark.png"}
             alt="MR Engines"
             width={200}
             height={200}
-            className="w-[80%] h-auto max-h-[80px] object-contain transition-opacity duration-200"
+            className={cn(
+              "h-auto max-h-[80px] object-contain transition-all duration-300",
+              isCollapsed ? "w-12 max-h-[48px]" : "w-[80%]"
+            )}
             quality={100}
             priority
             unoptimized={false}
@@ -105,37 +120,96 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className={cn(
+            "transition-opacity duration-200",
+            isCollapsed && "opacity-0 h-0 overflow-hidden"
+          )}>
+            Navigation
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navigation.map((item) => {
-                const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
-                const showBadge = item.showBadge && unreadCount > 0;
-                
-                return (
-                  <SidebarMenuItem key={item.name}>
-                    <SidebarMenuButton asChild isActive={isActive}>
-                      <Link href={item.href} className="flex items-center gap-3">
-                        <item.icon className="h-5 w-5" />
-                        <span>{item.name}</span>
+              <TooltipProvider delayDuration={0}>
+                {navigation.map((item) => {
+                  const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+                  const showBadge = item.showBadge && unreadCount > 0;
+                  
+                  const menuButton = (
+                    <SidebarMenuButton asChild isActive={isActive} className="transition-all duration-200 hover:bg-sidebar-accent/80">
+                      <Link href={item.href} className="flex items-center gap-3 group/item">
+                        <item.icon className={cn(
+                          "h-5 w-5 transition-all duration-200 flex-shrink-0",
+                          isActive && "scale-110"
+                        )} />
+                        <span className={cn(
+                          "transition-all duration-200",
+                          isCollapsed && "opacity-0 w-0 overflow-hidden"
+                        )}>
+                          {item.name}
+                        </span>
                         {showBadge && (
-                          <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
+                          <Badge 
+                            variant="destructive" 
+                            className={cn(
+                              "ml-auto h-5 min-w-5 px-1.5 text-xs transition-all duration-200 animate-in fade-in zoom-in",
+                              isCollapsed && "opacity-0 w-0 overflow-hidden"
+                            )}
+                          >
                             {unreadCount > 99 ? "99+" : unreadCount}
                           </Badge>
                         )}
                       </Link>
                     </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
+                  );
+
+                  if (isCollapsed) {
+                    return (
+                      <Tooltip key={item.name}>
+                        <TooltipTrigger asChild>
+                          <SidebarMenuItem>
+                            {menuButton}
+                          </SidebarMenuItem>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="flex items-center gap-2">
+                          <span>{item.name}</span>
+                          {showBadge && (
+                            <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
+                              {unreadCount > 99 ? "99+" : unreadCount}
+                            </Badge>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+
+                  return (
+                    <SidebarMenuItem key={item.name}>
+                      {menuButton}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </TooltipProvider>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t px-2 py-2 flex items-center justify-center">
-        <div className="opacity-70 hover:opacity-100 transition-opacity">
-          <ThemeToggle />
-        </div>
+      <SidebarFooter className="border-t px-2 py-2 flex items-center justify-center transition-all duration-200">
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className={cn(
+                "opacity-70 hover:opacity-100 transition-all duration-200",
+                isCollapsed && "w-full"
+              )}>
+                <ThemeToggle />
+              </div>
+            </TooltipTrigger>
+            {isCollapsed && (
+              <TooltipContent side="right">
+                <span>Promeni temu</span>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </SidebarFooter>
     </Sidebar>
   );

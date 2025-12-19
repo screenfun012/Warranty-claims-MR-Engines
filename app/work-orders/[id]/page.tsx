@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 
 interface WorkOrder {
   id: string;
@@ -70,8 +71,8 @@ export default function WorkOrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <p>Loading...</p>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" text="Učitavanje work order-a..." />
       </div>
     );
   }

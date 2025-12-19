@@ -12,6 +12,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search } from "lucide-react";
+import { Spinner } from "@/components/ui/spinner";
+import { StatusSpinner } from "@/components/ui/status-spinner";
 
 // This is a large component - importing sub-components
 import { ClaimMetadata } from "./ClaimMetadata";
@@ -46,17 +48,17 @@ interface Claim {
   reportSections: any[];
 }
 
-// Status badge component with icons - styled like the image
+// Status badge component with icons - styled like the table
 // Text is neutral gray, icons are colored and animated
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceStatus?: string | null }) => {
   const getIcon = () => {
     switch (status) {
       case "NEW":
-        return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400" />;
+        return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400 animate-pulse" />;
       case "IN_ANALYSIS":
-        return <Loader2 className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 animate-spin" />;
+        return <StatusSpinner color="amber" />;
       case "WAITING_CUSTOMER":
-        return <Loader2 className="h-3.5 w-3.5 text-yellow-500 dark:text-yellow-400 animate-spin" />;
+        return <StatusSpinner color="yellow" />;
       case "CLOSED":
       case "APPROVED":
         return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 dark:text-green-400 fill-green-500 dark:fill-green-400" />;
@@ -67,16 +69,57 @@ const StatusBadge = ({ status }: { status: string }) => {
     }
   };
 
+  const getAcceptanceIcon = () => {
+    if (acceptanceStatus === "ACCEPTED") {
+      return <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />;
+    } else if (acceptanceStatus === "REJECTED") {
+      return <XCircle className="h-3 w-3 text-red-600 dark:text-red-400 fill-red-600 dark:fill-red-400" />;
+    }
+    return null;
+  };
+
+  const getStatusColor = () => {
+    switch (status) {
+      case "NEW":
+        return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20";
+      case "IN_ANALYSIS":
+        return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
+      case "WAITING_CUSTOMER":
+        return "border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20";
+      case "CLOSED":
+      case "APPROVED":
+        return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20";
+      case "REJECTED":
+        return "border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20";
+      default:
+        return "border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800";
+    }
+  };
+
   return (
-    <Badge 
-      variant="outline" 
-      className="bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md"
-    >
-      {getIcon()}
-      <span className="text-sm font-medium">
-        {statusLabels[status] || status}
-      </span>
-    </Badge>
+    <div className="flex items-center gap-2">
+      <Badge 
+        variant="outline" 
+        className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
+      >
+        {getIcon()}
+        <span className="text-sm font-medium">
+          {statusLabels[status] || status}
+        </span>
+      </Badge>
+      {acceptanceStatus && (acceptanceStatus === "ACCEPTED" || acceptanceStatus === "REJECTED") && (
+        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all ${
+          acceptanceStatus === "ACCEPTED" 
+            ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
+            : "bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
+        }`}>
+          {getAcceptanceIcon()}
+          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+            {acceptanceStatus === "ACCEPTED" ? "Prihvaćeno" : "Odbijeno"}
+          </span>
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -272,8 +315,8 @@ export default function ClaimDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <p>Loading...</p>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" text="Učitavanje reklamacije..." />
       </div>
     );
   }
@@ -287,112 +330,98 @@ export default function ClaimDetailPage() {
   }
 
   return (
-    <div className="p-4 sm:p-8">
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1">
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
+    <div className="p-4 space-y-4">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-xl font-bold truncate">
               {claim.claimCodeRaw || "Unassigned Claim"}
             </h1>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <StatusBadge status={claim.status} />
-              {(() => {
-                console.log('[Header] Rendering. claimAcceptanceStatus:', claim.claimAcceptanceStatus);
-                return claim.claimAcceptanceStatus && (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED") && (
-                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-800">
-                    {claim.claimAcceptanceStatus === "ACCEPTED" ? (
-                      <>
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Prihvaćeno</span>
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="h-3.5 w-3.5 text-red-600 dark:text-red-400 fill-red-600 dark:fill-red-400" />
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Odbijeno</span>
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
-            </div>
+            <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:shrink-0">
+          {claim.customer?.name && (
+            <p className="text-sm text-muted-foreground truncate">{claim.customer.name}</p>
+          )}
+        </div>
+        <div className="flex gap-2 shrink-0">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => router.push("/claims")}
+            className="h-8"
+          >
+            ← Nazad
+          </Button>
+          {claim.status === "CLOSED" && (
             <Button 
-              variant="outline" 
-              onClick={() => router.push("/claims")}
-              className="w-full sm:w-auto"
+              variant="destructive" 
+              size="sm"
+              onClick={async () => {
+                if (!confirm("Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna.")) {
+                  return;
+                }
+                alert("Brisanje reklamacija je trenutno onemogućeno. Kontaktirajte super admin-a.");
+              }}
+              className="h-8"
             >
-              Back to Claims
+              Obriši
             </Button>
-            {/* TODO: Add super admin check - only show delete button for super admin */}
-            {claim.status === "CLOSED" && (
-              <Button 
-                variant="destructive" 
-                onClick={async () => {
-                  if (!confirm("Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna.")) {
-                    return;
-                  }
-                  // TODO: Add API call to delete claim (only for super admin)
-                  alert("Brisanje reklamacija je trenutno onemogućeno. Kontaktirajte super admin-a.");
-                }}
-                className="w-full sm:w-auto"
-              >
-                Delete Claim
-              </Button>
-            )}
-          </div>
+          )}
         </div>
       </div>
 
+      {/* Compact Info Banner */}
       {claim.status === "CLOSED" && (
-        <Card className="p-4 mb-6 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-700 dark:text-blue-300">
-            <strong>Ova reklamacija je završena.</strong> Svi podaci su read-only i ne mogu se menjati.
+        <Card className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+          <p className="text-xs text-blue-700 dark:text-blue-300">
+            <strong>Završena reklamacija.</strong> Svi podaci su read-only.
           </p>
         </Card>
       )}
       
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-1">
           <ClaimMetadata claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
         </div>
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="flex flex-wrap w-full gap-1 sm:grid sm:grid-cols-5">
-              <TabsTrigger value="overview" className="flex-1 sm:flex-none px-2 sm:px-3" title="Overview">
-                <LayoutDashboard className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline text-xs sm:text-sm">Overview</span>
+            <TabsList className="grid grid-cols-5 w-full h-10">
+              <TabsTrigger value="overview" className="text-xs px-2">
+                <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Overview</span>
               </TabsTrigger>
-              <TabsTrigger value="emails" className="flex-1 sm:flex-none px-2 sm:px-3" title="Emails">
-                <Mail className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline text-xs sm:text-sm">Emails</span>
+              <TabsTrigger value="emails" className="text-xs px-2">
+                <Mail className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Emails</span>
               </TabsTrigger>
-              <TabsTrigger value="documents" className="flex-1 sm:flex-none px-2 sm:px-3" title="Documents">
-                <FileText className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline text-xs sm:text-sm">Documents</span>
+              <TabsTrigger value="documents" className="text-xs px-2">
+                <FileText className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Docs</span>
               </TabsTrigger>
-              <TabsTrigger value="findings" className="flex-1 sm:flex-none px-2 sm:px-3" title="Findings">
-                <Search className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline text-xs sm:text-sm">Findings</span>
+              <TabsTrigger value="findings" className="text-xs px-2">
+                <Search className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Findings</span>
               </TabsTrigger>
-              <TabsTrigger value="photos" className="flex-1 sm:flex-none px-2 sm:px-3" title="Photos">
-                <ImageIcon className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline text-xs sm:text-sm">Photos</span>
+              <TabsTrigger value="photos" className="text-xs px-2">
+                <ImageIcon className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Photos</span>
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="overview">
+            <TabsContent value="overview" className="mt-4">
               <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
-            <TabsContent value="emails">
+            <TabsContent value="emails" className="mt-4">
               <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
-            <TabsContent value="documents">
+            <TabsContent value="documents" className="mt-4">
               <ClaimClientDocuments claim={claim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
-            <TabsContent value="findings">
+            <TabsContent value="findings" className="mt-4">
               <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
-            <TabsContent value="photos">
+            <TabsContent value="photos" className="mt-4">
               <ClaimPhotos claim={claim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
           </Tabs>

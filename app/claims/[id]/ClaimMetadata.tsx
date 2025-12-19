@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Hash, Building2, Settings, User, FolderOpen, FileCode } from "lucide-react";
 
 interface ClaimMetadataProps {
   claim: any;
@@ -22,45 +23,57 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     setCustomerName(claim.customer?.name || "");
   }, [claim.assignedTo?.fullName, claim.customer?.name]);
   return (
-    <Card className="p-4">
-      <h2 className="text-lg font-semibold mb-4">Metadata</h2>
-      <div className="space-y-4">
+    <Card className="p-4 border border-border">
+      <h2 className="text-sm font-semibold mb-4 text-primary flex items-center gap-2">
+        <Settings className="h-4 w-4" />
+        Metadata
+      </h2>
+      <div className="space-y-3">
         <div>
-          <Label>Claim Code</Label>
+          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+            <Hash className="h-3 w-3 text-muted-foreground" />
+            Claim Code
+          </Label>
           <Input
             value={claim.claimCodeRaw || ""}
             onChange={(e) => {
               if (!isReadOnly) {
                 onUpdate({ 
                   claimCodeRaw: e.target.value,
-                  // Auto-update status from NEW to IN_ANALYSIS when user starts filling metadata
                   ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
                 });
               }
             }}
             placeholder="MR1234/25"
             disabled={isReadOnly}
+            className="h-8 text-sm"
           />
         </div>
         <div>
-          <Label>Prefix</Label>
+          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+            <FileCode className="h-3 w-3 text-muted-foreground" />
+            Prefix
+          </Label>
           <Input 
             value={claim.claimPrefix || ""} 
             onChange={(e) => {
               if (!isReadOnly) {
                 onUpdate({ 
                   claimPrefix: e.target.value,
-                  // Auto-update status from NEW to IN_ANALYSIS when user starts filling metadata
                   ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
                 });
               }
             }}
             placeholder="MR"
             disabled={isReadOnly}
+            className="h-8 text-sm"
           />
         </div>
         <div>
-          <Label>Customer Name</Label>
+          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+            <Building2 className="h-3 w-3 text-muted-foreground" />
+            Customer Name
+          </Label>
           <Input
             value={customerName}
             placeholder="Customer name"
@@ -76,12 +89,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               const currentName = claim.customer?.name || "";
               
               if (newName === currentName) {
-                return; // No change
+                return;
               }
               
-              // Update customer name - if customer exists, update it, otherwise create new
               if (claim.customer?.id) {
-                // Update existing customer
                 try {
                   const res = await fetch(`/api/customers/${claim.customer.id}`, {
                     method: "PATCH",
@@ -90,15 +101,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   });
                   if (res.ok) {
                     const data = await res.json();
-                    // Update claim with new customer data
-                    // Auto-update status from NEW to IN_ANALYSIS when user starts filling metadata
                     onUpdate({ 
                       customerId: data.customer.id,
                       customer: data.customer,
                       ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
                     });
                   } else {
-                    // Revert on error
                     setCustomerName(currentName);
                     alert("Failed to update customer name");
                   }
@@ -108,7 +116,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   alert("Failed to update customer name");
                 }
               } else if (newName.trim()) {
-                // Create new customer and link to claim
                 try {
                   const res = await fetch("/api/customers", {
                     method: "POST",
@@ -120,15 +127,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   });
                   if (res.ok) {
                     const data = await res.json();
-                    // Update claim with new customer ID
-                    // Auto-update status from NEW to IN_ANALYSIS when user starts filling metadata
                     onUpdate({ 
                       customerId: data.customer.id,
                       customer: data.customer,
                       ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
                     });
                   } else {
-                    // Revert on error
                     setCustomerName("");
                     alert("Failed to create customer");
                   }
@@ -138,54 +142,56 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   alert("Failed to create customer");
                 }
               } else {
-                // Empty name, revert
                 setCustomerName("");
               }
             }}
+            className="h-8 text-sm"
           />
         </div>
         <div>
-          <Label>Engine Type</Label>
+          <Label className="text-xs mb-1.5">Engine Type</Label>
           <Input
             value={claim.engineType || ""}
             onChange={(e) => {
               if (!isReadOnly) {
                 onUpdate({ 
                   engineType: e.target.value,
-                  // Auto-update status from NEW to IN_ANALYSIS when user starts filling metadata
                   ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
                 });
               }
             }}
             disabled={isReadOnly}
+            className="h-8 text-sm"
           />
         </div>
         <div>
-          <Label>Engine Code</Label>
+          <Label className="text-xs mb-1.5">Engine Code</Label>
           <Input
             value={claim.mrEngineCode || ""}
             onChange={(e) => {
               if (!isReadOnly) {
                 onUpdate({ 
                   mrEngineCode: e.target.value,
-                  // Auto-update status from NEW to IN_ANALYSIS when user starts filling metadata
                   ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
                 });
               }
             }}
             placeholder="Engine code"
             disabled={isReadOnly}
+            className="h-8 text-sm"
           />
         </div>
         <div>
-          <Label>Assigned To</Label>
+          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+            <User className="h-3 w-3 text-muted-foreground" />
+            Assigned To
+          </Label>
           <Input
             value={assignedToName}
             placeholder="Assigned user"
             disabled={isReadOnly}
             onChange={(e) => {
               if (isReadOnly) return;
-              // Only update local state, don't call onUpdate
               setAssignedToName(e.target.value);
             }}
             onBlur={async (e) => {
@@ -194,10 +200,9 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               const currentName = claim.assignedTo?.fullName || "";
               
               if (newName === currentName) {
-                return; // No change
+                return;
               }
               
-              // Update assignedTo field only on blur
               try {
                 const res = await fetch(`/api/claims/${claim.id}`, {
                   method: "PATCH",
@@ -206,30 +211,30 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 });
                 if (res.ok) {
                   const data = await res.json();
-                  // Update parent claim state
                   onUpdate({ assignedTo: data.claim.assignedTo });
-                  // Update local state
                   setAssignedToName(data.claim.assignedTo?.fullName || "");
                 } else {
                   const errorData = await res.json();
                   console.error("Error updating assignedTo:", errorData.error);
                   alert("Failed to update assigned to: " + (errorData.error || "Unknown error"));
-                  // Revert to original value
                   setAssignedToName(currentName);
                 }
               } catch (error) {
                 console.error("Error updating assignedTo:", error);
                 alert("Failed to update assigned to");
-                // Revert to original value
                 setAssignedToName(currentName);
               }
             }}
+            className="h-8 text-sm"
           />
         </div>
         {claim.serverFolderPath && (
           <div>
-            <Label>Server Folder Path</Label>
-            <Input value={claim.serverFolderPath} disabled />
+            <Label className="text-xs flex items-center gap-1.5 mb-1.5">
+              <FolderOpen className="h-3 w-3 text-muted-foreground" />
+              Server Folder Path
+            </Label>
+            <Input value={claim.serverFolderPath} disabled className="h-8 text-sm" />
           </div>
         )}
       </div>

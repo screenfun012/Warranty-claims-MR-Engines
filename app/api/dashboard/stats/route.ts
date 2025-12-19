@@ -225,18 +225,124 @@ export async function GET() {
       }));
     }
 
+    // Get recent claims (last 10)
+    let recentClaims: Array<{
+      id: string;
+      claimCodeRaw: string | null;
+      status: string;
+      customer: { name: string } | null;
+      createdAt: Date;
+    }> = [];
+    try {
+      recentClaims = await prisma.claim.findMany({
+        take: 10,
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+          claimCodeRaw: true,
+          status: true,
+          createdAt: true,
+          customer: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching recent claims:", error);
+    }
+
+    // Get unread email threads count
+    let unreadEmailsCount = 0;
+    try {
+      const unreadThreads = await prisma.emailThread.findMany({
+        where: {
+          viewedAt: null,
+          claimId: null,
+        },
+        select: {
+          id: true,
+        },
+      });
+      unreadEmailsCount = unreadThreads.length;
+    } catch (error) {
+      console.error("Error fetching unread emails count:", error);
+    }
+
+    // Get urgent claims (WAITING_CUSTOMER or NEW that are older than 7 days)
+    let urgentClaims: Array<{
+      id: string;
+      claimCodeRaw: string | null;
+      status: string;
+      customer: { name: string } | null;
+      createdAt: Date;
+    }> = [];
+    try {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      urgentClaims = await prisma.claim.findMany({
+        where: {
+          OR: [
+            { status: "WAITING_CUSTOMER" },
+            {
+              status: "NEW",
+              createdAt: {
+                lt: sevenDaysAgo,
+              },
+            },
+          ],
+        },
+        take: 5,
+        orderBy: {
+          createdAt: "asc",
+        },
+        select: {
+          id: true,
+          claimCodeRaw: true,
+          status: true,
+          createdAt: true,
+          customer: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching urgent claims:", error);
+    }
+
     return NextResponse.json({
       totalClaims,
       resolvedCount,
       approvedCount,
       rejectedCount,
       inProcessCount,
+      unreadEmailsCount,
       claimsByCustomer: claimsByCustomerWithNames,
       claimsByStatus: claimsByStatus.map((s) => ({
         status: s.status,
         count: s._count.id,
       })),
       claimsByAcceptanceStatus,
+      recentClaims: recentClaims.map((c) => ({
+        id: c.id,
+        claimCodeRaw: c.claimCodeRaw,
+        status: c.status,
+        customer: c.customer,
+        createdAt: c.createdAt.toISOString(),
+      })),
+      urgentClaims: urgentClaims.map((c) => ({
+        id: c.id,
+        claimCodeRaw: c.claimCodeRaw,
+        status: c.status,
+        customer: c.customer,
+        createdAt: c.createdAt.toISOString(),
+      })),
     });
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);

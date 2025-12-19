@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 
 interface WorkOrder {
   id: string;
@@ -50,8 +51,8 @@ export default function WorkOrdersPage() {
 
   if (loading) {
     return (
-      <div className="p-8">
-        <p>Loading...</p>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" text="Učitavanje..." />
       </div>
     );
   }

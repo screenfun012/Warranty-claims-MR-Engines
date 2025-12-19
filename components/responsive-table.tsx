@@ -28,7 +28,7 @@ export function ResponsiveTable({
     return (
       <div className={cn("space-y-4", className)}>
         {data.length === 0 ? (
-          <Card className="p-6 text-center text-muted-foreground">
+          <Card className="p-6 text-center text-muted-foreground border border-border animate-in fade-in">
             {emptyMessage}
           </Card>
         ) : (
@@ -36,9 +36,10 @@ export function ResponsiveTable({
             <Card
               key={index}
               className={cn(
-                "p-4 cursor-pointer transition-colors hover:bg-muted/50",
-                onRowClick && "cursor-pointer"
+                "p-4 cursor-pointer transition-all hover:bg-muted/50 hover:shadow-md hover:border-primary/20 animate-in fade-in slide-in-from-bottom-4 border border-border",
+                onRowClick && "cursor-pointer group"
               )}
+              style={{ animationDelay: `${index * 50}ms` }}
               onClick={() => onRowClick?.(row, index)}
             >
               <div className="space-y-3">
@@ -65,9 +66,9 @@ export function ResponsiveTable({
     <div className={cn("rounded-md border", className)}>
       <Table>
         <TableHeader>
-          <TableRow>
+          <TableRow className="bg-muted/30 hover:bg-muted/50">
             {headers.map((header) => (
-              <TableHead key={header.key} className={header.className}>
+              <TableHead key={header.key} className={`${header.className} font-semibold`}>
                 {header.label}
               </TableHead>
             ))}
@@ -76,7 +77,7 @@ export function ResponsiveTable({
         <TableBody>
           {data.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={headers.length} className="text-center text-muted-foreground">
+              <TableCell colSpan={headers.length} className="text-center text-muted-foreground py-12">
                 {emptyMessage}
               </TableCell>
             </TableRow>
@@ -84,7 +85,8 @@ export function ResponsiveTable({
             data.map((row, index) => (
               <TableRow
                 key={index}
-                className={onRowClick ? "cursor-pointer" : ""}
+                className={`${onRowClick ? "cursor-pointer group" : ""} transition-all duration-200 hover:bg-muted/50 hover:shadow-md hover:border-primary/30 animate-in fade-in slide-in-from-left-4 border-b border-border/50`}
+                style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}
                 onClick={() => onRowClick?.(row, index)}
               >
                 {headers.map((header) => (

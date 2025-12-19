@@ -83,7 +83,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false }: ClaimClientD
 
   if (!claim.clientDocuments || claim.clientDocuments.length === 0) {
     return (
-      <Card className="p-6">
+      <Card className="p-6 hover:shadow-md transition-shadow">
         <p className="text-muted-foreground">No client documents found</p>
       </Card>
     );
@@ -92,7 +92,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false }: ClaimClientD
   return (
     <div className="space-y-4">
       {claim.clientDocuments.map((doc: any) => (
-        <Card key={doc.id} className="p-4">
+        <Card key={doc.id} className="p-4 hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="font-semibold">{doc.attachment?.fileName || "Document"}</h3>

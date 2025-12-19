@@ -56,66 +56,74 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
   };
 
   return (
-    <Card className="p-6">
-      <h2 className="text-xl font-semibold mb-4">Summary</h2>
-      <div className="space-y-4">
-        <div>
-          <Label>Summary (Serbian)</Label>
-          <Textarea
-            value={claim.summarySr || ""}
-            onChange={(e) => !isReadOnly && onUpdate({ summarySr: e.target.value })}
-            rows={5}
-            placeholder="Enter summary in Serbian..."
-            disabled={isReadOnly}
-          />
-        </div>
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label>Summary (English)</Label>
-            {(claim.summarySr || claim.summaryEn) && (
-              <div className="flex items-center gap-2">
-                <Select value={sourceLang} onValueChange={setSourceLang} disabled={translating}>
-                  <SelectTrigger className="w-24 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SR">SR</SelectItem>
-                    <SelectItem value="EN">EN</SelectItem>
-                    <SelectItem value="auto">Auto</SelectItem>
-                  </SelectContent>
-                </Select>
-                <span className="text-sm">→</span>
-                <Select value={targetLang} onValueChange={setTargetLang} disabled={translating}>
-                  <SelectTrigger className="w-24 h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="SR">SR</SelectItem>
-                    <SelectItem value="EN">EN</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleTranslateSummary}
-                  disabled={translating || sourceLang === targetLang || isReadOnly}
-                >
-                  <Languages className="h-4 w-4 mr-2" />
-                  {translating ? "Translating..." : "Translate"}
-                </Button>
-              </div>
-            )}
+    <div className="space-y-4">
+      <Card className="p-4 border border-border">
+        <h2 className="text-sm font-semibold mb-4 text-primary flex items-center gap-2">
+          <Languages className="h-4 w-4" />
+          Summary
+        </h2>
+        <div className="space-y-3">
+          <div>
+            <Label className="text-xs mb-1.5">Summary (Serbian)</Label>
+            <Textarea
+              value={claim.summarySr || ""}
+              onChange={(e) => !isReadOnly && onUpdate({ summarySr: e.target.value })}
+              rows={4}
+              placeholder="Enter summary in Serbian..."
+              disabled={isReadOnly}
+              className="text-sm"
+            />
           </div>
-          <Textarea
-            value={claim.summaryEn || ""}
-            onChange={(e) => !isReadOnly && onUpdate({ summaryEn: e.target.value })}
-            rows={5}
-            placeholder="Enter or translate summary in English..."
-            disabled={isReadOnly}
-          />
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <Label className="text-xs">Summary (English)</Label>
+              {(claim.summarySr || claim.summaryEn) && (
+                <div className="flex items-center gap-1.5">
+                  <Select value={sourceLang} onValueChange={setSourceLang} disabled={translating}>
+                    <SelectTrigger className="w-20 h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SR">SR</SelectItem>
+                      <SelectItem value="EN">EN</SelectItem>
+                      <SelectItem value="auto">Auto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs">→</span>
+                  <Select value={targetLang} onValueChange={setTargetLang} disabled={translating}>
+                    <SelectTrigger className="w-20 h-7 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SR">SR</SelectItem>
+                      <SelectItem value="EN">EN</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTranslateSummary}
+                    disabled={translating || sourceLang === targetLang || isReadOnly}
+                    className="h-7 px-2 text-xs"
+                  >
+                    <Languages className="h-3 w-3 mr-1" />
+                    {translating ? "..." : "Translate"}
+                  </Button>
+                </div>
+              )}
+            </div>
+            <Textarea
+              value={claim.summaryEn || ""}
+              onChange={(e) => !isReadOnly && onUpdate({ summaryEn: e.target.value })}
+              rows={4}
+              placeholder="Enter or translate summary in English..."
+              disabled={isReadOnly}
+              className="text-sm"
+            />
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </div>
   );
 }
 

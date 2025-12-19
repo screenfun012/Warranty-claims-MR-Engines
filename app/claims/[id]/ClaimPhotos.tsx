@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Languages } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { useState } from "react";
 import { FileViewerModal } from "@/components/file-viewer-modal";
 
@@ -74,15 +75,17 @@ export function ClaimPhotos({ claim, isReadOnly = false }: ClaimPhotosProps) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {claim.photos.map((photo: any, index: number) => (
-          <Card key={photo.id} className="p-4 flex flex-col">
+          <Card key={photo.id} className="p-4 flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
             {photo.attachment && (
-              <div className="mb-2 rounded-lg overflow-hidden bg-muted/50">
-                <img
-                  src={`/api/files/${photo.attachment.id}`}
-                  alt={photo.captionSr || "Photo"}
-                  className="w-full h-auto max-h-[200px] object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => handleImageClick(photosWithAttachments.findIndex((p: any) => p.id === photo.id))}
-                />
+              <div className="mb-3 rounded-lg overflow-hidden bg-muted/30 border border-border">
+                <AspectRatio ratio={4 / 3} className="bg-muted/50">
+                  <img
+                    src={`/api/files/${photo.attachment.id}`}
+                    alt={photo.captionSr || "Photo"}
+                    className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => handleImageClick(photosWithAttachments.findIndex((p: any) => p.id === photo.id))}
+                  />
+                </AspectRatio>
               </div>
             )}
           {photo.groupLabel && (
