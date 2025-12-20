@@ -28,6 +28,16 @@ export default function WorkOrdersPage() {
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+
+  // Debounce search input - only update search after user stops typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+    }, 300); // Wait 300ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     fetchWorkOrders();
@@ -64,8 +74,8 @@ export default function WorkOrdersPage() {
       <Card className="p-4 mb-6">
         <Label>Search by Work Order Code</Label>
         <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           placeholder="Enter work order code..."
           className="mt-2"
         />

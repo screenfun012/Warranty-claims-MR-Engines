@@ -66,10 +66,10 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
   });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {Object.entries(sectionsByType).map(([type, sections]: [string, any]) => (
-        <Card key={type} className="p-4 hover:shadow-md transition-shadow">
-          <h3 className="font-semibold mb-4">{type}</h3>
+        <Card key={type} className="p-6 hover:shadow-md transition-shadow">
+          <h3 className="text-lg font-semibold mb-6">{type}</h3>
           <div className="space-y-4">
             {sections.map((section: any, index: number) => (
               <div key={section.id} className="pl-4 space-y-4">
@@ -287,7 +287,7 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
       )}
       {sections.length === 0 && !isReadOnly && (
         <Card className="p-6">
-          <p className="text-muted-foreground mb-4">No report sections found. Create one to add findings.</p>
+          <p className="text-muted-foreground mb-6">No report sections found. Create one to add findings.</p>
           <Button
             onClick={async () => {
               try {

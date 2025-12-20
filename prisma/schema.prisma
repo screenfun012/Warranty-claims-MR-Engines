@@ -69,6 +69,9 @@ model Claim {
   serverFolderPath     String?
   summarySr            String?
   summaryEn            String?
+  summaryDe            String? // German (Beta)
+  summaryFr            String? // French (Beta)
+  summaryNl            String? // Dutch (Beta)
   emailThreads         EmailThread[]
   attachments          Attachment[]
   clientDocuments      ClientDocument[]

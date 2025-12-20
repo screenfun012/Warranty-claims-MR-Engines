@@ -73,9 +73,9 @@ export function ClaimPhotos({ claim, isReadOnly = false }: ClaimPhotosProps) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {claim.photos.map((photo: any, index: number) => (
-          <Card key={photo.id} className="p-4 flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
+          <Card key={photo.id} className="p-6 flex flex-col overflow-hidden hover:shadow-lg transition-shadow">
             {photo.attachment && (
               <div className="mb-3 rounded-lg overflow-hidden bg-muted/30 border border-border">
                 <AspectRatio ratio={4 / 3} className="bg-muted/50">

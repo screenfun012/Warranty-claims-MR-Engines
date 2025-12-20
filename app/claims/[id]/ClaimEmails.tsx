@@ -7,8 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, Paperclip, FileText, Image as ImageIcon } from "lucide-react";
+import { Upload, X, Paperclip, FileText, Image as ImageIcon, Mail } from "lucide-react";
 import { FileViewerModal } from "@/components/file-viewer-modal";
+import { cn } from "@/lib/utils";
 
 interface ClaimEmailsProps {
   claim: any;
@@ -227,7 +228,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     <div className="space-y-4">
       {claim.emailThreads && claim.emailThreads.length > 0 ? (
         claim.emailThreads.map((thread: any) => (
-        <Card key={thread.id} className="p-3 sm:p-4">
+        <Card key={thread.id} className="p-6">
           <h3 className="font-semibold mb-2 text-sm sm:text-base break-words">{thread.subjectOriginal}</h3>
           <div className="space-y-3">
             {thread.messages.map((message: any) => (
@@ -304,8 +305,11 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       )}
 
       {!isReadOnly && (
-      <Card className="p-3 sm:p-4">
-        <h3 className="font-semibold mb-4 text-sm sm:text-base">Send Reply</h3>
+      <Card className="p-6">
+        <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
+          <Mail className="h-5 w-5 text-primary" />
+          Send Reply
+        </h3>
         <div className="space-y-3 sm:space-y-4">
           <div>
             <Label>To</Label>
@@ -386,30 +390,44 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 pt-2 border-t">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="accepted"
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4 border-t">
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleAcceptanceStatusChange("ACCEPTED")}
+                className={cn(
+                  "relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
+                  claimAcceptanceStatus === "ACCEPTED"
+                    ? "border-green-500 bg-green-500 dark:border-green-400 dark:bg-green-400"
+                    : "border-muted-foreground/40 hover:border-green-500/50 dark:border-muted-foreground/60 dark:hover:border-green-400/50"
+                )}
                 aria-label="Prihvaćeno"
-                checked={claimAcceptanceStatus === "ACCEPTED"}
-                onChange={() => handleAcceptanceStatusChange("ACCEPTED")}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="accepted" className="cursor-pointer font-normal text-sm">
+              >
+                {claimAcceptanceStatus === "ACCEPTED" && (
+                  <div className="h-2.5 w-2.5 rounded-full bg-white dark:bg-gray-900" />
+                )}
+              </button>
+              <Label htmlFor="accepted" className="cursor-pointer font-medium text-sm text-foreground">
                 Prihvaćeno
               </Label>
             </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="rejected"
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => handleAcceptanceStatusChange("REJECTED")}
+                className={cn(
+                  "relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
+                  claimAcceptanceStatus === "REJECTED"
+                    ? "border-red-500 bg-red-500 dark:border-red-400 dark:bg-red-400"
+                    : "border-muted-foreground/40 hover:border-red-500/50 dark:border-muted-foreground/60 dark:hover:border-red-400/50"
+                )}
                 aria-label="Odbijeno"
-                checked={claimAcceptanceStatus === "REJECTED"}
-                onChange={() => handleAcceptanceStatusChange("REJECTED")}
-                className="h-4 w-4"
-              />
-              <Label htmlFor="rejected" className="cursor-pointer font-normal text-sm">
+              >
+                {claimAcceptanceStatus === "REJECTED" && (
+                  <div className="h-2.5 w-2.5 rounded-full bg-white dark:bg-gray-900" />
+                )}
+              </button>
+              <Label htmlFor="rejected" className="cursor-pointer font-medium text-sm text-foreground">
                 Odbijeno
               </Label>
             </div>

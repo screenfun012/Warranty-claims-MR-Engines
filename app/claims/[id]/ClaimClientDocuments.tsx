@@ -90,12 +90,12 @@ export function ClaimClientDocuments({ claim, isReadOnly = false }: ClaimClientD
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {claim.clientDocuments.map((doc: any) => (
-        <Card key={doc.id} className="p-4 hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start mb-4">
+        <Card key={doc.id} className="p-6 hover:shadow-md transition-shadow">
+          <div className="flex justify-between items-start mb-6">
             <div>
-              <h3 className="font-semibold">{doc.attachment?.fileName || "Document"}</h3>
+              <h3 className="text-lg font-semibold mb-1">{doc.attachment?.fileName || "Document"}</h3>
               <p className="text-sm text-muted-foreground">
                 Original: {doc.originalLanguage || "Unknown"} | Detected: {doc.detectedLanguage || "Unknown"}
               </p>

@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { normalizeSerbianLatin } from "@/lib/utils/search";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,13 +13,8 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get("search");
 
     const where: any = {};
-    if (search) {
-      where.workOrderCode = {
-        contains: search,
-      };
-    }
-
-    const workOrders = await prisma.workOrder.findMany({
+    // We'll filter in memory for Serbian character support
+    let workOrders = await prisma.workOrder.findMany({
       where,
       include: {
         worker: {
@@ -38,6 +34,14 @@ export async function GET(request: NextRequest) {
         createdAt: "desc",
       },
     });
+
+    // Apply Serbian Latin normalization filter if search is provided
+    if (search) {
+      const normalizedSearch = normalizeSerbianLatin(search);
+      workOrders = workOrders.filter(wo => 
+        normalizeSerbianLatin(wo.workOrderCode || "").includes(normalizedSearch)
+      );
+    }
 
     // Add claim count
     const workOrdersWithCount = workOrders.map((wo) => ({

@@ -41,6 +41,9 @@ interface Claim {
   serverFolderPath: string | null;
   summarySr: string | null;
   summaryEn: string | null;
+  summaryDe: string | null;
+  summaryFr: string | null;
+  summaryNl: string | null;
   emailThreads: any[];
   attachments: any[];
   clientDocuments: any[];

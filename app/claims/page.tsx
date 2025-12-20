@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText } from "lucide-react";
+import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 
@@ -118,6 +119,7 @@ const statusLabels: Record<string, string> = {
 export default function ClaimsPage() {
   const router = useRouter();
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [allClaims, setAllClaims] = useState<Claim[]>([]); // Store all claims for suggestions
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     status: "",
@@ -129,56 +131,147 @@ export default function ClaimsPage() {
     claimCode: "",
     customerId: "",
   });
+  // Suggestions state
+  const [showClaimCodeSuggestions, setShowClaimCodeSuggestions] = useState(false);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const [claimCodeSuggestions, setClaimCodeSuggestions] = useState<string[]>([]);
+  const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
 
-  const fetchClaims = useCallback(async () => {
-    setLoading(true);
+  const fetchClaims = useCallback(async (showAll = false, customFilters?: { claimCode?: string; customerId?: string }) => {
+    // Don't show loading if user is typing (to prevent "panic")
+    const isTyping = textFilters.claimCode !== filters.claimCode || textFilters.customerId !== filters.customerId;
+    if (!isTyping) {
+      setLoading(true);
+    }
+    
     try {
       const params = new URLSearchParams();
-      if (filters.status) params.append("status", filters.status);
-      if (filters.claimCode) params.append("claimCode", filters.claimCode);
-      if (filters.customerId) params.append("customerId", filters.customerId);
+      const activeFilters = customFilters || filters;
+      
+      // If showing all, only apply status filter for suggestions
+      if (showAll) {
+        if (filters.status) params.append("status", filters.status);
+      } else {
+        if (filters.status) params.append("status", filters.status);
+        if (activeFilters.claimCode) params.append("claimCode", activeFilters.claimCode);
+        if (activeFilters.customerId) params.append("customerId", activeFilters.customerId);
+      }
 
       const res = await fetch(`/api/claims?${params.toString()}`);
       const data = await res.json();
-      setClaims(data.claims || []);
+      const fetchedClaims = data.claims || [];
+      
+      if (showAll) {
+        setAllClaims(fetchedClaims);
+        // Also update displayed claims if no text filters are active
+        if (!filters.claimCode && !filters.customerId) {
+          setClaims(fetchedClaims);
+        }
+      } else {
+        setClaims(fetchedClaims);
+      }
     } catch (error) {
       console.error("Error fetching claims:", error);
     } finally {
-      setLoading(false);
+      if (!isTyping) {
+        setLoading(false);
+      }
     }
-  }, [filters]);
+  }, [filters, textFilters]);
 
   const handleClaimCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setTextFilters(prev => ({ ...prev, claimCode: e.target.value }));
-  }, []);
+    const value = e.target.value;
+    setTextFilters(prev => ({ ...prev, claimCode: value }));
+    
+    // Show suggestions if there's text
+    if (value.trim()) {
+      setShowClaimCodeSuggestions(true);
+      // Generate suggestions from allClaims with Serbian Latin support
+      const normalizedValue = normalizeSerbianLatin(value);
+      const suggestions = Array.from(
+        new Set(
+          allClaims
+            .map(c => c.claimCodeRaw)
+            .filter((code): code is string => !!code && normalizeSerbianLatin(code).includes(normalizedValue))
+            .slice(0, 5)
+        )
+      );
+      setClaimCodeSuggestions(suggestions);
+    } else {
+      setShowClaimCodeSuggestions(false);
+      setClaimCodeSuggestions([]);
+    }
+  }, [allClaims]);
 
   const handleCustomerIdChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setTextFilters(prev => ({ ...prev, customerId: e.target.value }));
+    const value = e.target.value;
+    setTextFilters(prev => ({ ...prev, customerId: value }));
+    
+    // Show suggestions if there's text
+    if (value.trim()) {
+      setShowCustomerSuggestions(true);
+      // Generate suggestions from allClaims with Serbian Latin support
+      const normalizedValue = normalizeSerbianLatin(value);
+      const suggestions = Array.from(
+        new Set(
+          allClaims
+            .map(c => c.customer?.name)
+            .filter((name): name is string => !!name && normalizeSerbianLatin(name).includes(normalizedValue))
+            .slice(0, 5)
+        )
+      );
+      setCustomerSuggestions(suggestions);
+    } else {
+      setShowCustomerSuggestions(false);
+      setCustomerSuggestions([]);
+    }
+  }, [allClaims]);
+
+  // NO debounce - filters are only applied when user clicks suggestion or presses Enter
+  // This keeps the list visible while typing
+
+  // Initial load - fetch all claims
+  useEffect(() => {
+    fetchClaims(true); // Fetch all claims for suggestions
   }, []);
 
-  // Debounce text filters - only update filters after user stops typing
+  // Fetch all claims for suggestions when status changes
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setFilters(prev => {
-        // Only update if values actually changed to avoid unnecessary re-renders
-        if (prev.claimCode !== textFilters.claimCode || prev.customerId !== textFilters.customerId) {
-          return {
-            ...prev,
-            claimCode: textFilters.claimCode,
-            customerId: textFilters.customerId,
-          };
-        }
-        return prev;
+    fetchClaims(true); // Fetch all claims for suggestions
+  }, [filters.status]);
+
+  // Real-time filtering while typing - filter locally from allClaims
+  useEffect(() => {
+    // Filter claims locally in real-time as user types
+    if (allClaims.length === 0) return;
+    
+    let filtered = [...allClaims];
+    
+    // Apply claimCode filter in real-time with Serbian Latin support
+    if (textFilters.claimCode.trim()) {
+      const normalizedClaimCode = normalizeSerbianLatin(textFilters.claimCode);
+      filtered = filtered.filter(claim => {
+        const claimCode = normalizeSerbianLatin(claim.claimCodeRaw || "");
+        return claimCode.includes(normalizedClaimCode);
       });
-    }, 500); // Wait 500ms after user stops typing
-
-    return () => clearTimeout(timer);
-  }, [textFilters.claimCode, textFilters.customerId]);
-
-  // Fetch claims when filters change (status changes immediately, text filters are debounced)
-  useEffect(() => {
-    fetchClaims();
-  }, [fetchClaims]);
+    }
+    
+    // Apply customerId filter in real-time with Serbian Latin support
+    if (textFilters.customerId.trim()) {
+      const normalizedCustomer = normalizeSerbianLatin(textFilters.customerId);
+      filtered = filtered.filter(claim => {
+        const customerName = normalizeSerbianLatin(claim.customer?.name || "");
+        return customerName.includes(normalizedCustomer);
+      });
+    }
+    
+    // Apply status filter
+    if (filters.status) {
+      filtered = filtered.filter(claim => claim.status === filters.status);
+    }
+    
+    setClaims(filtered);
+  }, [textFilters.claimCode, textFilters.customerId, filters.status, allClaims]);
 
   // Listen for claim updates to refresh the list
   useEffect(() => {
@@ -253,29 +346,95 @@ export default function ClaimsPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="animate-in fade-in slide-in-from-left-4" style={{ animationDelay: "100ms" }}>
+          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "100ms" }}>
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
               Claim Code
             </label>
-            <Input
-              placeholder="Search by claim code"
-              value={textFilters.claimCode}
-              onChange={handleClaimCodeChange}
-              className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
+            <div className="relative">
+              <Input
+                placeholder="Search by claim code"
+                value={textFilters.claimCode}
+                onChange={handleClaimCodeChange}
+                onFocus={() => {
+                  if (textFilters.claimCode.trim()) {
+                    setShowClaimCodeSuggestions(true);
+                  }
+                }}
+                onBlur={() => {
+                  // Delay hiding to allow clicking on suggestions
+                  setTimeout(() => setShowClaimCodeSuggestions(false), 200);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowClaimCodeSuggestions(false);
+                  }
+                }}
+                className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              {showClaimCodeSuggestions && claimCodeSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                  {claimCodeSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setTextFilters(prev => ({ ...prev, claimCode: suggestion }));
+                        setShowClaimCodeSuggestions(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="animate-in fade-in slide-in-from-left-4" style={{ animationDelay: "200ms" }}>
+          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "200ms" }}>
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
               Customer
             </label>
-            <Input
-              placeholder="Pretraži po imenu klijenta"
-              value={textFilters.customerId}
-              onChange={handleCustomerIdChange}
-              className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
+            <div className="relative">
+              <Input
+                placeholder="Pretraži po imenu klijenta"
+                value={textFilters.customerId}
+                onChange={handleCustomerIdChange}
+                onFocus={() => {
+                  if (textFilters.customerId.trim()) {
+                    setShowCustomerSuggestions(true);
+                  }
+                }}
+                onBlur={() => {
+                  // Delay hiding to allow clicking on suggestions
+                  setTimeout(() => setShowCustomerSuggestions(false), 200);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setShowCustomerSuggestions(false);
+                  }
+                }}
+                className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              {showCustomerSuggestions && customerSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                  {customerSuggestions.map((suggestion, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        setTextFilters(prev => ({ ...prev, customerId: suggestion }));
+                        setShowCustomerSuggestions(false);
+                      }}
+                      className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </Card>

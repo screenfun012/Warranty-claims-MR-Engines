@@ -26,25 +26,57 @@ export async function POST(
 
       // Determine source text based on sourceLang
       let textToTranslate = "";
-      if (sourceLang === "SR" || !sourceLang) {
+      const sourceLangUpper = (sourceLang || "SR").toUpperCase();
+      const claimWithSummaries = claim as typeof claim & {
+        summaryDe?: string | null;
+        summaryFr?: string | null;
+        summaryNl?: string | null;
+      };
+      
+      if (sourceLangUpper === "SR") {
         textToTranslate = claim.summarySr || "";
-      } else if (sourceLang === "EN") {
+      } else if (sourceLangUpper === "EN") {
         textToTranslate = claim.summaryEn || "";
+      } else if (sourceLangUpper === "DE") {
+        textToTranslate = claimWithSummaries.summaryDe || "";
+      } else if (sourceLangUpper === "FR") {
+        textToTranslate = claimWithSummaries.summaryFr || "";
+      } else if (sourceLangUpper === "NL") {
+        textToTranslate = claimWithSummaries.summaryNl || "";
       }
 
       if (!textToTranslate) {
-        return NextResponse.json({ error: `No ${sourceLang === "EN" ? "English" : "Serbian"} summary to translate` }, { status: 400 });
+        const langNames: Record<string, string> = {
+          SR: "Serbian",
+          EN: "English",
+          DE: "German",
+          FR: "French",
+          NL: "Dutch",
+        };
+        return NextResponse.json({ 
+          error: `No ${langNames[sourceLangUpper] || sourceLangUpper} summary to translate` 
+        }, { status: 400 });
       }
 
       const translated = await translator.translate({
         text: textToTranslate,
-        sourceLang: sourceLang || "SR",
-        targetLang,
+        sourceLang: sourceLangUpper,
+        targetLang: targetLang.toUpperCase(),
       });
 
-      const updateData: any = {};
-      if (targetLang === "EN") updateData.summaryEn = translated;
-      if (targetLang === "SR") updateData.summarySr = translated;
+      const updateData: {
+        summaryEn?: string;
+        summarySr?: string;
+        summaryDe?: string;
+        summaryFr?: string;
+        summaryNl?: string;
+      } = {};
+      const targetLangUpper = targetLang.toUpperCase();
+      if (targetLangUpper === "EN") updateData.summaryEn = translated;
+      else if (targetLangUpper === "SR") updateData.summarySr = translated;
+      else if (targetLangUpper === "DE") updateData.summaryDe = translated;
+      else if (targetLangUpper === "FR") updateData.summaryFr = translated;
+      else if (targetLangUpper === "NL") updateData.summaryNl = translated;
 
       await prisma.claim.update({
         where: { id },
@@ -82,7 +114,7 @@ export async function POST(
         targetLang,
       });
 
-      const updateData: any = {};
+      const updateData: { textSr?: string; textEn?: string } = {};
       if (targetLang === "SR") updateData.textSr = translated;
       if (targetLang === "EN") updateData.textEn = translated;
 
@@ -120,7 +152,7 @@ export async function POST(
         targetLang,
       });
 
-      const updateData: any = {};
+      const updateData: { textSr?: string; textEn?: string } = {};
       if (targetLang === "EN") updateData.textEn = translated;
       if (targetLang === "SR") updateData.textSr = translated;
 
@@ -158,7 +190,7 @@ export async function POST(
         targetLang,
       });
 
-      const updateData: any = {};
+      const updateData: { captionSr?: string; captionEn?: string } = {};
       if (targetLang === "EN") updateData.captionEn = translated;
       if (targetLang === "SR") updateData.captionSr = translated;
 

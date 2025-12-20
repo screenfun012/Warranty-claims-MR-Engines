@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendEmailAndSave } from "@/lib/email/smtpClient";
 import { getClaimProcessingEmailTemplate } from "@/lib/email/emailTemplates";
+import { normalizeSerbianLatin } from "@/lib/utils/search";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,9 +20,12 @@ export async function GET(request: NextRequest) {
     const where: any = {};
     if (status) where.status = status;
     if (claimCode) {
+      // Normalize Serbian Latin characters for search
+      const normalizedClaimCode = normalizeSerbianLatin(claimCode);
       // SQLite doesn't support case-insensitive mode, so we'll use contains
+      // We'll filter in memory for Serbian character support
       where.claimCodeRaw = {
-        contains: claimCode,
+        contains: claimCode, // Keep original for initial filter
       };
     }
 
@@ -29,17 +33,21 @@ export async function GET(request: NextRequest) {
     let customerIds: string[] = [];
     if (customerName) {
       try {
-        const customers = await prisma.customer.findMany({
-          where: {
-            name: {
-              contains: customerName,
-            },
-          },
+        // Normalize search query for Serbian Latin support
+        const normalizedCustomerName = normalizeSerbianLatin(customerName);
+        
+        // Fetch all customers and filter in memory for Serbian character support
+        const allCustomers = await prisma.customer.findMany({
           select: {
             id: true,
+            name: true,
           },
         });
-        customerIds = customers.map(c => c.id);
+        
+        // Filter customers that match the normalized search
+        customerIds = allCustomers
+          .filter(c => normalizeSerbianLatin(c.name || "").includes(normalizedCustomerName))
+          .map(c => c.id);
       } catch (error) {
         console.warn("Error searching customers:", error);
       }
@@ -57,7 +65,7 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    const claims = await prisma.claim.findMany({
+    let claims = await prisma.claim.findMany({
       where,
       include: {
         customer: true,
@@ -73,6 +81,14 @@ export async function GET(request: NextRequest) {
         createdAt: "desc",
       },
     });
+
+    // Apply Serbian Latin normalization filter for claimCode if provided
+    if (claimCode) {
+      const normalizedClaimCode = normalizeSerbianLatin(claimCode);
+      claims = claims.filter(claim => 
+        normalizeSerbianLatin(claim.claimCodeRaw || "").includes(normalizedClaimCode)
+      );
+    }
 
     // Log to verify claimAcceptanceStatus is being returned
     if (claims.length > 0) {

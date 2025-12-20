@@ -23,15 +23,15 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     setCustomerName(claim.customer?.name || "");
   }, [claim.assignedTo?.fullName, claim.customer?.name]);
   return (
-    <Card className="p-4 border border-border">
-      <h2 className="text-sm font-semibold mb-4 text-primary flex items-center gap-2">
-        <Settings className="h-4 w-4" />
+    <Card className="p-6">
+      <h2 className="text-lg font-semibold mb-6 text-primary flex items-center gap-2">
+        <Settings className="h-5 w-5" />
         Metadata
       </h2>
       <div className="space-y-3">
         <div>
-          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-            <Hash className="h-3 w-3 text-muted-foreground" />
+          <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <Hash className="h-4 w-4 text-muted-foreground" />
             Claim Code
           </Label>
           <Input
@@ -46,12 +46,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             }}
             placeholder="MR1234/25"
             disabled={isReadOnly}
-            className="h-8 text-sm"
+            className="h-9"
           />
         </div>
         <div>
-          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-            <FileCode className="h-3 w-3 text-muted-foreground" />
+          <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <FileCode className="h-4 w-4 text-muted-foreground" />
             Prefix
           </Label>
           <Input 
@@ -66,12 +66,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             }}
             placeholder="MR"
             disabled={isReadOnly}
-            className="h-8 text-sm"
+            className="h-9"
           />
         </div>
         <div>
-          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-            <Building2 className="h-3 w-3 text-muted-foreground" />
+          <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <Building2 className="h-4 w-4 text-muted-foreground" />
             Customer Name
           </Label>
           <Input
@@ -145,11 +145,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 setCustomerName("");
               }
             }}
-            className="h-8 text-sm"
+            className="h-9"
           />
         </div>
         <div>
-          <Label className="text-xs mb-1.5">Engine Type</Label>
+          <Label className="text-sm font-medium mb-2">Engine Type</Label>
           <Input
             value={claim.engineType || ""}
             onChange={(e) => {
@@ -161,11 +161,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               }
             }}
             disabled={isReadOnly}
-            className="h-8 text-sm"
+            className="h-9"
           />
         </div>
         <div>
-          <Label className="text-xs mb-1.5">Engine Code</Label>
+          <Label className="text-sm font-medium mb-2">Engine Code</Label>
           <Input
             value={claim.mrEngineCode || ""}
             onChange={(e) => {
@@ -178,12 +178,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             }}
             placeholder="Engine code"
             disabled={isReadOnly}
-            className="h-8 text-sm"
+            className="h-9"
           />
         </div>
         <div>
-          <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-            <User className="h-3 w-3 text-muted-foreground" />
+          <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <User className="h-4 w-4 text-muted-foreground" />
             Assigned To
           </Label>
           <Input
@@ -225,16 +225,16 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 setAssignedToName(currentName);
               }
             }}
-            className="h-8 text-sm"
+            className="h-9"
           />
         </div>
         {claim.serverFolderPath && (
           <div>
-            <Label className="text-xs flex items-center gap-1.5 mb-1.5">
-              <FolderOpen className="h-3 w-3 text-muted-foreground" />
+            <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+              <FolderOpen className="h-4 w-4 text-muted-foreground" />
               Server Folder Path
             </Label>
-            <Input value={claim.serverFolderPath} disabled className="h-8 text-sm" />
+            <Input value={claim.serverFolderPath} disabled className="h-9" />
           </div>
         )}
       </div>

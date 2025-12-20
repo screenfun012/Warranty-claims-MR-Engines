@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
@@ -69,10 +70,13 @@ interface Claim {
 export default function InboxPage() {
   const router = useRouter();
   const [threads, setThreads] = useState<EmailThread[]>([]);
+  const [filteredThreads, setFilteredThreads] = useState<EmailThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
+  const [searchInput, setSearchInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchThreads();
@@ -88,6 +92,32 @@ export default function InboxPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Filter threads based on search query with Serbian Latin support
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredThreads(threads);
+      return;
+    }
+
+    const normalizedQuery = normalizeSerbianLatin(searchQuery);
+    const filtered = threads.filter((thread) => {
+      const subject = normalizeSerbianLatin(thread.subjectOriginal || "");
+      const sender = normalizeSerbianLatin(thread.originalSender || "");
+      const claimCode = normalizeSerbianLatin(thread.claim?.claimCodeRaw || "");
+      
+      return subject.includes(normalizedQuery) || sender.includes(normalizedQuery) || claimCode.includes(normalizedQuery);
+    });
+    setFilteredThreads(filtered);
+  }, [threads, searchQuery]);
+
   const fetchThreads = async () => {
     try {
       const res = await fetch("/api/inbox");
@@ -97,7 +127,12 @@ export default function InboxPage() {
         throw new Error(`API error: ${res.status}`);
       }
       const data = await res.json();
-      setThreads(data.threads || []);
+      const fetchedThreads = data.threads || [];
+      setThreads(fetchedThreads);
+      // Initialize filtered threads
+      if (!searchQuery.trim()) {
+        setFilteredThreads(fetchedThreads);
+      }
     } catch (error) {
       console.error("Error fetching threads:", error);
     } finally {
@@ -196,6 +231,16 @@ export default function InboxPage() {
           </Button>
         </div>
 
+        <Card className="p-4 mb-6">
+          <Label>Search</Label>
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by subject, sender, or claim code..."
+            className="mt-2"
+          />
+        </Card>
+
         {selectedThread ? (
           <ThreadDetail 
             thread={selectedThread} 
@@ -221,7 +266,7 @@ export default function InboxPage() {
                 { key: "claim", label: "Linked Claim" },
                 { key: "actions", label: "Actions" },
               ]}
-              data={threads.map((thread) => {
+              data={filteredThreads.map((thread) => {
                 const lastMessage = thread.messages[thread.messages.length - 1];
                 const isUnread = !thread.viewedAt;
                 const isUnassigned = !thread.claimId; // Novo samo ako nije povezan sa claim-om
@@ -229,14 +274,9 @@ export default function InboxPage() {
                 return {
                   date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
                   sender: (
-                    <div className="flex items-center gap-2">
-                      {isUnread && (
-                        <div className="h-2 w-2 bg-primary rounded-full animate-pulse shrink-0" />
-                      )}
-                      <span className={isUnread ? "font-bold" : ""}>
-                        {thread.originalSender || "-"}
-                      </span>
-                    </div>
+                    <span className={isUnread ? "font-bold" : ""}>
+                      {thread.originalSender || "-"}
+                    </span>
                   ),
                   subject: (
                     <div className="flex items-center gap-2 min-w-0">
@@ -298,9 +338,9 @@ export default function InboxPage() {
                   ),
                 };
               })}
-              emptyMessage="No email threads found"
+              emptyMessage={searchQuery ? "No email threads found matching your search" : "No email threads found"}
               onRowClick={(row, index) => {
-                const thread = threads[index];
+                const thread = filteredThreads[index];
                 if (!thread.viewedAt) {
                   fetch(`/api/inbox/${thread.id}/mark-viewed`, {
                     method: "POST",
