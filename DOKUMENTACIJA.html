@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MR Engines Warranty Claims Management System - Dokumentacija</title>
+    <style>
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            line-height: 1.6;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            page-break-after: avoid;
+        }
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+            margin-top: 30px;
+            page-break-after: avoid;
+        }
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            page-break-after: avoid;
+        }
+        h4 {
+            color: #666;
+            margin-top: 15px;
+            page-break-after: avoid;
+        }
+        .image-placeholder {
+            border: 2px dashed #3498db;
+            background: #ecf0f1;
+            padding: 40px;
+            text-align: center;
+            margin: 20px 0;
+            color: #7f8c8d;
+            font-style: italic;
+            page-break-inside: avoid;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            page-break-inside: avoid;
+        }
+        pre code {
+            background: transparent;
+            color: inherit;
+            padding: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            page-break-inside: avoid;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #3498db;
+            color: white;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        .tip {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 10px;
+            margin: 15px 0;
+        }
+        ul, ol {
+            margin: 10px 0;
+            padding-left: 30px;
+        }
+        li {
+            margin: 5px 0;
+        }
+        .toc {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc li {
+            margin: 8px 0;
+        }
+        .toc a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        @media print {
+            body {
+                padding: 10mm;
+            }
+            .image-placeholder {
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>MR Engines Warranty Claims Management System</h1>
+    <h2>Kompleksna dokumentacija aplikacije</h2>
+    
+    <div class="toc">
+        <h3>Sadržaj</h3>
+        <ul>
+            <li><a href="#uvod">1. Uvod</a></li>
+            <li><a href="#arhitektura">2. Arhitektura i tehnologije</a></li>
+            <li><a href="#funkcionalnosti">3. Glavne funkcionalnosti</a></li>
+            <li><a href="#koriscenje">4. Korišćenje aplikacije</a></li>
+            <li><a href="#tehnicki">5. Tehnički detalji</a></li>
+            <li><a href="#bezbednost">6. Bezbednost i performanse</a></li>
+            <li><a href="#razvoj">7. Razvoj i održavanje</a></li>
+            <li><a href="#buducnost">8. Buduća poboljšanja</a></li>
+            <li><a href="#zakljucak">9. Zaključak</a></li>
+        </ul>
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 1: Naslovna slika - Dashboard aplikacije]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot glavnog dashboard-a sa svim statistikama
+    </div>
+
+    <h2 id="uvod">1. UVOD</h2>
+
+    <h3>1.1 Opis problema</h3>
+    <p>Sistem za upravljanje reklamacijama garancije motora (MR Engines Warranty Claims Management System) je web aplikacija dizajnirana za upravljanje kompletnim procesom reklamacija motora. Aplikacija rešava problem centralizovanog upravljanja reklamacijama koji uključuje primanje email poruka, organizovanje dokumenata, praćenje statusa, prevod dokumentata i generisanje izveštaja.</p>
+
+    <div style="text-align: center; margin: 30px 0; overflow-x: auto;">
+        <svg width="900" height="1800" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                    <polygon points="0 0, 10 3, 0 6" fill="#2c3e50" />
+                </marker>
+                <marker id="arrowhead-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                    <polygon points="0 0, 10 3, 0 6" fill="#27ae60" />
+                </marker>
+                <marker id="arrowhead-red" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                    <polygon points="0 0, 10 3, 0 6" fill="#e74c3c" />
+                </marker>
+            </defs>
+            
+            <!-- START -->
+            <rect x="325" y="30" width="250" height="60" rx="10" fill="#2ecc71" stroke="#27ae60" stroke-width="3"/>
+            <text x="450" y="70" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="20" font-weight="bold">START</text>
+            
+            <!-- Email stiže -->
+            <rect x="300" y="120" width="300" height="60" rx="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+            <text x="450" y="150" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Email stiže u inbox</text>
+            
+            <!-- Sinhronizacija -->
+            <rect x="300" y="210" width="300" height="60" rx="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+            <text x="450" y="240" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16">Sinhronizacija email-a</text>
+            
+            <!-- Email thread kreiran -->
+            <rect x="300" y="300" width="300" height="60" rx="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+            <text x="450" y="330" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16">Email thread kreiran</text>
+            
+            <!-- Decision: Kreirati claim? -->
+            <polygon points="450,390 520,450 450,510 380,450" fill="#f39c12" stroke="#e67e22" stroke-width="3"/>
+            <text x="450" y="435" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Kreirati</text>
+            <text x="450" y="455" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="15" font-weight="bold">claim?</text>
+            
+            <!-- NE - Ostavljeno (unassigned) -->
+            <rect x="50" y="430" width="200" height="50" rx="8" fill="#95a5a6" stroke="#7f8c8d" stroke-width="2"/>
+            <text x="150" y="455" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Ostavljeno</text>
+            <text x="150" y="470" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="12">(unassigned)</text>
+            
+            <!-- DA - Kreiranje claim-a -->
+            <rect x="650" y="430" width="200" height="50" rx="8" fill="#9b59b6" stroke="#8e44ad" stroke-width="2"/>
+            <text x="750" y="455" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Kreiranje claim-a</text>
+            
+            <!-- Status: NEW -->
+            <rect x="650" y="510" width="200" height="50" rx="8" fill="#3498db" stroke="#2980b9" stroke-width="2"/>
+            <text x="750" y="540" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Status: NEW</text>
+            
+            <!-- Popunjavanje osnovnih podataka -->
+            <rect x="650" y="590" width="200" height="60" rx="8" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+            <text x="750" y="615" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="13">Popunjavanje</text>
+            <text x="750" y="635" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="13">osnovnih podataka</text>
+            
+            <!-- Status: IN_ANALYSIS -->
+            <rect x="650" y="680" width="200" height="50" rx="8" fill="#f39c12" stroke="#e67e22" stroke-width="2"/>
+            <text x="750" y="710" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Status: IN_ANALYSIS</text>
+            
+            <!-- Analiza dokumenata -->
+            <rect x="250" y="760" width="400" height="70" rx="8" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+            <text x="450" y="785" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Analiza dokumenata</text>
+            <text x="450" y="805" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="13">Ekstrakcija teksta, prevod,</text>
+            <text x="450" y="820" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="13">organizacija fotografija</text>
+            
+            <!-- Kreiranje nalaza (Findings) -->
+            <rect x="250" y="860" width="400" height="70" rx="8" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+            <text x="450" y="885" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Kreiranje nalaza (Findings)</text>
+            <text x="450" y="905" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="13">Strukturisani delovi izveštaja</text>
+            <text x="450" y="920" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="13">sa prevodom</text>
+            
+            <!-- Decision: Čeka klijenta? -->
+            <polygon points="450,960 520,1020 450,1080 380,1020" fill="#f39c12" stroke="#e67e22" stroke-width="3"/>
+            <text x="450" y="1005" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Čeka</text>
+            <text x="450" y="1025" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="15" font-weight="bold">klijenta?</text>
+            
+            <!-- DA - Status: WAITING_CUSTOMER -->
+            <rect x="250" y="1110" width="200" height="50" rx="8" fill="#f1c40f" stroke="#f39c12" stroke-width="2"/>
+            <text x="350" y="1140" text-anchor="middle" fill="black" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Status: WAITING_CUSTOMER</text>
+            
+            <!-- Decision: Odgovor klijenta? -->
+            <polygon points="350,1190 400,1250 350,1310 300,1250" fill="#f39c12" stroke="#e67e22" stroke-width="3"/>
+            <text x="350" y="1235" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Odgovor</text>
+            <text x="350" y="1255" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">klijenta?</text>
+            
+            <!-- Status: REJECTED (od klijenta) -->
+            <rect x="50" y="1240" width="200" height="50" rx="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+            <text x="150" y="1270" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Status: REJECTED</text>
+            
+            <!-- Nastavak obrade (bez čekanja klijenta) -->
+            <rect x="600" y="1110" width="250" height="50" rx="8" fill="#34495e" stroke="#2c3e50" stroke-width="2"/>
+            <text x="725" y="1140" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="14" font-weight="bold">Nastavak obrade</text>
+            
+            <!-- Decision: Odobreno? -->
+            <polygon points="725,1190 795,1250 725,1310 655,1250" fill="#16a085" stroke="#1abc9c" stroke-width="3"/>
+            <text x="725" y="1235" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="15" font-weight="bold">Odobreno?</text>
+            
+            <!-- Status: APPROVED -->
+            <rect x="600" y="1340" width="250" height="50" rx="8" fill="#27ae60" stroke="#229954" stroke-width="2"/>
+            <text x="725" y="1370" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Status: APPROVED</text>
+            
+            <!-- Status: REJECTED (od strane sistema) -->
+            <rect x="250" y="1340" width="250" height="50" rx="8" fill="#e74c3c" stroke="#c0392b" stroke-width="2"/>
+            <text x="375" y="1370" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Status: REJECTED</text>
+            
+            <!-- Status: CLOSED -->
+            <rect x="425" y="1420" width="200" height="50" rx="8" fill="#95a5a6" stroke="#7f8c8d" stroke-width="2"/>
+            <text x="525" y="1450" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">Status: CLOSED</text>
+            
+            <!-- END -->
+            <rect x="350" y="1500" width="200" height="60" rx="10" fill="#2ecc71" stroke="#27ae60" stroke-width="3"/>
+            <text x="450" y="1535" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="20" font-weight="bold">END</text>
+            
+            <!-- Strelicu - vertikalne -->
+            <line x1="450" y1="90" x2="450" y2="120" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="450" y1="180" x2="450" y2="210" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="450" y1="270" x2="450" y2="300" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="450" y1="360" x2="450" y2="390" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="750" y1="480" x2="750" y2="510" stroke="#9b59b6" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="750" y1="560" x2="750" y2="590" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="750" y1="650" x2="750" y2="680" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="750" y1="730" x2="450" y2="760" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="450" y1="830" x2="450" y2="860" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="450" y1="930" x2="450" y2="960" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="450" y1="1080" x2="450" y2="1110" stroke="#f1c40f" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <line x1="450" y1="1080" x2="725" y2="1110" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <line x1="350" y1="1160" x2="350" y2="1190" stroke="#f1c40f" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <line x1="725" y1="1160" x2="725" y2="1190" stroke="#16a085" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <line x1="725" y1="1310" x2="725" y2="1340" stroke="#27ae60" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <line x1="725" y1="1390" x2="525" y2="1420" stroke="#27ae60" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <line x1="350" y1="1310" x2="300" y2="1270" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead-red)"/>
+            <line x1="375" y1="1390" x2="475" y2="1420" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead-red)"/>
+            <line x1="525" y1="1470" x2="450" y2="1500" stroke="#95a5a6" stroke-width="3" marker-end="url(#arrowhead)"/>
+            
+            <!-- Strelicu - horizontalne (decision) -->
+            <!-- Kreirati claim? DA -->
+            <line x1="520" y1="450" x2="650" y2="455" stroke="#2c3e50" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <text x="585" y="448" text-anchor="middle" fill="#2c3e50" font-family="Arial, sans-serif" font-size="14" font-weight="bold">DA</text>
+            
+            <!-- Kreirati claim? NE -->
+            <line x1="380" y1="450" x2="250" y2="455" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead-red)"/>
+            <text x="315" y="448" text-anchor="middle" fill="#e74c3c" font-family="Arial, sans-serif" font-size="14" font-weight="bold">NE</text>
+            
+            <!-- Čeka klijenta? DA -->
+            <line x1="380" y1="1020" x2="350" y2="1110" stroke="#f1c40f" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <text x="365" y="1070" text-anchor="middle" fill="#f39c12" font-family="Arial, sans-serif" font-size="14" font-weight="bold">DA</text>
+            
+            <!-- Čeka klijenta? NE -->
+            <text x="590" y="1070" text-anchor="middle" fill="#1abc9c" font-family="Arial, sans-serif" font-size="14" font-weight="bold">NE</text>
+            
+            <!-- Odgovor klijenta? DA (Odbijeno) -->
+            <line x1="300" y1="1250" x2="250" y2="1265" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead-red)"/>
+            <text x="275" y="1255" text-anchor="middle" fill="#e74c3c" font-family="Arial, sans-serif" font-size="13" font-weight="bold">DA (Odbijeno)</text>
+            
+            <!-- Odgovor klijenta? NE (Nastavak) -->
+            <line x1="400" y1="1250" x2="600" y2="1135" stroke="#34495e" stroke-width="3" marker-end="url(#arrowhead)"/>
+            <text x="500" y="1195" text-anchor="middle" fill="#2c3e50" font-family="Arial, sans-serif" font-size="13" font-weight="bold">NE</text>
+            
+            <!-- Odobreno? DA -->
+            <line x1="795" y1="1250" x2="850" y2="1365" stroke="#27ae60" stroke-width="3" marker-end="url(#arrowhead-green)"/>
+            <text x="822" y="1310" text-anchor="middle" fill="#229954" font-family="Arial, sans-serif" font-size="14" font-weight="bold">DA</text>
+            
+            <!-- Odobreno? NE -->
+            <line x1="655" y1="1250" x2="375" y2="1340" stroke="#e74c3c" stroke-width="3" marker-end="url(#arrowhead-red)"/>
+            <text x="515" y="1295" text-anchor="middle" fill="#c0392b" font-family="Arial, sans-serif" font-size="14" font-weight="bold">NE</text>
+            
+        </svg>
+    </div>
+
+    <h3>1.2 Ciljevi aplikacije</h3>
+    <p>Glavni ciljevi sistema su:</p>
+    <ul>
+        <li><strong>Automatizacija procesa</strong>: Automatska sinhronizacija email poruka iz posvećene poštanske kutije</li>
+        <li><strong>Centralizovano upravljanje</strong>: Sve reklamacije na jednom mestu sa kompletnom istorijom komunikacije</li>
+        <li><strong>Organizacija dokumenata</strong>: Automatska organizacija fajlova po reklamacijama i tipovima</li>
+        <li><strong>Multijezična podrška</strong>: Automatski prevod dokumentata na više jezika (srpski, engleski, nemački, francuski, holandski)</li>
+        <li><strong>Praćenje statusa</strong>: Detaljno praćenje statusa svake reklamacije kroz ceo životni ciklus</li>
+        <li><strong>Integracija sa radnim nalozima</strong>: Povezivanje reklamacija sa postojećim radnim nalozima (RN)</li>
+        <li><strong>Mobilna optimizacija</strong>: Aplikacija je potpuno responsive i optimizovana za korišćenje na mobilnim telefonima i tabletima preko web pregledača, omogućavajući pristup i upravljanje reklamacijama sa bilo koje lokacije</li>
+    </ul>
+
+    <h2 id="arhitektura">2. ARHITEKTURA I TEHNOLOGIJE</h2>
+
+    <h3>2.1 Tehnološki stack</h3>
+    <p>Aplikacija je izgrađena koristeći moderne web tehnologije:</p>
+
+    <table>
+        <tr>
+            <th>Kategorija</th>
+            <th>Tehnologija</th>
+            <th>Opis</th>
+        </tr>
+        <tr>
+            <td rowspan="5">Frontend</td>
+            <td>Next.js 16</td>
+            <td>React framework za server-side rendering i routing</td>
+        </tr>
+        <tr>
+            <td>TypeScript</td>
+            <td>Tipizirani JavaScript za sigurniji kod</td>
+        </tr>
+        <tr>
+            <td>Tailwind CSS</td>
+            <td>Utility-first CSS framework</td>
+        </tr>
+        <tr>
+            <td>shadcn/ui</td>
+            <td>Komponentna biblioteka bazirana na Radix UI</td>
+        </tr>
+        <tr>
+            <td>React 19</td>
+            <td>Biblioteka za građenje korisničkog interfejsa</td>
+        </tr>
+        <tr>
+            <td rowspan="3">Backend</td>
+            <td>Next.js API Routes</td>
+            <td>Serverless API endpoints</td>
+        </tr>
+        <tr>
+            <td>Prisma ORM</td>
+            <td>Moderni ORM za rad sa bazom podataka</td>
+        </tr>
+        <tr>
+            <td>SQLite / PostgreSQL</td>
+            <td>Relacione baze podataka</td>
+        </tr>
+        <tr>
+            <td rowspan="5">Integracije</td>
+            <td>imapflow</td>
+            <td>IMAP klijent za primanje email poruka</td>
+        </tr>
+        <tr>
+            <td>nodemailer</td>
+            <td>SMTP klijent za slanje email poruka</td>
+        </tr>
+        <tr>
+            <td>pdf-parse</td>
+            <td>Ekstrakcija teksta iz PDF dokumenata</td>
+        </tr>
+        <tr>
+            <td>mammoth</td>
+            <td>Ekstrakcija teksta iz DOCX dokumenata</td>
+        </tr>
+        <tr>
+            <td>DeepL / OpenAI</td>
+            <td>Servisi za prevod dokumentata</td>
+        </tr>
+    </table>
+
+    <div class="image-placeholder">
+        [SLIKA 3: Arhitekturna dijagram]
+        <br><strong>Instrukcije:</strong> Ubacite dijagram koji prikazuje arhitekturu sistema (Frontend, Backend, Database, Email, File Storage)
+    </div>
+
+    <h3>2.2 Struktura projekta</h3>
+    <pre><code>mr-engines-warranty/
+├── app/                    # Next.js App Router
+│   ├── api/               # API endpoints
+│   ├── claims/            # UI stranice za reklamacije
+│   ├── inbox/             # UI stranica za inbox
+│   ├── dashboard/         # Dashboard sa statistikama
+│   └── work-orders/       # UI stranice za radne naloge
+├── components/            # React komponente
+├── lib/                  # Biznis logika
+│   ├── email/           # Email integracija
+│   ├── files/           # File storage
+│   └── translation/     # Servisi prevoda
+└── prisma/              # Prisma schema i migracije</code></pre>
+
+    <div class="image-placeholder">
+        [SLIKA 4: Struktura folder-a projekta]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot strukture foldera iz IDE-a (VSCode ili slično)
+    </div>
+
+    <h3>2.3 Baza podataka</h3>
+    <p>Sistem koristi <strong>Prisma ORM</strong> za upravljanje bazom podataka. Glavni entiteti su:</p>
+    <ul>
+        <li><strong>User</strong> - Korisnici sistema (Admin, Operator, Technician, Worker)</li>
+        <li><strong>Customer</strong> - Spoljni klijenti</li>
+        <li><strong>WorkOrder</strong> - Radni nalozi (RN)</li>
+        <li><strong>Claim</strong> - Reklamacije (glavni entitet)</li>
+        <li><strong>EmailThread</strong> - Email konverzacije</li>
+        <li><strong>EmailMessage</strong> - Pojedinačne email poruke</li>
+        <li><strong>Attachment</strong> - Prilozi iz email poruka</li>
+        <li><strong>ClientDocument</strong> - Ekstrahovani tekst iz dokumenata</li>
+        <li><strong>Photo</strong> - Fotografije sa opisima</li>
+        <li><strong>ReportSection</strong> - Strukturisani delovi izveštaja</li>
+    </ul>
+
+    <div class="image-placeholder">
+        [SLIKA 5: ER dijagram baze podataka]
+        <br><strong>Instrukcije:</strong> Ubacite Entity-Relationship dijagram koji prikazuje tabele i relacije između njih (može biti screenshot iz Prisma Studio)
+    </div>
+
+    <h2 id="funkcionalnosti">3. GLAVNE FUNKCIONALNOSTI</h2>
+
+    <h3>3.1 Email integracija i sinhronizacija</h3>
+    <h4>3.1.1 IMAP integracija</h4>
+    <p>Aplikacija automatski sinhronizuje email poruke iz posvećene poštanske kutije koristeći IMAP protokol. Sinhronizacija je <strong>inkrementalna</strong> - prati se poslednji obrađeni UID i preuzimaju se samo nove poruke.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 6: Inbox stranica sa email thread-ovima]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot inbox stranice (/inbox) koja prikazuje listu email thread-ova
+    </div>
+
+    <h4>3.1.2 Kreiranje reklamacije iz email-a</h4>
+    <p>Reklamacije se mogu kreirati direktno iz email thread-a:</p>
+    <ol>
+        <li>Otvorite email thread u inbox-u</li>
+        <li>Kliknite "Create claim from this thread"</li>
+        <li>Sistem automatski ekstraktuje podatke i kreira reklamaciju</li>
+    </ol>
+
+    <div class="image-placeholder">
+        [SLIKA 7: Email thread detalj sa opcijama]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot otvorenog email thread-a sa dugmadima "Create claim" i "Link to existing claim"
+    </div>
+
+    <h3>3.2 Upravljanje reklamacijama</h3>
+    <h4>3.2.1 Claim Code format</h4>
+    <p>Sistem podržava parsiranje claim kodova u formatu:</p>
+    <ul>
+        <li><code>MR1234/25</code> - Prefix "MR", broj 1234, godina 2025</li>
+        <li><code>1234/25</code> - Bez prefiksa</li>
+        <li><code>MR1234/2025</code> - Sa punom godinom</li>
+    </ul>
+
+    <div class="image-placeholder">
+        [SLIKA 8: Lista reklamacija sa različitim claim kodovima]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot stranice /claims koja prikazuje tabelu sa reklamacijama i njihovim kodovima
+    </div>
+
+    <h4>3.2.2 Statusi reklamacija</h4>
+    <p>Reklamacije mogu imati sledeće statuse:</p>
+    <table>
+        <tr>
+            <th>Status</th>
+            <th>Opis</th>
+            <th>Boja badge-a</th>
+        </tr>
+        <tr>
+            <td>NEW</td>
+            <td>Nova reklamacija</td>
+            <td>Plava</td>
+        </tr>
+        <tr>
+            <td>IN_ANALYSIS</td>
+            <td>U obradi</td>
+            <td>Žuta/Narandžasta</td>
+        </tr>
+        <tr>
+            <td>WAITING_CUSTOMER</td>
+            <td>Čeka odgovor klijenta</td>
+            <td>Žuta</td>
+        </tr>
+        <tr>
+            <td>APPROVED</td>
+            <td>Odobrena</td>
+            <td>Zelena</td>
+        </tr>
+        <tr>
+            <td>REJECTED</td>
+            <td>Odbijena</td>
+            <td>Crvena</td>
+        </tr>
+        <tr>
+            <td>CLOSED</td>
+            <td>Zatvorena</td>
+            <td>Siva/Zelena</td>
+        </tr>
+    </table>
+
+    <div class="image-placeholder">
+        [SLIKA 9: Reklamacija sa različitim status badge-ovima]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot koji prikazuje reklamacije sa različitim status badge-ovima u različitim bojama
+    </div>
+
+    <h4>3.2.3 Sekcije reklamacije</h4>
+    <p>Svaka reklamacija ima sledeće sekcije (tab-ove):</p>
+
+    <div class="image-placeholder">
+        [SLIKA 10: Claim detail stranica sa tab-ovima]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot detalja reklamacije (/claims/[id]) sa svim tab-ovima: Overview, Emails, Client Documents, Findings, Photos, Work Order, Metadata
+    </div>
+
+    <h5>Overview (Pregled)</h5>
+    <p>Sažetak reklamacije na više jezika sa opcijama za prevod.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 11: Overview sekcija sa prevodom]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Overview sekcije koja prikazuje tekst na srpskom i engleskom sa "Translate" i "Swap" dugmadima
+    </div>
+
+    <h5>Emails</h5>
+    <p>Prikaz svih email konverzacija povezanih sa reklamacijom.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 12: Emails sekcija sa thread-ovima]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Emails sekcije koja prikazuje email konverzacije
+    </div>
+
+    <h5>Client Documents</h5>
+    <p>Dokumenti primljeni od klijenta sa ekstrakcijom teksta i prevodom.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 13: Client Documents sekcija]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Client Documents sekcije koja prikazuje PDF/DOCX dokumente sa opcijama "Extract Text" i "Translate"
+    </div>
+
+    <h5>Findings (Nalazi)</h5>
+    <p>Strukturisani delovi izveštaja sa prevodom.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 14: Findings sekcija sa sekcijama]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Findings sekcije koja prikazuje strukturisane sekcije (IDENTIFICATION, GENERAL, FINDINGS, itd.)
+    </div>
+
+    <h5>Photos</h5>
+    <p>Organizacija fotografija sa opisima na više jezika.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 15: Photos sekcija sa fotografijama]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Photos sekcije koja prikazuje grid fotografija sa caption-ima
+    </div>
+
+    <h5>Metadata</h5>
+    <p>Osnovne informacije o reklamaciji.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 16: Metadata sekcija sa formom]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Metadata sekcije sa formom za osnovne informacije (status, klijent, radni nalog, itd.)
+    </div>
+
+    <h3>3.3 Dashboard i statistike</h3>
+    <p>Dashboard prikazuje pregled svih reklamacija sa statistikama.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 17: Dashboard sa statistikama - glavni prikaz]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot dashboard-a sa kartama: Ukupno reklamacija, Rešene, Prihvaćene, Odbijene, U procesu
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 18: Dashboard - grafikoni i distribucija]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot dashboard-a sa graficima koji prikazuju distribuciju po statusu i klijentima
+    </div>
+
+    <h3>3.4 Sistem prevoda</h3>
+    <p>Sistem podržava prevod na više jezika koristeći DeepL, OpenAI ili Google Translate API.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 19: Proces prevoda dokumenta]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot koji prikazuje originalni tekst i prevod sa dugmetom "Translate to EN"
+    </div>
+
+    <h3>3.5 Radni nalozi</h3>
+    <p>Povezivanje reklamacija sa radnim nalozima (RN).</p>
+
+    <div class="image-placeholder">
+        [SLIKA 20: Work Orders stranica]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot /work-orders stranice koja prikazuje listu radnih naloga
+    </div>
+
+    <h2 id="koriscenje">4. KORIŠĆENJE APLIKACIJE</h2>
+
+    <h3>4.1 Instalacija i podešavanje</h3>
+    <h4>4.1.1 Preduslovi</h4>
+    <ul>
+        <li>Node.js 18+ i npm</li>
+        <li>SQLite (za lokalni razvoj) ili PostgreSQL (za produkciju)</li>
+        <li>IMAP/SMTP email nalog credentials</li>
+        <li>(Opciono) API ključ za servis prevoda</li>
+    </ul>
+
+    <h4>4.1.2 Koraci instalacije</h4>
+    <pre><code># 1. Kloniranje repozitorijuma
+git clone &lt;repository-url&gt;
+cd mr-engines-warranty
+
+# 2. Instalacija zavisnosti
+npm install
+
+# 3. Podešavanje environment varijabli
+cp .env.example .env
+
+# 4. Postavljanje baze podataka
+npx prisma migrate dev
+
+# 5. Pokretanje development servera
+npm run dev</code></pre>
+
+    <div class="image-placeholder">
+        [SLIKA 21: Terminal sa komandama instalacije]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot terminala sa komandama za instalaciju i output-om
+    </div>
+
+    <h3>4.2 Radni proces - Tipičan scenario</h3>
+    <h4>4.2.1 Primer: Proces reklamacije od početka do kraja</h4>
+
+    <div class="tip">
+        <strong>Korak 1: Primanje email poruke</strong><br>
+        Klijent šalje email na warranty@mrgroup.rs. Sistem automatski sinhronizuje poruku.
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 22: Primanje email-a u inbox-u]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot inbox-a sa novom email porukom (badge "Novo")
+    </div>
+
+    <div class="tip">
+        <strong>Korak 2: Kreiranje reklamacije</strong><br>
+        Otvorite email thread i kliknite "Create claim from this thread".
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 23: Kreiranje reklamacije iz email-a]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot procesa kreiranja reklamacije iz email thread-a
+    </div>
+
+    <div class="tip">
+        <strong>Korak 3: Popunjavanje informacija</strong><br>
+        Unesite claim code, odaberite klijenta, povežite sa radnim nalogom.
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 24: Forma za kreiranje nove reklamacije]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot forme za kreiranje reklamacije (/claims/new)
+    </div>
+
+    <div class="tip">
+        <strong>Korak 4: Analiza dokumenata</strong><br>
+        Ekstraktujte tekst iz PDF/DOCX dokumenata i prevedite ga.
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 25: Ekstrakcija teksta iz PDF dokumenta]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot koji prikazuje ekstrahovani tekst iz PDF-a i opcije za prevod
+    </div>
+
+    <div class="tip">
+        <strong>Korak 5: Promena statusa</strong><br>
+        Primenite promene statusa kroz životni ciklus reklamacije.
+    </div>
+
+    <div class="image-placeholder">
+        [SLIKA 26: Promena statusa reklamacije]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot dropdown-a za promenu statusa u Metadata sekciji
+    </div>
+
+    <h3>4.3 Pretraga i filtriranje</h3>
+    <p>Sistem podržava naprednu pretragu reklamacija.</p>
+
+    <div class="image-placeholder">
+        [SLIKA 27: Pretraga reklamacija sa filterima]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot /claims stranice sa filterima (Status, Claim Code, Customer) i rezultatima pretrage
+    </div>
+
+    <h2 id="tehnicki">5. TEHNIČKI DETALJI</h2>
+
+    <h3>5.1 Email sync algoritam</h3>
+    <p>Inkrementalna sinhronizacija koristi sledeći algoritam:</p>
+    <pre><code>1. Pročitaj MailSyncState.lastUid iz baze
+2. Ako nema lastUid, uzmi sve poruke (prva sinhronizacija)
+3. Ako ima lastUid, uzmi poruke sa UID > lastUid
+4. Ograniči na MAIL_SYNC_MAX_MESSAGES_PER_RUN
+5. Za svaku poruku:
+   a. Proveri da li već postoji (po Message-ID)
+   b. Pronađi ili kreiraj EmailThread
+   c. Kreiraj EmailMessage
+   d. Sačuvaj sve priloge
+6. Ažuriraj MailSyncState.lastUid</code></pre>
+
+    <div class="image-placeholder">
+        [SLIKA 28: Flowchart email sync procesa]
+        <br><strong>Instrukcije:</strong> Ubacite flowchart dijagram koji prikazuje tok email sinhronizacije
+    </div>
+
+    <h3>5.2 Claim Code parsing</h3>
+    <p>Algoritam za parsiranje claim kodova:</p>
+    <pre><code>Input: "MR1234/25"
+
+1. Ekstraktuj prefix: "MR"
+2. Ukloni prefix: "1234/25"
+3. Split po "/": ["1234", "25"]
+4. Parsiraj broj: 1234
+5. Parsiraj godinu: 25 → 2025
+
+Output: {
+  raw: "MR1234/25",
+  prefix: "MR",
+  number: 1234,
+  year: 2025
+}</code></pre>
+
+    <h3>5.3 File storage sistem</h3>
+    <p>Hijerarhija direktorijuma:</p>
+    <pre><code>&lt;FILE_ROOT_PATH&gt;/
+├── &lt;year&gt;/                      # 2025
+│   └── &lt;sanitizedClaimCode&gt;/    # MR1234-25
+│       ├── 01_photos/
+│       ├── 02_documents/
+│       └── 03_attachments/
+└── _unassigned/                 # Nepovezani thread-ovi
+    └── &lt;threadId&gt;/</code></pre>
+
+    <div class="image-placeholder">
+        [SLIKA 29: Struktura file storage-a]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot file sistema (iz file explorera) koji prikazuje hijerarhiju foldera
+    </div>
+
+    <h2 id="bezbednost">6. BEZBEDNOST I PERFORMANSE</h2>
+
+    <h3>6.1 Bezbednosni aspekti</h3>
+    <ul>
+        <li><strong>SQL Injection zaštita</strong>: Prisma ORM automatski štiti od SQL injection napada</li>
+        <li><strong>XSS zaštita</strong>: Next.js automatski escape-uje HTML</li>
+        <li><strong>Email credentials</strong>: Enkripcija i sigurno čuvanje (planirano)</li>
+        <li><strong>File access</strong>: Autentifikacija i autorizacija (planirano)</li>
+    </ul>
+
+    <h3>6.2 Performanse</h3>
+    <ul>
+        <li><strong>Database indexing</strong>: Indeksi na često korišćenim poljima</li>
+        <li><strong>Incremental sync</strong>: Samo nove poruke se preuzimaju</li>
+        <li><strong>Real-time polling</strong>: Inteligentno osvežavanje (1s kada je tab aktivan)</li>
+        <li><strong>Lazy loading</strong>: Komponente se učitavaju po potrebi</li>
+    </ul>
+
+    <h2 id="razvoj">7. RAZVOJ I ODRŽAVANJE</h2>
+
+    <h3>7.1 Database migracije</h3>
+    <pre><code># Kreiranje migracije
+npx prisma migrate dev --name your_migration_name
+
+# Prisma Studio (pregled baze)
+npx prisma studio</code></pre>
+
+    <div class="image-placeholder">
+        [SLIKA 30: Prisma Studio interface]
+        <br><strong>Instrukcije:</strong> Ubacite screenshot Prisma Studio sa prikazom tabela i podataka
+    </div>
+
+    <h3>7.2 Build za produkciju</h3>
+    <pre><code>npm run build
+npm start</code></pre>
+
+    <h2 id="buducnost">8. BUDUĆA POBOLJŠANJA</h2>
+
+    <h3>8.1 Planirane funkcije</h3>
+    <ul>
+        <li>PDF report generation</li>
+        <li>User authentication i authorization</li>
+        <li>Background job scheduler</li>
+        <li>NAS integration</li>
+        <li>Napredna pretraga (full-text search)</li>
+        <li>Bulk operacije</li>
+        <li>Export funkcionalnost (Excel, CSV, PDF)</li>
+        <li>Email templates</li>
+        <li>Push notifikacije</li>
+        <li>Activity log</li>
+    </ul>
+
+    <h2 id="zakljucak">9. ZAKLJUČAK</h2>
+
+    <p>MR Engines Warranty Claims Management System je kompleksna web aplikacija koja automatskuje i centralizuje proces upravljanja reklamacijama garancije motora. Kroz integraciju email sistema, automatsku organizaciju dokumenata, multijezičnu podršku i detaljno praćenje statusa, aplikacija značajno poboljšava efikasnost i produktivnost tima za reklamacije.</p>
+
+    <h3>9.1 Ključne prednosti</h3>
+    <ul>
+        <li><strong>Automatizacija</strong>: Smanjenje ručnog rada kroz automatsku sinhronizaciju email-a</li>
+        <li><strong>Centralizacija</strong>: Sve informacije o reklamacijama na jednom mestu</li>
+        <li><strong>Multijezičnost</strong>: Podrška za prevod na više jezika</li>
+        <li><strong>Organizacija</strong>: Automatska organizacija fajlova i dokumenata</li>
+        <li><strong>Praćenje</strong>: Detaljno praćenje statusa i statistika</li>
+        <li><strong>Fleksibilnost</strong>: Modularna arhitektura omogućava lako proširenje</li>
+    </ul>
+
+    <div class="image-placeholder">
+        [SLIKA 31: Finalni prikaz - sve funkcionalnosti zajedno]
+        <br><strong>Instrukcije:</strong> Ubacite kompleksniji screenshot koji prikazuje više funkcionalnosti aplikacije istovremeno (npr. dashboard + lista reklamacija)
+    </div>
+
+    <hr>
+    <p style="text-align: center; color: #7f8c8d; margin-top: 40px;">
+        <strong>Verzija dokumentacije:</strong> 1.0<br>
+        <strong>Datum:</strong> 2025<br>
+        <strong>Autor:</strong> MR Engines Development Team
+    </p>
+
+</body>
+</html>

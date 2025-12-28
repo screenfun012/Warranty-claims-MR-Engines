@@ -147,19 +147,70 @@
   }
   
   /* Prevent sidebar links from being blue and underlined */
-  nav a {
+  nav a,
+  [data-sidebar="menu-button"] a,
+  [data-sidebar="menu-button"] a:link,
+  [data-sidebar="menu-button"] a:visited,
+  [data-sidebar="menu-button"] a:hover,
+  [data-sidebar="menu-button"] a:active,
+  [data-sidebar="menu-button"] a:focus {
     text-decoration: none !important;
     color: inherit !important;
+    font-family: inherit !important;
+    font-size: inherit !important;
+    font-weight: inherit !important;
   }
-  nav a:visited {
-    color: inherit !important;
+  
+  /* Email body styling - poštuj originalne stilove iz email-a */
+  .email-body {
+    /* Reset prose stilove koji mogu da prebrišu email stilove */
+    color: inherit;
+    font-family: inherit;
+    line-height: inherit;
   }
-  nav a:hover {
-    text-decoration: none !important;
-    color: inherit !important;
+
+  /* Poštuj inline stilove iz email potpisa */
+  .email-body * {
+    /* Dozvoli inline stilove da se primene */
+    box-sizing: border-box;
   }
-  nav a:active {
-    color: inherit !important;
+
+  /* Poštuj boje i fontove iz email-a - ali dozvoli inline stilove da override-uju */
+  .email-body table,
+  .email-body td,
+  .email-body th,
+  .email-body div,
+  .email-body span,
+  .email-body p {
+    /* Ne resetuj stilove ako su inline definisani */
+    color: inherit;
+    font-family: inherit;
+  }
+
+  /* Poštuj slike u email potpisima */
+  .email-body img {
+    max-width: 100%;
+    height: auto;
+    display: inline-block;
+  }
+
+  /* Poštuj linkove u email potpisima */
+  .email-body a {
+    color: inherit;
+    text-decoration: inherit;
+  }
+
+  /* Poštuj tabelu strukture (često se koriste u potpisima) */
+  .email-body table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .email-body td,
+  .email-body th {
+    padding: inherit;
+    border: inherit;
+    vertical-align: inherit;
   }
   
   /* Custom animations for table rows */
@@ -181,5 +232,18 @@
       transparent 100%
     );
     background-size: 1000px 100%;
+  }
+  
+  /* Fix Next.js portal positioning - allow pointer events for dev overlay */
+  nextjs-portal {
+    position: fixed;
+    width: 0;
+    height: 0;
+    z-index: 9999;
+  }
+  
+  /* Allow Next.js dev overlay to be clickable */
+  nextjs-portal > * {
+    pointer-events: auto;
   }
 }

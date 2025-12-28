@@ -1,23 +1,33 @@
 /**
  * Mail Sync Scheduler - Automatic email synchronization
- * Uses periodic polling to check for new emails automatically
- * Polls every 2 minutes by default
+ * Supports both IMAP IDLE (real-time push) and periodic polling
+ * Falls back to polling if IDLE is not available or fails
  */
 
 import { syncNewEmails } from "./mailSyncService";
 import { getEmailConfig } from "@/lib/config/envLoader";
 import { env } from "@/lib/config/env";
+import { getImapIdleClient } from "./imapIdleClient";
 
 let syncInterval: NodeJS.Timeout | null = null;
 let isSyncActive = false;
+let useIdleMode = false;
 
 /**
- * Start automatic email sync with periodic polling
+ * Start automatic email sync
+ * Tries IMAP IDLE first (if enabled), falls back to periodic polling
  */
 export async function startIdleSync(): Promise<void> {
+  // If already active but IDLE failed, restart it
   if (isSyncActive) {
-    console.log("[AutoSync] Already active, skipping start");
-    return;
+    const usingIdle = isUsingIdleMode();
+    if (!usingIdle && env.MAIL_SYNC_USE_IDLE) {
+      console.log("[AutoSync] IDLE failed, restarting sync to retry IDLE...");
+      await stopIdleSync();
+    } else {
+      console.log("[AutoSync] Already active, skipping start");
+      return;
+    }
   }
 
   if (!env.MAIL_SYNC_ENABLED) {
@@ -34,10 +44,10 @@ export async function startIdleSync(): Promise<void> {
     return;
   }
 
-  console.log("[AutoSync] Starting automatic email sync (polling every 2 minutes)...");
   isSyncActive = true;
+  useIdleMode = env.MAIL_SYNC_USE_IDLE;
 
-  // Initial sync
+  // Initial sync regardless of mode
   try {
     const result = await syncNewEmails();
     if (result.newMessages > 0) {
@@ -47,21 +57,75 @@ export async function startIdleSync(): Promise<void> {
     console.error("[AutoSync] Error in initial sync:", error);
   }
 
-  // Set up periodic polling - every 2 minutes
-  const pollInterval = 2 * 60 * 1000; // 2 minutes
-  syncInterval = setInterval(async () => {
-    if (isSyncActive) {
-      try {
-        console.log("[AutoSync] Checking for new emails...");
-        const result = await syncNewEmails();
-        if (result.newMessages > 0) {
-          console.log(`[AutoSync] Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
+  // Try IMAP IDLE mode first (if enabled)
+  if (useIdleMode) {
+    try {
+      console.log("[AutoSync] Attempting to start IMAP IDLE mode (real-time push notifications)...");
+      const idleClient = getImapIdleClient();
+      
+      await idleClient.start(async () => {
+        // Callback when new message is detected
+        console.log("[AutoSync] IDLE detected mailbox change, syncing emails...");
+        try {
+          // Add a small delay to ensure IMAP server has processed the new message
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          const result = await syncNewEmails();
+          if (result.newMessages > 0) {
+            console.log(`[AutoSync] IDLE: Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+            console.log("[AutoSync] IDLE: New messages synced, frontend should refresh via polling");
+          } else {
+            console.log("[AutoSync] IDLE: No new messages found (may be a false positive or already synced)");
+          }
+        } catch (error) {
+          console.error("[AutoSync] Error syncing emails via IDLE:", error);
         }
-      } catch (error) {
-        console.error("[AutoSync] Error syncing emails:", error);
-      }
+      });
+
+      console.log("[AutoSync] IMAP IDLE mode started successfully - using real-time push notifications");
+      
+      // Also start periodic polling as backup (every 2 minutes) in case IDLE misses something
+      console.log("[AutoSync] Starting backup polling (every 2 minutes) in addition to IDLE...");
+      const backupPollInterval = 2 * 60 * 1000; // 2 minutes
+      syncInterval = setInterval(async () => {
+        if (isSyncActive) {
+          try {
+            console.log("[AutoSync] Backup polling: Checking for new emails...");
+            const result = await syncNewEmails();
+            if (result.newMessages > 0) {
+              console.log(`[AutoSync] Backup polling: Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
+            }
+          } catch (error) {
+            console.error("[AutoSync] Error in backup polling:", error);
+          }
+        }
+      }, backupPollInterval);
+      
+      return; // Successfully started IDLE with backup polling
+    } catch (error) {
+      console.error("[AutoSync] Failed to start IMAP IDLE, falling back to polling:", error);
+      useIdleMode = false; // Fall back to polling
     }
-  }, pollInterval);
+  }
+
+  // Fallback to periodic polling
+  if (!useIdleMode) {
+    console.log("[AutoSync] Starting periodic polling (every 30 seconds)...");
+    const pollInterval = 30 * 1000; // 30 seconds for faster response
+    syncInterval = setInterval(async () => {
+      if (isSyncActive && !useIdleMode) {
+        try {
+          console.log("[AutoSync] Polling for new emails...");
+          const result = await syncNewEmails();
+          if (result.newMessages > 0) {
+            console.log(`[AutoSync] Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
+          }
+        } catch (error) {
+          console.error("[AutoSync] Error syncing emails:", error);
+        }
+      }
+    }, pollInterval);
+  }
 }
 
 /**
@@ -71,6 +135,18 @@ export async function stopIdleSync(): Promise<void> {
   console.log("[AutoSync] Stopping automatic sync...");
   isSyncActive = false;
 
+  // Stop IDLE if active
+  if (useIdleMode) {
+    try {
+      const idleClient = getImapIdleClient();
+      await idleClient.stop();
+      useIdleMode = false;
+    } catch (error) {
+      console.error("[AutoSync] Error stopping IDLE:", error);
+    }
+  }
+
+  // Stop polling if active
   if (syncInterval) {
     clearInterval(syncInterval);
     syncInterval = null;
@@ -84,5 +160,14 @@ export async function stopIdleSync(): Promise<void> {
  */
 export function isIdleSyncActive(): boolean {
   return isSyncActive;
+}
+
+/**
+ * Check if currently using IDLE mode
+ */
+export function isUsingIdleMode(): boolean {
+  if (!isSyncActive) return false;
+  const idleClient = getImapIdleClient();
+  return idleClient.isIdleActive();
 }
 

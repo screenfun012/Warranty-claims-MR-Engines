@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendEmailAndSave } from "@/lib/email/smtpClient";
 import { getAttachmentFilePath } from "@/lib/files/fileStorage";
+import { getClaimStatusEmailTemplate } from "@/lib/email/emailTemplates";
 import fs from "fs";
 
 export async function POST(
@@ -87,15 +88,48 @@ export async function POST(
       );
     }
 
+    // Generate email template if claimAcceptanceStatus is provided
+    let emailSubject = body.subject;
+    let emailText = body.text || body.body;
+    let emailHtml = body.html;
+
+    if (body.claimAcceptanceStatus && (body.claimAcceptanceStatus === "ACCEPTED" || body.claimAcceptanceStatus === "REJECTED")) {
+      // Get base URL for logo and links - use request origin if available
+      const baseUrl = request.nextUrl.origin || 
+                     process.env.NEXT_PUBLIC_APP_URL || 
+                     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+                     "http://localhost:3000";
+      
+      // Use the new template for status emails
+      const template = getClaimStatusEmailTemplate(
+        body.claimAcceptanceStatus,
+        {
+          claimCode: claim.claimCodeRaw || undefined,
+          customerName: claim.customer?.name || undefined,
+          customMessage: body.text || body.body,
+          baseUrl,
+          // TODO: Generate viewLink when public viewing is implemented
+          // viewLink: `${baseUrl}/claims/${id}/view?token=...`,
+        }
+      );
+      
+      emailSubject = template.subject;
+      emailText = template.text;
+      emailHtml = template.html;
+    } else if (body.body && !body.html) {
+      // If custom body is provided but no HTML, create simple HTML
+      emailHtml = `<p>${(body.text || body.body).replace(/\n/g, '<br>')}</p>`;
+    }
+
     // Send email
     const result = await sendEmailAndSave({
       emailThreadId: threadId,
       claimId: id,
       to: body.to,
       cc: body.cc,
-      subject: body.subject,
-      text: body.text || body.body,
-      html: body.html || (body.body ? `<p>${body.body.replace(/\n/g, '<br>')}</p>` : undefined),
+      subject: emailSubject,
+      text: emailText,
+      html: emailHtml,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
 

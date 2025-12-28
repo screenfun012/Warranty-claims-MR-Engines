@@ -13,12 +13,37 @@ import { normalizeSerbianLatin } from "@/lib/utils/search";
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const status = searchParams.get("status");
+    const statusParams = searchParams.getAll("status"); // Get all status values for multi-select
     const claimCode = searchParams.get("claimCode");
     const customerName = searchParams.get("customerId"); // Keep param name for backward compatibility
 
     const where: any = {};
-    if (status) where.status = status;
+    // Handle multi-select status filter
+    if (statusParams.length > 0) {
+      // Separate status and acceptanceStatus filters
+      const statusFilters = statusParams.filter(s => !["ACCEPTED", "REJECTED"].includes(s));
+      const acceptanceFilters = statusParams.filter(s => ["ACCEPTED", "REJECTED"].includes(s));
+      
+      const orConditions: any[] = [];
+      
+      if (statusFilters.length > 0) {
+        if (statusFilters.length === 1) {
+          orConditions.push({ status: statusFilters[0] });
+        } else {
+          orConditions.push({ status: { in: statusFilters } });
+        }
+      }
+      
+      if (acceptanceFilters.length > 0) {
+        acceptanceFilters.forEach(af => {
+          orConditions.push({ claimAcceptanceStatus: af });
+        });
+      }
+      
+      if (orConditions.length > 0) {
+        where.OR = orConditions;
+      }
+    }
     if (claimCode) {
       // Normalize Serbian Latin characters for search
       const normalizedClaimCode = normalizeSerbianLatin(claimCode);
@@ -129,7 +154,7 @@ export async function POST(request: NextRequest) {
     });
     
     // If creating from email thread, link the thread to the claim
-    let emailThreadId = body.emailThreadId;
+    const emailThreadId = body.emailThreadId;
     
     const claim = await prisma.claim.create({
       data: {
@@ -278,7 +303,7 @@ export async function POST(request: NextRequest) {
         try {
           // Use originalSender from thread first (this is the real customer email)
           // Fallback to first message from if originalSender is not available
-          let customerEmail = thread.originalSender || (thread.messages[0]?.from);
+          let customerEmail: string | null = thread.originalSender || (thread.messages[0]?.from) || null;
           
           // Extract email address from "from" field (handle "Name <email@domain.com>" format)
           if (customerEmail) {
@@ -292,19 +317,30 @@ export async function POST(request: NextRequest) {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(customerEmail)) {
               console.log(`[create-claim] Invalid email format: ${customerEmail}, skipping auto-email`);
-              customerEmail = null;
+              customerEmail = null as string | null;
             }
             
             // Skip known invalid/system email addresses
             const invalidEmails = ['cpanel@', 'noreply@', 'no-reply@', 'mailer-daemon@', 'postmaster@', 'bounce@', 'return@'];
-            if (customerEmail && invalidEmails.some(invalid => customerEmail.toLowerCase().includes(invalid))) {
+            if (customerEmail && invalidEmails.some(invalid => customerEmail!.toLowerCase().includes(invalid))) {
               console.log(`[create-claim] Skipping system/invalid email: ${customerEmail}`);
               customerEmail = null;
             }
           }
           
           if (customerEmail) {
-            const emailTemplate = getClaimProcessingEmailTemplate();
+            // Get base URL for logo and links - use request origin if available
+            const baseUrl = request.nextUrl.origin || 
+                           process.env.NEXT_PUBLIC_APP_URL || 
+                           (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+                           "http://localhost:3000";
+            
+            const emailTemplate = getClaimProcessingEmailTemplate({
+              claimCode: claim.claimCodeRaw || undefined,
+              customerName: claim.customer?.name || undefined,
+              status: claim.status,
+              baseUrl,
+            });
             
             // Create or get email thread for this claim
             let emailThread = await prisma.emailThread.findFirst({

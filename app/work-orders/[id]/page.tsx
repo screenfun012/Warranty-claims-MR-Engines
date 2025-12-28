@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,25 +39,26 @@ interface WorkOrder {
 const statusColors: Record<string, string> = {
   NEW: "bg-blue-100 text-blue-800",
   IN_ANALYSIS: "bg-yellow-100 text-yellow-800",
-  WAITING_CUSTOMER: "bg-orange-100 text-orange-800",
   APPROVED: "bg-green-100 text-green-800",
   REJECTED: "bg-red-100 text-red-800",
   CLOSED: "bg-gray-100 text-gray-800",
 };
 
 export default function WorkOrderDetailPage() {
-  const params = useParams();
   const router = useRouter();
+  // In Client Components, useParams returns direct values (not Promises)
+  const params = useParams();
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (params.id) {
+    if (params?.id) {
       fetchWorkOrder();
     }
-  }, [params.id]);
+  }, [params?.id]);
 
   const fetchWorkOrder = async () => {
+    if (!params?.id) return;
     try {
       const res = await fetch(`/api/work-orders/${params.id}`);
       const data = await res.json();

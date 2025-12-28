@@ -54,7 +54,7 @@ model Claim {
   claimPrefix          String?
   claimNumber          Int?
   claimYear            Int?
-  status               String          @default("NEW") // NEW, IN_ANALYSIS, WAITING_CUSTOMER, APPROVED, REJECTED, CLOSED
+  status               String          @default("NEW") // NEW, IN_ANALYSIS, APPROVED, REJECTED, CLOSED
   claimAcceptanceStatus String?        // ACCEPTED, REJECTED, PENDING
   customerId           String?
   customer             Customer?       @relation(fields: [customerId], references: [id])

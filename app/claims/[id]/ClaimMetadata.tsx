@@ -1,27 +1,67 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Hash, Building2, Settings, User, FolderOpen, FileCode } from "lucide-react";
 
 interface ClaimMetadataProps {
-  claim: any;
-  onUpdate: (updates: any) => void;
+  claim: {
+    id: string;
+    claimCodeRaw: string | null;
+    claimPrefix: string | null;
+    claimNumber: number | null;
+    claimYear: number | null;
+    status: string;
+    engineType: string | null;
+    mrEngineCode: string | null;
+    customerReference: string | null;
+    invoiceNumber: string | null;
+    serverFolderPath: string | null;
+    assignedTo: {
+      id: string;
+      fullName: string;
+    } | null;
+    customer: {
+      id: string;
+      name: string;
+    } | null;
+  };
+  onUpdate: (updates: Record<string, unknown>) => void;
   isReadOnly?: boolean;
 }
 
 export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMetadataProps) {
   const [assignedToName, setAssignedToName] = useState(claim.assignedTo?.fullName || "");
   const [customerName, setCustomerName] = useState(claim.customer?.name || "");
+  const [isEditingCustomerName, setIsEditingCustomerName] = useState(false);
+  const [isEditingAssignedToName, setIsEditingAssignedToName] = useState(false);
+  
+  const prevClaimIdRef = useRef(claim.id);
 
-  // Update local state when claim changes
+  // Only update local state when claim ID changes (new claim loaded), not when editing
   useEffect(() => {
-    setAssignedToName(claim.assignedTo?.fullName || "");
-    setCustomerName(claim.customer?.name || "");
-  }, [claim.assignedTo?.fullName, claim.customer?.name]);
+    if (prevClaimIdRef.current !== claim.id) {
+      // New claim loaded, reset local state
+      setAssignedToName(claim.assignedTo?.fullName || "");
+      setCustomerName(claim.customer?.name || "");
+      setIsEditingCustomerName(false);
+      setIsEditingAssignedToName(false);
+      prevClaimIdRef.current = claim.id;
+    } else if (!isEditingCustomerName && !isEditingAssignedToName) {
+      // Claim updated from outside (e.g., after API call), update if not editing
+      const newAssignedToName = claim.assignedTo?.fullName || "";
+      const newCustomerName = claim.customer?.name || "";
+      
+      if (newAssignedToName !== assignedToName) {
+        setAssignedToName(newAssignedToName);
+      }
+      if (newCustomerName !== customerName) {
+        setCustomerName(newCustomerName);
+      }
+    }
+  }, [claim.id, claim.assignedTo?.fullName, claim.customer?.name]);
   return (
     <Card className="p-6">
       <h2 className="text-lg font-semibold mb-6 text-primary flex items-center gap-2">
@@ -78,6 +118,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             value={customerName}
             placeholder="Customer name"
             disabled={isReadOnly}
+            onFocus={() => {
+              if (!isReadOnly) {
+                setIsEditingCustomerName(true);
+              }
+            }}
             onChange={(e) => {
               if (isReadOnly) return;
               const newName = e.target.value;
@@ -85,6 +130,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             }}
             onBlur={async (e) => {
               if (isReadOnly) return;
+              setIsEditingCustomerName(false);
               const newName = e.target.value.trim();
               const currentName = claim.customer?.name || "";
               
@@ -190,12 +236,18 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             value={assignedToName}
             placeholder="Assigned user"
             disabled={isReadOnly}
+            onFocus={() => {
+              if (!isReadOnly) {
+                setIsEditingAssignedToName(true);
+              }
+            }}
             onChange={(e) => {
               if (isReadOnly) return;
               setAssignedToName(e.target.value);
             }}
             onBlur={async (e) => {
               if (isReadOnly) return;
+              setIsEditingAssignedToName(false);
               const newName = e.target.value.trim();
               const currentName = claim.assignedTo?.fullName || "";
               

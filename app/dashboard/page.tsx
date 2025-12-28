@@ -240,7 +240,6 @@ export default function DashboardPage() {
             <BarChart data={stats.claimsByStatus.map((item) => ({
               status: item.status === "NEW" ? "NOVO" : 
                       item.status === "IN_ANALYSIS" ? "U OBRADI" :
-                      item.status === "WAITING_CUSTOMER" ? "ČEKA KLIJENTA" :
                       item.status === "CLOSED" ? "ZATVORENO" :
                       item.status === "APPROVED" ? "ODOBRENO" :
                       item.status === "REJECTED" ? "ODBIJENO" : item.status,
@@ -272,7 +271,6 @@ export default function DashboardPage() {
               <p className="text-sm font-medium text-muted-foreground">
                 {item.status === "NEW" ? "NOVO" : 
                  item.status === "IN_ANALYSIS" ? "U OBRADI" :
-                 item.status === "WAITING_CUSTOMER" ? "ČEKA KLIJENTA" :
                  item.status === "CLOSED" ? "GOTOVO" :
                  item.status === "APPROVED" ? "ODOBRENO" :
                  item.status === "REJECTED" ? "ODBIJENO" : item.status}

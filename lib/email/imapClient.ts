@@ -31,7 +31,7 @@ export interface FetchedMessage {
  * Get a configured IMAP client instance
  * Checks database config first, then falls back to env vars
  */
-async function getImapClient(): Promise<ImapFlow> {
+export async function getImapClient(): Promise<ImapFlow> {
   const dbConfig = await getEmailConfig();
   
   const host = dbConfig?.imapHost || env.IMAP_HOST;
@@ -212,11 +212,25 @@ export async function fetchNewMessagesSince(
 
         // Parse headers
         const envelope = fullMessage.envelope;
+        
+        // Helper function to decode HTML entities
+        const decodeHtmlEntities = (str: string): string => {
+          if (!str) return "";
+          return str
+            .replace(/&quot;/g, '"')
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&#39;/g, "'")
+            .replace(/&#x27;/g, "'")
+            .replace(/&#x2F;/g, '/');
+        };
+        
         const headers = {
-          from: envelope.from?.[0]?.address || envelope.from?.[0]?.name || "",
-          to: envelope.to?.[0]?.address || envelope.to?.[0]?.name || "",
-          cc: envelope.cc?.map((c) => c.address || c.name).join(", "),
-          subject: envelope.subject || "",
+          from: decodeHtmlEntities(envelope.from?.[0]?.address || envelope.from?.[0]?.name || ""),
+          to: decodeHtmlEntities(envelope.to?.[0]?.address || envelope.to?.[0]?.name || ""),
+          cc: envelope.cc?.map((c) => decodeHtmlEntities(c.address || c.name)).join(", "),
+          subject: decodeHtmlEntities(envelope.subject || ""),
           messageId: envelope.messageId || undefined,
           inReplyTo: envelope.inReplyTo?.[0] || undefined,
           date: envelope.date || new Date(),

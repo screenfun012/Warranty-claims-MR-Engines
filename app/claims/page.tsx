@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText } from "lucide-react";
+import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
@@ -41,8 +41,6 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
         return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400 animate-pulse" />;
       case "IN_ANALYSIS":
         return <StatusSpinner color="amber" />;
-      case "WAITING_CUSTOMER":
-        return <StatusSpinner color="yellow" />;
       case "CLOSED":
       case "APPROVED":
         return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 dark:text-green-400 fill-green-500 dark:fill-green-400" />;
@@ -68,8 +66,6 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
         return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20";
       case "IN_ANALYSIS":
         return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
-      case "WAITING_CUSTOMER":
-        return "border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20";
       case "CLOSED":
       case "APPROVED":
         return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20";
@@ -110,7 +106,6 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
 const statusLabels: Record<string, string> = {
   NEW: "NOVO",
   IN_ANALYSIS: "U OBRADI",
-  WAITING_CUSTOMER: "ČEKA KLIJENTA",
   APPROVED: "ODOBRENO",
   REJECTED: "ODBIJENO",
   CLOSED: "ZATVORENO",
@@ -122,10 +117,13 @@ export default function ClaimsPage() {
   const [allClaims, setAllClaims] = useState<Claim[]>([]); // Store all claims for suggestions
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    status: "",
+    status: [] as string[], // Changed to array for multi-select
     claimCode: "",
     customerId: "",
+    urgentOnly: false, // Filter for urgent claims (NEW or IN_ANALYSIS older than 7 days)
   });
+  const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
   // Separate state for text inputs to allow debouncing
   const [textFilters, setTextFilters] = useState({
     claimCode: "",
@@ -150,9 +148,13 @@ export default function ClaimsPage() {
       
       // If showing all, only apply status filter for suggestions
       if (showAll) {
-        if (filters.status) params.append("status", filters.status);
+        if (filters.status.length > 0) {
+          filters.status.forEach(s => params.append("status", s));
+        }
       } else {
-        if (filters.status) params.append("status", filters.status);
+        if (filters.status.length > 0) {
+          filters.status.forEach(s => params.append("status", s));
+        }
         if (activeFilters.claimCode) params.append("claimCode", activeFilters.claimCode);
         if (activeFilters.customerId) params.append("customerId", activeFilters.customerId);
       }
@@ -235,10 +237,7 @@ export default function ClaimsPage() {
     fetchClaims(true); // Fetch all claims for suggestions
   }, []);
 
-  // Fetch all claims for suggestions when status changes
-  useEffect(() => {
-    fetchClaims(true); // Fetch all claims for suggestions
-  }, [filters.status]);
+  // Initial fetch only - no refresh on status change
 
   // Real-time filtering while typing - filter locally from allClaims
   useEffect(() => {
@@ -265,13 +264,37 @@ export default function ClaimsPage() {
       });
     }
     
-    // Apply status filter
-    if (filters.status) {
-      filtered = filtered.filter(claim => claim.status === filters.status);
+    // Apply status filter (multi-select) - real-time filtering
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(claim => {
+        return filters.status.some(selectedStatus => {
+          // For NEW and IN_ANALYSIS, check status field
+          if (selectedStatus === "NEW" && claim.status === "NEW") return true;
+          if (selectedStatus === "IN_ANALYSIS" && claim.status === "IN_ANALYSIS") return true;
+          
+          // For ACCEPTED and REJECTED, check claimAcceptanceStatus
+          if (selectedStatus === "ACCEPTED" && claim.claimAcceptanceStatus === "ACCEPTED") return true;
+          if (selectedStatus === "REJECTED" && claim.claimAcceptanceStatus === "REJECTED") return true;
+          
+          return false;
+        });
+      });
+    }
+    
+    // Apply urgent filter - NEW or IN_ANALYSIS older than 7 days
+    if (filters.urgentOnly) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      filtered = filtered.filter(claim => {
+        const claimDate = new Date(claim.createdAt);
+        const isOldEnough = claimDate < sevenDaysAgo;
+        const isUrgentStatus = claim.status === "NEW" || claim.status === "IN_ANALYSIS";
+        return isOldEnough && isUrgentStatus;
+      });
     }
     
     setClaims(filtered);
-  }, [textFilters.claimCode, textFilters.customerId, filters.status, allClaims]);
+  }, [textFilters.claimCode, textFilters.customerId, filters.status.join(","), filters.urgentOnly, allClaims]);
 
   // Listen for claim updates to refresh the list
   useEffect(() => {
@@ -283,6 +306,21 @@ export default function ClaimsPage() {
       window.removeEventListener('claim-updated', handleClaimUpdate);
     };
   }, [fetchClaims]);
+
+  // Close status dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setShowStatusDropdown(false);
+      }
+    };
+    if (showStatusDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showStatusDropdown]);
 
   if (loading) {
     return (
@@ -319,32 +357,145 @@ export default function ClaimsPage() {
             Upravljanje svim reklamacijama
           </p>
         </div>
-        <Button 
-          onClick={() => router.push("/claims/new")} 
-          className="bg-primary hover:bg-primary/90 transition-all hover:shadow-lg animate-in fade-in slide-in-from-right-4"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New claim
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            onClick={() => router.push("/claims/new")} 
+            className="bg-primary hover:bg-primary/90 transition-all hover:shadow-lg"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New claim
+          </Button>
+        </div>
       </div>
 
       <Card className="p-4 mb-6 hover:shadow-md transition-all border border-border animate-in fade-in slide-in-from-top-2">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="animate-in fade-in slide-in-from-left-4" style={{ animationDelay: "0ms" }}>
+        {/* Active filters indicator */}
+        {(filters.status.length > 0 || filters.urgentOnly || textFilters.claimCode.trim() || textFilters.customerId.trim()) && (
+          <div className="mb-4 pb-4 border-b flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-muted-foreground">Aktivni filteri:</span>
+            {filters.status.map((status) => (
+              <span
+                key={status}
+                className="inline-flex items-center gap-1 bg-zinc-800 dark:bg-zinc-900 text-zinc-200 dark:text-zinc-300 border border-zinc-600 dark:border-zinc-600 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded-md px-2.5 py-1 text-sm font-medium"
+              >
+                {status === "NEW" ? "Novo" : 
+                 status === "IN_ANALYSIS" ? "U obradi" :
+                 status === "ACCEPTED" ? "Završeno (Prihvaćeno)" :
+                 status === "REJECTED" ? "Završeno (Odbijeno)" : status}
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, status: filters.status.filter(s => s !== status) });
+                  }}
+                  className="ml-1 hover:text-white text-zinc-300 dark:text-zinc-400 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+            {filters.urgentOnly && (
+              <span
+                className="inline-flex items-center gap-1 bg-zinc-800 dark:bg-zinc-900 text-zinc-200 dark:text-zinc-300 border border-zinc-600 dark:border-zinc-600 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded-md px-2.5 py-1 text-sm font-medium"
+              >
+                Hitne reklamacije
+                <button
+                  onClick={() => {
+                    setFilters({ ...filters, urgentOnly: false });
+                  }}
+                  className="ml-1 hover:text-white text-zinc-300 dark:text-zinc-400 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {textFilters.claimCode.trim() && (
+              <span
+                className="inline-flex items-center gap-1 bg-zinc-800 dark:bg-zinc-900 text-zinc-200 dark:text-zinc-300 border border-zinc-600 dark:border-zinc-600 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded-md px-2.5 py-1 text-sm font-medium"
+              >
+                Claim Code: {textFilters.claimCode}
+                <button
+                  onClick={() => {
+                    setTextFilters({ ...textFilters, claimCode: "" });
+                  }}
+                  className="ml-1 hover:text-white text-zinc-300 dark:text-zinc-400 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+            {textFilters.customerId.trim() && (
+              <span
+                className="inline-flex items-center gap-1 bg-zinc-800 dark:bg-zinc-900 text-zinc-200 dark:text-zinc-300 border border-zinc-600 dark:border-zinc-600 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded-md px-2.5 py-1 text-sm font-medium"
+              >
+                Customer: {textFilters.customerId}
+                <button
+                  onClick={() => {
+                    setTextFilters({ ...textFilters, customerId: "" });
+                  }}
+                  className="ml-1 hover:text-white text-zinc-300 dark:text-zinc-400 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "0ms" }}>
             <label className="text-sm font-medium mb-2 block">Status</label>
-            <Select value={filters.status || undefined} onValueChange={(value) => setFilters({ ...filters, status: value || "" })}>
-              <SelectTrigger className="transition-all hover:border-primary/50 focus:border-primary">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="NEW">Novo</SelectItem>
-                <SelectItem value="IN_ANALYSIS">U obradi</SelectItem>
-                <SelectItem value="WAITING_CUSTOMER">Čeka klijenta</SelectItem>
-                <SelectItem value="APPROVED">Odobreno</SelectItem>
-                <SelectItem value="REJECTED">Odbijeno</SelectItem>
-                <SelectItem value="CLOSED">Gotovo</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                type="button"
+                onClick={() => setShowStatusDropdown(!showStatusDropdown)}
+                className="w-full flex items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20 h-9 min-h-[36px]"
+              >
+                <span className={filters.status.length === 0 ? "text-muted-foreground" : ""}>
+                  {filters.status.length === 0 
+                    ? "Sve reklamacije" 
+                    : filters.status.length === 1 
+                      ? (filters.status[0] === "NEW" ? "Novo" : 
+                         filters.status[0] === "IN_ANALYSIS" ? "U obradi" :
+                         filters.status[0] === "ACCEPTED" ? "Završeno (Prihvaćeno)" :
+                         filters.status[0] === "REJECTED" ? "Završeno (Odbijeno)" : filters.status[0])
+                      : `${filters.status.length} izabrano`}
+                </span>
+                <ChevronDownIcon className="h-4 w-4 opacity-50" />
+              </button>
+              {showStatusDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
+                  <div className="p-2 space-y-1">
+                    {[
+                      { value: "NEW", label: "Novo" },
+                      { value: "IN_ANALYSIS", label: "U obradi" },
+                      { value: "ACCEPTED", label: "Završeno (Prihvaćeno)" },
+                      { value: "REJECTED", label: "Završeno (Odbijeno)" },
+                    ].map((option) => {
+                      const isSelected = filters.status.includes(option.value);
+                      return (
+                        <label
+                          key={option.value}
+                          className="flex items-center gap-2 px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors cursor-pointer rounded-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFilters({ ...filters, status: [...filters.status, option.value] });
+                              } else {
+                                setFilters({ ...filters, status: filters.status.filter(s => s !== option.value) });
+                              }
+                            }}
+                            className="h-4 w-4 rounded border-input"
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "100ms" }}>
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
@@ -370,7 +521,7 @@ export default function ClaimsPage() {
                     setShowClaimCodeSuggestions(false);
                   }
                 }}
-                className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-9 min-h-[36px] transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               {showClaimCodeSuggestions && claimCodeSuggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
@@ -415,7 +566,7 @@ export default function ClaimsPage() {
                     setShowCustomerSuggestions(false);
                   }
                 }}
-                className="transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-9 min-h-[36px] transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               {showCustomerSuggestions && customerSuggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
@@ -436,6 +587,49 @@ export default function ClaimsPage() {
               )}
             </div>
           </div>
+          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "50ms" }}>
+            <label className="text-sm font-medium mb-2 block flex items-center gap-2">
+              <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              Hitne reklamacije
+            </label>
+            <div className="flex items-center gap-2 h-9 px-3 py-2 rounded-md border border-input bg-transparent">
+              <input
+                type="checkbox"
+                id="urgentOnly"
+                checked={filters.urgentOnly}
+                onChange={(e) => {
+                  setFilters({ ...filters, urgentOnly: e.target.checked });
+                }}
+                className="h-4 w-4 rounded border-input cursor-pointer"
+              />
+              <label htmlFor="urgentOnly" className="text-sm text-muted-foreground cursor-pointer flex-1">
+                Starije od 7 dana
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        {/* Results count */}
+        <div className="mt-4 pt-4 border-t flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Prikazano: <span className="font-semibold text-foreground">{claims.length}</span> od <span className="font-semibold text-foreground">{allClaims.length}</span> reklamacija
+          </p>
+          {(filters.status.length > 0 || filters.urgentOnly || textFilters.claimCode.trim() || textFilters.customerId.trim()) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilters({ status: [], claimCode: "", customerId: "", urgentOnly: false });
+                setTextFilters({ claimCode: "", customerId: "" });
+                setShowClaimCodeSuggestions(false);
+                setShowCustomerSuggestions(false);
+              }}
+              className="h-8"
+            >
+              <X className="h-3 w-3 mr-1" />
+              Obriši sve filtere
+            </Button>
+          )}
         </div>
       </Card>
 

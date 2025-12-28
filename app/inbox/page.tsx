@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,20 +76,97 @@ export default function InboxPage() {
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [lastCheckTime, setLastCheckTime] = useState<string | null>(null);
 
   useEffect(() => {
     fetchThreads();
-    // Auto-refresh threads every 30 seconds to catch new emails
-    // Also trigger manual sync check
-    const interval = setInterval(() => {
+    
+    // Listen for inbox-updated events (from other components)
+    const handleInboxUpdate = () => {
       fetchThreads();
-      // Also trigger a sync check in the background
-      fetch("/api/admin/mail/sync-now", { method: "POST" }).catch(() => {
-        // Silently fail - sync might already be running
-      });
-    }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    };
+    window.addEventListener('inbox-updated', handleInboxUpdate);
+    
+    // Lightweight check for updates (faster than full fetch)
+    const checkForUpdates = async () => {
+      if (document.hidden) return; // Don't check when tab is hidden
+      
+      try {
+        const url = lastCheckTime 
+          ? `/api/inbox/check-updates?lastCheck=${encodeURIComponent(lastCheckTime)}`
+          : '/api/inbox/check-updates';
+        
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasUpdates) {
+            // New emails detected, fetch full list
+            fetchThreads();
+          }
+          if (data.lastUpdated) {
+            setLastCheckTime(data.lastUpdated);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for updates:", error);
+      }
+    };
+    
+    // Auto-refresh threads more frequently to catch new emails in real-time
+    // Lightweight check every 3 seconds if page is visible, full refresh every 30 seconds
+    let checkInterval: NodeJS.Timeout;
+    let fullRefreshInterval: NodeJS.Timeout;
+    
+    const setupRefresh = () => {
+      const isVisible = !document.hidden;
+      
+      // Clear existing intervals
+      if (checkInterval) clearInterval(checkInterval);
+      if (fullRefreshInterval) clearInterval(fullRefreshInterval);
+      
+      if (isVisible) {
+        // Lightweight check every 5 seconds when visible (optimized from 1 second)
+        checkInterval = setInterval(checkForUpdates, 5000);
+        // Full refresh every 30 seconds as backup (optimized from 15 seconds)
+        fullRefreshInterval = setInterval(() => {
+          fetchThreads();
+        }, 30000);
+      } else {
+        // Less frequent checks when hidden
+        checkInterval = setInterval(checkForUpdates, 30000);
+      }
+    };
+    
+    // Initial setup
+    setupRefresh();
+    
+    // Update interval when page visibility changes
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // When tab becomes visible, immediately check for updates
+        checkForUpdates();
+        fetchThreads();
+      }
+      setupRefresh();
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also refresh when window regains focus
+    const handleFocus = () => {
+      checkForUpdates();
+      fetchThreads();
+    };
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      if (checkInterval) clearInterval(checkInterval);
+      if (fullRefreshInterval) clearInterval(fullRefreshInterval);
+      window.removeEventListener('inbox-updated', handleInboxUpdate);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastCheckTime]);
 
   // Debounce search input
   useEffect(() => {
@@ -118,7 +194,7 @@ export default function InboxPage() {
     setFilteredThreads(filtered);
   }, [threads, searchQuery]);
 
-  const fetchThreads = async () => {
+  const fetchThreads = useCallback(async () => {
     try {
       const res = await fetch("/api/inbox");
       if (!res.ok) {
@@ -129,16 +205,21 @@ export default function InboxPage() {
       const data = await res.json();
       const fetchedThreads = data.threads || [];
       setThreads(fetchedThreads);
-      // Initialize filtered threads
-      if (!searchQuery.trim()) {
-        setFilteredThreads(fetchedThreads);
+      // Initialize filtered threads (will be filtered by searchQuery in separate effect)
+      setFilteredThreads(fetchedThreads);
+      // Update last check time
+      if (fetchedThreads.length > 0) {
+        const mostRecent = fetchedThreads[0]?.updatedAt;
+        if (mostRecent) {
+          setLastCheckTime(mostRecent);
+        }
       }
     } catch (error) {
       console.error("Error fetching threads:", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -275,7 +356,13 @@ export default function InboxPage() {
                   date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
                   sender: (
                     <span className={isUnread ? "font-bold" : ""}>
-                      {thread.originalSender || "-"}
+                      {thread.originalSender 
+                        ? thread.originalSender
+                            .replace(/&quot;/g, '"')
+                            .replace(/&amp;/g, '&')
+                            .replace(/&lt;/g, '<')
+                            .replace(/&gt;/g, '>')
+                        : "-"}
                     </span>
                   ),
                   subject: (
@@ -384,14 +471,7 @@ function ThreadDetail({
   const [expandedAttachments, setExpandedAttachments] = useState<Set<string>>(new Set());
   const [previewAttachment, setPreviewAttachment] = useState<{ id: string; fileName: string; mimeType: string } | null>(null);
 
-  useEffect(() => {
-    fetchFullThread();
-    if (showLinkClaim) {
-      fetchClaims();
-    }
-  }, [thread.id, showLinkClaim]);
-
-  const fetchFullThread = async () => {
+  const fetchFullThread = useCallback(async () => {
     setLoading(true);
     try {
       // Mark thread as viewed when opened
@@ -421,7 +501,14 @@ function ThreadDetail({
     } finally {
       setLoading(false);
     }
-  };
+  }, [thread.id]);
+
+  useEffect(() => {
+    fetchFullThread();
+    if (showLinkClaim) {
+      fetchClaims();
+    }
+  }, [thread.id, showLinkClaim, fetchFullThread]);
 
   const fetchClaims = async () => {
     try {
@@ -674,7 +761,7 @@ function ThreadDetail({
               {message.bodyHtml ? (
                 <div 
                   dangerouslySetInnerHTML={{ __html: message.bodyHtml }} 
-                  className="prose prose-sm max-w-none"
+                  className="email-body"
                 />
               ) : (
                 <p className="whitespace-pre-wrap">{message.bodyText || ""}</p>

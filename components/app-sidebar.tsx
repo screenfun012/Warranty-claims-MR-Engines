@@ -4,11 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Inbox,
   FileText,
-  Wrench,
   Home,
   Settings,
 } from "lucide-react";
@@ -49,6 +48,18 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
 
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/inbox/unread-count");
+      if (res.ok) {
+        const data = await res.json();
+        setUnreadCount(data.count || 0);
+      }
+    } catch (error) {
+      console.error("Error fetching unread count:", error);
+    }
+  }, []);
+
   useEffect(() => {
     // Check current theme
     const checkTheme = () => {
@@ -65,11 +76,13 @@ export function AppSidebar() {
       attributeFilter: ["class"],
     });
 
-    // Fetch unread count on mount
-    fetchUnreadCount();
+    // Fetch unread count on mount (use setTimeout to avoid cascading renders warning)
+    setTimeout(() => {
+      fetchUnreadCount();
+    }, 0);
 
-    // Poll for unread count every 10 seconds
-    const interval = setInterval(fetchUnreadCount, 10000);
+    // Poll for unread count more frequently (every 2 seconds) to catch changes faster
+    const interval = setInterval(fetchUnreadCount, 2000);
 
     // Listen for inbox updates
     const handleInboxUpdate = () => {
@@ -82,19 +95,7 @@ export function AppSidebar() {
       clearInterval(interval);
       window.removeEventListener('inbox-updated', handleInboxUpdate);
     };
-  }, []);
-
-  const fetchUnreadCount = async () => {
-    try {
-      const res = await fetch("/api/inbox/unread-count");
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.count || 0);
-      }
-    } catch (error) {
-      console.error("Error fetching unread count:", error);
-    }
-  };
+  }, [fetchUnreadCount]);
 
   return (
     <Sidebar>
@@ -135,9 +136,19 @@ export function AppSidebar() {
                   
                   const menuButton = (
                     <SidebarMenuButton asChild isActive={isActive} className="transition-all duration-200 hover:bg-sidebar-accent/80">
-                      <Link href={item.href} className="flex items-center gap-3 group/item">
+                      <Link 
+                        href={item.href} 
+                        className="flex items-center gap-3 group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit hover:text-inherit visited:text-inherit active:text-inherit"
+                        style={{ 
+                          textDecoration: 'none',
+                          color: 'inherit',
+                          fontFamily: 'inherit',
+                          fontSize: 'inherit',
+                          fontWeight: 'inherit'
+                        }}
+                      >
                         <item.icon className={cn(
-                          "h-5 w-5 transition-all duration-200 flex-shrink-0",
+                          "h-5 w-5 transition-all duration-200 shrink-0",
                           isActive && "scale-110"
                         )} />
                         <span className={cn(

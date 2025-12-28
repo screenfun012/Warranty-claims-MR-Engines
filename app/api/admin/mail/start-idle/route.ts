@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
-import { startIdleSync, isIdleSyncActive } from "@/lib/email/mailSyncScheduler";
+import { startIdleSync, isIdleSyncActive, isUsingIdleMode } from "@/lib/email/mailSyncScheduler";
+import { getImapIdleClient } from "@/lib/email/imapIdleClient";
 
 export async function POST() {
   try {
-    // Check if already active
-    if (isIdleSyncActive()) {
-      return NextResponse.json({
-        success: true,
-        message: "Automatic email sync is already active",
-      });
-    }
-
+    // Always restart sync to ensure it's running
+    // This will reset reconnect attempts if IDLE failed
     await startIdleSync();
+    
+    const usingIdle = isUsingIdleMode();
+    const mode = usingIdle ? "IDLE (real-time push)" : "Polling (every 30 seconds)";
+    
     return NextResponse.json({
       success: true,
-      message: "Automatic email sync started (checking every 2 minutes)",
+      message: `Automatic email sync started - ${mode}`,
+      mode,
     });
   } catch (error) {
     console.error("Error starting automatic email sync:", error);
@@ -30,13 +30,23 @@ export async function POST() {
 
 export async function GET() {
   try {
+    const active = isIdleSyncActive();
+    const usingIdle = isUsingIdleMode();
+    const idleClient = getImapIdleClient();
+    const reconnectAttempts = idleClient.getReconnectAttempts();
+    
     return NextResponse.json({
-      active: isIdleSyncActive(),
+      active,
+      usingIdle,
+      idleActive: idleClient.isIdleActive(),
+      reconnectAttempts,
+      mode: usingIdle ? "IDLE (real-time push)" : "Polling (every 30 seconds)",
     });
   } catch (error) {
     return NextResponse.json(
       {
         active: false,
+        usingIdle: false,
         error: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }

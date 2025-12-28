@@ -42,19 +42,21 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
 
   // Sync local state with claim prop when claim ID changes
   const prevClaimIdRef = useRef<string | null>(null);
+  const prevStatusRef = useRef<string | null>(null);
   useEffect(() => {
-    console.log('[ClaimEmails] useEffect triggered. claim.id:', claim.id, 'claim.claimAcceptanceStatus:', claim.claimAcceptanceStatus);
     if (prevClaimIdRef.current !== claim.id) {
       const newStatus = claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED" 
         ? claim.claimAcceptanceStatus 
         : "";
-      console.log('[ClaimEmails] Claim ID changed, syncing status:', newStatus);
       setClaimAcceptanceStatus(newStatus);
       prevClaimIdRef.current = claim.id;
-    } else if (claim.claimAcceptanceStatus && (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED")) {
-      // Also sync if acceptance status changes (e.g., when claim is reloaded)
-      console.log('[ClaimEmails] Acceptance status changed, syncing:', claim.claimAcceptanceStatus);
+      prevStatusRef.current = claim.claimAcceptanceStatus;
+    } else if (claim.claimAcceptanceStatus && 
+               claim.claimAcceptanceStatus !== prevStatusRef.current &&
+               (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED")) {
+      // Only sync if status actually changed
       setClaimAcceptanceStatus(claim.claimAcceptanceStatus);
+      prevStatusRef.current = claim.claimAcceptanceStatus;
     }
   }, [claim.id, claim.claimAcceptanceStatus]);
 
@@ -63,14 +65,12 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     // If clicking the same checkbox that's already selected, deselect it
     const newValue = claimAcceptanceStatus === value ? null : value;
     
-    console.log('[ClaimEmails] Status change:', { value, newValue, current: claimAcceptanceStatus });
     
     // Update local state immediately
     setClaimAcceptanceStatus(newValue || "");
     
     // Update parent immediately so header shows the change right away
     if (onUpdate) {
-      console.log('[ClaimEmails] Updating parent with new status:', newValue);
       onUpdate({ ...claim, claimAcceptanceStatus: newValue });
     }
     
@@ -97,17 +97,14 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       }
       
       const data = await res.json();
-      console.log('[ClaimEmails] API response:', data.claim?.claimAcceptanceStatus);
       if (data.claim && onUpdate) {
         // Only update parent if API returned a valid claimAcceptanceStatus
         // If API returns undefined, keep the optimistic update we already did
         if (data.claim.claimAcceptanceStatus !== undefined) {
-          console.log('[ClaimEmails] Updating parent with full claim from API. Status:', data.claim.claimAcceptanceStatus);
           onUpdate(data.claim);
           // Dispatch event to refresh claims list
           window.dispatchEvent(new Event('claim-updated'));
         } else {
-          console.log('[ClaimEmails] API returned undefined for claimAcceptanceStatus, keeping optimistic update');
           // Don't update parent - keep the optimistic update we already did
           // But still dispatch event to refresh claims list
           window.dispatchEvent(new Event('claim-updated'));
@@ -224,83 +221,161 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     }
   };
 
+  // Collect all messages from all threads and sort by date for timeline view
+  const allMessages = claim.emailThreads?.flatMap((thread: any) => 
+    (thread.messages || []).map((message: any) => ({
+      ...message,
+      threadSubject: thread.subjectOriginal,
+      threadId: thread.id,
+    }))
+  ) || [];
+
+  // Sort messages by date (oldest first for timeline)
+  const sortedMessages = [...allMessages].sort((a, b) => 
+    new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
   return (
     <div className="space-y-4">
-      {claim.emailThreads && claim.emailThreads.length > 0 ? (
-        claim.emailThreads.map((thread: any) => (
-        <Card key={thread.id} className="p-6">
-          <h3 className="font-semibold mb-2 text-sm sm:text-base break-words">{thread.subjectOriginal}</h3>
-          <div className="space-y-3">
-            {thread.messages.map((message: any) => (
-              <div key={message.id} className="border-l-2 pl-2 sm:pl-4">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-1 sm:gap-0 mb-1">
-                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                    <strong className="text-xs sm:text-sm break-all">{message.from}</strong>
-                    <Badge variant={message.direction === "INBOUND" ? "default" : "secondary"} className="text-xs shrink-0">
-                      {message.direction}
-                    </Badge>
+      {/* Timeline Header */}
+      <Card className="p-4 bg-muted/50">
+        <h3 className="font-semibold text-lg mb-1">Email Timeline</h3>
+        <p className="text-sm text-muted-foreground">
+          Komunikacija između operatera i klijenta
+        </p>
+      </Card>
+
+      {/* Timeline Messages */}
+      {sortedMessages.length > 0 ? (
+        <div className="space-y-4">
+          {sortedMessages.map((message: any, index: number) => {
+            const isInbound = message.direction === "INBOUND";
+            const isFirstInbound = isInbound && index === 0;
+            const date = new Date(message.date);
+            const formattedDate = date.toLocaleDateString('sr-RS', { 
+              day: 'numeric', 
+              month: 'numeric', 
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+
+            return (
+              <Card 
+                key={`${message.threadId}-${message.id}`} 
+                className={`p-4 ${isInbound ? 'bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800' : 'bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800'}`}
+              >
+                <div className="flex items-start gap-3">
+                  {/* Timeline line */}
+                  <div className="flex flex-col items-center">
+                    <div className={`w-3 h-3 rounded-full ${isInbound ? 'bg-blue-500' : 'bg-green-500'}`} />
+                    {index < sortedMessages.length - 1 && (
+                      <div className={`w-0.5 flex-1 mt-2 ${isInbound ? 'bg-blue-300' : 'bg-green-300'}`} style={{ minHeight: '20px' }} />
+                    )}
                   </div>
-                  <span className="text-xs sm:text-sm text-muted-foreground shrink-0">
-                    {new Date(message.date).toLocaleString()}
-                  </span>
-                </div>
-                <p className="text-xs sm:text-sm whitespace-pre-wrap break-words">{message.bodyText || ""}</p>
-                {message.attachments && message.attachments.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">
-                      {message.attachments.length} attachment(s):
-                    </p>
-                    <div className="flex flex-wrap gap-1.5 sm:gap-2">
-                      {message.attachments.map((attachment: any, attIndex: number) => {
-                        const allAttachments = claim.emailThreads?.flatMap((t: any) => 
-                          t.messages?.flatMap((m: any) => m.attachments || []) || []
-                        ) || [];
-                        const globalIndex = allAttachments.findIndex((a: any) => 
-                          a.id === attachment.id
-                        );
-                        
-                        const isImage = attachment.mimeType?.startsWith("image/") || 
-                                       /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(attachment.fileName || "");
-                        const isPdf = attachment.mimeType?.includes("pdf") || 
-                                     /\.pdf$/i.test(attachment.fileName || "");
-                        
-                        const fileName = attachment.fileName || `Attachment ${attIndex + 1}`;
-                        const truncatedFileName = fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName;
-                        
-                        return (
-                          <Button
-                            key={attachment.id}
-                            variant="outline"
-                            size="sm"
-                            className="text-xs h-auto py-1.5 px-2 sm:px-3"
-                            onClick={() => {
-                              setViewerIndex(globalIndex >= 0 ? globalIndex : 0);
-                              setViewerOpen(true);
-                            }}
-                            title={fileName}
-                          >
-                            {isImage ? (
-                              <ImageIcon className="h-3 w-3 mr-1 shrink-0" />
-                            ) : isPdf ? (
-                              <FileText className="h-3 w-3 mr-1 shrink-0" />
-                            ) : (
-                              <Paperclip className="h-3 w-3 mr-1 shrink-0" />
-                            )}
-                            <span className="truncate max-w-[120px] sm:max-w-none">{truncatedFileName}</span>
-                          </Button>
-                        );
-                      })}
+
+                  {/* Message content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge 
+                          variant={isInbound ? "default" : "secondary"} 
+                          className={`text-xs ${isInbound ? 'bg-blue-500' : 'bg-green-500'}`}
+                        >
+                          {isInbound ? "Od klijenta" : "Aplikacija → Klijent"}
+                        </Badge>
+                        {isFirstInbound && (
+                          <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                            Početna poruka
+                          </Badge>
+                        )}
+                        {!isInbound && message.threadSubject && (
+                          <Badge variant="outline" className="text-xs">
+                            Status: U obradi
+                          </Badge>
+                        )}
+                      </div>
+                      <span className="text-xs text-muted-foreground shrink-0">
+                        {formattedDate}
+                      </span>
                     </div>
+
+                    <div className="mb-2">
+                      <strong className="text-sm break-all">{message.from}</strong>
+                      {message.to && (
+                        <span className="text-xs text-muted-foreground ml-2">
+                          → {message.to}
+                        </span>
+                      )}
+                    </div>
+
+                    {message.subject && (
+                      <p className="text-sm font-medium mb-2 break-words">
+                        {message.subject}
+                      </p>
+                    )}
+
+                    <div className="text-sm whitespace-pre-wrap break-words bg-background/50 p-3 rounded border">
+                      {message.bodyText || "(Nema teksta)"}
+                    </div>
+
+                    {message.attachments && message.attachments.length > 0 && (
+                      <div className="mt-3 space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground mb-2">
+                          {message.attachments.length} attachment(s):
+                        </p>
+                        <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                          {message.attachments.map((attachment: any, attIndex: number) => {
+                            const allAttachments = claim.emailThreads?.flatMap((t: any) => 
+                              t.messages?.flatMap((m: any) => m.attachments || []) || []
+                            ) || [];
+                            const globalIndex = allAttachments.findIndex((a: any) => 
+                              a.id === attachment.id
+                            );
+                            
+                            const isImage = attachment.mimeType?.startsWith("image/") || 
+                                           /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(attachment.fileName || "");
+                            const isPdf = attachment.mimeType?.includes("pdf") || 
+                                         /\.pdf$/i.test(attachment.fileName || "");
+                            
+                            const fileName = attachment.fileName || `Attachment ${attIndex + 1}`;
+                            const truncatedFileName = fileName.length > 30 ? fileName.substring(0, 30) + "..." : fileName;
+                            
+                            return (
+                              <Button
+                                key={attachment.id}
+                                variant="outline"
+                                size="sm"
+                                className="text-xs h-auto py-1.5 px-2 sm:px-3"
+                                onClick={() => {
+                                  setViewerIndex(globalIndex >= 0 ? globalIndex : 0);
+                                  setViewerOpen(true);
+                                }}
+                                title={fileName}
+                              >
+                                {isImage ? (
+                                  <ImageIcon className="h-3 w-3 mr-1 shrink-0" />
+                                ) : isPdf ? (
+                                  <FileText className="h-3 w-3 mr-1 shrink-0" />
+                                ) : (
+                                  <Paperclip className="h-3 w-3 mr-1 shrink-0" />
+                                )}
+                                <span className="truncate max-w-[120px] sm:max-w-none">{truncatedFileName}</span>
+                              </Button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </Card>
-      ))
+                </div>
+              </Card>
+            );
+          })}
+        </div>
       ) : (
         <Card className="p-4">
-          <p className="text-muted-foreground">No email threads found for this claim.</p>
+          <p className="text-muted-foreground">Nema email poruka za ovu reklamaciju.</p>
         </Card>
       )}
 

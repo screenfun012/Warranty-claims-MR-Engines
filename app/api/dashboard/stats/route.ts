@@ -1,7 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 
+// Cache stats for 10 seconds to reduce database load
+let cachedStats: any = null;
+let cacheTimestamp = 0;
+const CACHE_DURATION = 10000; // 10 seconds
+
 export async function GET() {
+  // Return cached stats if still valid
+  const now = Date.now();
+  if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
+    return NextResponse.json(cachedStats);
+  }
   try {
     // Get total claims count
     let totalClaims = 0;
@@ -92,14 +102,14 @@ export async function GET() {
       }
     }
 
-    // Get in process claims (NEW, IN_ANALYSIS, WAITING_CUSTOMER) - exclude CLOSED
+    // Get in process claims (NEW, IN_ANALYSIS) - exclude CLOSED
     let inProcessCount = 0;
     try {
       try {
         inProcessCount = await prisma.claim.count({
           where: {
             status: {
-              in: ["NEW", "IN_ANALYSIS", "WAITING_CUSTOMER"],
+              in: ["NEW", "IN_ANALYSIS"],
             },
           },
         });
@@ -108,8 +118,7 @@ export async function GET() {
         console.warn("Error counting in-process claims, using fallback:", error);
         const newCount = await prisma.claim.count({ where: { status: "NEW" } }).catch(() => 0);
         const analysisCount = await prisma.claim.count({ where: { status: "IN_ANALYSIS" } }).catch(() => 0);
-        const waitingCount = await prisma.claim.count({ where: { status: "WAITING_CUSTOMER" } }).catch(() => 0);
-        inProcessCount = newCount + analysisCount + waitingCount;
+        inProcessCount = newCount + analysisCount;
       }
     } catch (error) {
       console.error("Error calculating in-process count:", error);
@@ -272,7 +281,7 @@ export async function GET() {
       console.error("Error fetching unread emails count:", error);
     }
 
-    // Get urgent claims (WAITING_CUSTOMER or NEW that are older than 7 days)
+    // Get urgent claims (NEW that are older than 7 days)
     let urgentClaims: Array<{
       id: string;
       claimCodeRaw: string | null;
@@ -284,19 +293,25 @@ export async function GET() {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
+      // Hitne reklamacije: NEW ili IN_ANALYSIS status, starije od 7 dana
       urgentClaims = await prisma.claim.findMany({
         where: {
           OR: [
-            { status: "WAITING_CUSTOMER" },
             {
               status: "NEW",
               createdAt: {
                 lt: sevenDaysAgo,
               },
             },
+            {
+              status: "IN_ANALYSIS",
+              createdAt: {
+                lt: sevenDaysAgo,
+              },
+            },
           ],
         },
-        take: 5,
+        take: 10,
         orderBy: {
           createdAt: "asc",
         },
@@ -316,7 +331,72 @@ export async function GET() {
       console.error("Error fetching urgent claims:", error);
     }
 
-    return NextResponse.json({
+    // Get claims by month for trend chart (last 12 months)
+    let claimsByMonth: Array<{
+      month: string;
+      accepted: number;
+      rejected: number;
+    }> = [];
+    try {
+      const now = new Date();
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+      
+      // Get all claims from last 12 months with acceptance status
+      const claims = await prisma.claim.findMany({
+        where: {
+          createdAt: {
+            gte: twelveMonthsAgo,
+          },
+          claimAcceptanceStatus: {
+            in: ["ACCEPTED", "REJECTED"],
+          },
+        },
+        select: {
+          claimAcceptanceStatus: true,
+          createdAt: true,
+        },
+      });
+
+      // Group by month
+      const monthMap = new Map<string, { accepted: number; rejected: number; label: string }>();
+      
+      // Initialize all months (last 12 months) - use Latin month names
+      const monthNames = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'avg', 'sep', 'okt', 'nov', 'dec'];
+      for (let i = 11; i >= 0; i--) {
+        const date = new Date();
+        date.setMonth(date.getMonth() - i);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}.`;
+        monthMap.set(monthKey, { accepted: 0, rejected: 0, label: monthLabel });
+      }
+
+      // Count claims by month
+      claims.forEach((claim) => {
+        const date = new Date(claim.createdAt);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const monthData = monthMap.get(monthKey);
+        if (monthData) {
+          if (claim.claimAcceptanceStatus === "ACCEPTED") {
+            monthData.accepted++;
+          } else if (claim.claimAcceptanceStatus === "REJECTED") {
+            monthData.rejected++;
+          }
+        }
+      });
+
+      // Convert to array format - show all months, even if 0
+      claimsByMonth = Array.from(monthMap.entries())
+        .map(([key, data]) => ({
+          month: data.label,
+          accepted: data.accepted,
+          rejected: data.rejected,
+        }));
+    } catch (error) {
+      console.error("Error fetching claims by month:", error);
+    }
+
+    const stats = {
       totalClaims,
       resolvedCount,
       approvedCount,
@@ -343,7 +423,14 @@ export async function GET() {
         customer: c.customer,
         createdAt: c.createdAt.toISOString(),
       })),
-    });
+      claimsByMonth,
+    };
+
+    // Update cache
+    cachedStats = stats;
+    cacheTimestamp = now;
+
+    return NextResponse.json(stats);
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

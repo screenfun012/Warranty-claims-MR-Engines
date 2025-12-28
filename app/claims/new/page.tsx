@@ -108,7 +108,6 @@ export default function NewClaimPage() {
                 <SelectContent>
                   <SelectItem value="NEW">New</SelectItem>
                   <SelectItem value="IN_ANALYSIS">In Analysis</SelectItem>
-                  <SelectItem value="WAITING_CUSTOMER">Waiting Customer</SelectItem>
                   <SelectItem value="APPROVED">Approved</SelectItem>
                   <SelectItem value="REJECTED">Rejected</SelectItem>
                   <SelectItem value="CLOSED">Closed</SelectItem>

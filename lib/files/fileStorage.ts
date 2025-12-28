@@ -156,3 +156,18 @@ export async function readAttachmentFile(relativePath: string): Promise<Buffer> 
   return await fs.readFile(absolutePath);
 }
 
+/**
+ * Delete a file by its relative path
+ */
+export async function deleteAttachmentFile(relativePath: string): Promise<void> {
+  const absolutePath = getAttachmentFilePath(relativePath);
+  try {
+    await fs.unlink(absolutePath);
+  } catch (error) {
+    // If file doesn't exist, that's okay - just log it
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw error;
+    }
+  }
+}
+

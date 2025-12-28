@@ -65,4 +65,5 @@ export const env = {
   MAIL_SYNC_ENABLED: getEnvBoolean("MAIL_SYNC_ENABLED", true),
   MAIL_SYNC_INTERVAL_SECONDS: getEnvNumber("MAIL_SYNC_INTERVAL_SECONDS", 300),
   MAIL_SYNC_MAX_MESSAGES_PER_RUN: getEnvNumber("MAIL_SYNC_MAX_MESSAGES_PER_RUN", 50),
+  MAIL_SYNC_USE_IDLE: getEnvBoolean("MAIL_SYNC_USE_IDLE", true), // Use IMAP IDLE for real-time notifications
 };

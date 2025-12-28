@@ -23,6 +23,8 @@ export interface SyncResult {
  * Reads MailSyncState.lastUid, fetches new messages, creates threads/messages/attachments
  */
 export async function syncNewEmails(): Promise<SyncResult> {
+  const syncStartTime = Date.now();
+  
   if (!env.MAIL_SYNC_ENABLED) {
     return { newMessages: 0, newThreads: 0, newClaims: 0 };
   }
@@ -222,13 +224,21 @@ export async function syncNewEmails(): Promise<SyncResult> {
     data: updateData,
   });
 
+  const syncDuration = Date.now() - syncStartTime;
   console.log("Sync completed:", {
     newMessages: newMessagesCount,
     newThreads: newThreadsCount,
     newClaims: newClaimsCount,
     highestUid,
     totalFetched: fetchedMessages.length,
+    duration: `${syncDuration}ms`,
   });
+
+  // If new messages were synced, we can't dispatch to window from server-side
+  // But the frontend polling will pick it up quickly (1-2 seconds)
+  if (newMessagesCount > 0) {
+    console.log(`[Sync] ${newMessagesCount} new messages synced - frontend should refresh soon`);
+  }
 
   return {
     newMessages: newMessagesCount,
@@ -310,10 +320,21 @@ async function detectForwardedEmail(
       bodyHtml.match(/from:\s*([^\r\n<]+)/i);
 
     if (originalSenderMatch) {
+      // Decode HTML entities from the matched sender
+      let decodedSender = originalSenderMatch[1].trim();
+      // Decode common HTML entities
+      decodedSender = decodedSender
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&#39;/g, "'")
+        .replace(/&#x27;/g, "'");
+      
       await prisma.emailThread.update({
         where: { id: thread.id },
         data: {
-          originalSender: originalSenderMatch[1].trim(),
+          originalSender: decodedSender,
           forwardedBy: fetchedMsg.headers.from,
         },
       });

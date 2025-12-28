@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,41 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+// Dynamically import recharts to avoid SSR issues
+const LineChart = dynamic(
+  () => import("recharts").then((mod) => mod.LineChart),
+  { ssr: false }
+);
+const Line = dynamic(
+  () => import("recharts").then((mod) => mod.Line),
+  { ssr: false }
+);
+const XAxis = dynamic(
+  () => import("recharts").then((mod) => mod.XAxis),
+  { ssr: false }
+);
+const YAxis = dynamic(
+  () => import("recharts").then((mod) => mod.YAxis),
+  { ssr: false }
+);
+const CartesianGrid = dynamic(
+  () => import("recharts").then((mod) => mod.CartesianGrid),
+  { ssr: false }
+);
+const Tooltip = dynamic(
+  () => import("recharts").then((mod) => mod.Tooltip),
+  { ssr: false }
+);
+const Legend = dynamic(
+  () => import("recharts").then((mod) => mod.Legend),
+  { ssr: false }
+);
+const ResponsiveContainer = dynamic(
+  () => import("recharts").then((mod) => mod.ResponsiveContainer),
+  { ssr: false }
+);
 
 interface DashboardStats {
   totalClaims: number;
@@ -42,6 +77,11 @@ interface DashboardStats {
     acceptanceStatus: string;
     count: number;
   }>;
+  claimsByMonth?: Array<{
+    month: string;
+    accepted: number;
+    rejected: number;
+  }>;
   recentClaims?: Array<{
     id: string;
     claimCodeRaw: string | null;
@@ -62,7 +102,6 @@ const getStatusLabel = (status: string) => {
   const labels: Record<string, string> = {
     NEW: "NOVO",
     IN_ANALYSIS: "U OBRADI",
-    WAITING_CUSTOMER: "ČEKA KLIJENTA",
     CLOSED: "ZATVORENO",
     APPROVED: "ODOBRENO",
     REJECTED: "ODBIJENO",
@@ -74,7 +113,6 @@ const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
     NEW: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800",
     IN_ANALYSIS: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
-    WAITING_CUSTOMER: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800",
     CLOSED: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800",
     APPROVED: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
     REJECTED: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800",
@@ -86,6 +124,20 @@ export default function DashboardPage() {
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/dashboard/stats");
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchStats();
@@ -102,21 +154,7 @@ export default function DashboardPage() {
       window.removeEventListener('claim-updated', handleClaimUpdate);
       window.removeEventListener('claim-created', handleClaimUpdate);
     };
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const res = await fetch("/api/dashboard/stats");
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [fetchStats]);
 
   if (loading) {
     return (
@@ -164,6 +202,30 @@ export default function DashboardPage() {
           Osveži
         </Button>
       </div>
+
+      {/* Unread Emails Alert - moved to top */}
+      {stats.unreadEmailsCount !== undefined && stats.unreadEmailsCount > 0 && (
+        <Card className="p-6 bg-blue-500/5 border-blue-500/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              <div>
+                <p className="font-semibold">Nepročitane poruke</p>
+                <p className="text-sm text-muted-foreground">
+                  Imate <span className="font-bold text-blue-600 dark:text-blue-400">{stats.unreadEmailsCount}</span> nepročitanih email poruka
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="default"
+              onClick={() => router.push("/inbox")}
+            >
+              Otvori inbox
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </Card>
+      )}
 
       {/* Main Statistics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -314,33 +376,44 @@ export default function DashboardPage() {
           </div>
           {stats.urgentClaims && stats.urgentClaims.length > 0 ? (
             <div className="space-y-3">
-              {stats.urgentClaims.slice(0, 5).map((claim) => (
-                <div
-                  key={claim.id}
-                  className="flex items-center justify-between p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/claims/${claim.id}`)}
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium truncate">
-                        {claim.claimCodeRaw || "Bez koda"}
-                      </span>
-                      <Badge 
-                        variant="outline" 
-                        className={cn("text-xs", getStatusColor(claim.status))}
-                      >
-                        {getStatusLabel(claim.status)}
-                      </Badge>
+              {stats.urgentClaims.slice(0, 5).map((claim) => {
+                const daysAgo = Math.floor(
+                  (new Date().getTime() - new Date(claim.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                );
+                return (
+                  <div
+                    key={claim.id}
+                    className="flex items-center justify-between p-3 rounded-lg bg-amber-500/5 border border-amber-500/20 hover:bg-amber-500/10 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/claims/${claim.id}`)}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium truncate">
+                          {claim.claimCodeRaw || "Bez koda"}
+                        </span>
+                        <Badge 
+                          variant="outline" 
+                          className={cn("text-xs", getStatusColor(claim.status))}
+                        >
+                          {getStatusLabel(claim.status)}
+                        </Badge>
+                        <Badge 
+                          variant="outline" 
+                          className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                        >
+                          {daysAgo} {daysAgo === 1 ? 'dan' : 'dana'}
+                        </Badge>
+                      </div>
+                      {claim.customer && (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {claim.customer.name}
+                        </p>
+                      )}
                     </div>
-                    {claim.customer && (
-                      <p className="text-sm text-muted-foreground truncate">
-                        {claim.customer.name}
-                      </p>
-                    )}
+                    <ArrowRight className="h-4 w-4 text-amber-600 dark:text-amber-400 ml-2 flex-shrink-0" />
                   </div>
-                  <ArrowRight className="h-4 w-4 text-amber-600 dark:text-amber-400 ml-2 flex-shrink-0" />
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-muted-foreground text-center py-8">Nema hitnih reklamacija</p>
@@ -411,29 +484,47 @@ export default function DashboardPage() {
         )}
       </Card>
 
-      {/* Unread Emails Alert */}
-      {stats.unreadEmailsCount !== undefined && stats.unreadEmailsCount > 0 && (
-        <Card className="p-6 bg-blue-500/5 border-blue-500/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              <div>
-                <p className="font-semibold">Nepročitane poruke</p>
-                <p className="text-sm text-muted-foreground">
-                  Imate <span className="font-bold text-blue-600 dark:text-blue-400">{stats.unreadEmailsCount}</span> nepročitanih email poruka
-                </p>
-              </div>
-            </div>
-            <Button 
-              variant="default"
-              onClick={() => router.push("/inbox")}
-            >
-              Otvori inbox
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
+      {/* Claims Trend Chart - Prihvaćene i Odbijene tokom godine */}
+      <Card className="p-6">
+        <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          Trend reklamacija tokom godine
+        </h2>
+        {stats.claimsByMonth && stats.claimsByMonth.length > 0 ? (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.claimsByMonth}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis 
+                  dataKey="month" 
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line 
+                  type="monotone" 
+                  dataKey="accepted" 
+                  stroke="#22c55e" 
+                  strokeWidth={2}
+                  name="Prihvaćene"
+                  dot={{ r: 4, fill: "#22c55e" }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="rejected" 
+                  stroke="#ef4444" 
+                  strokeWidth={2}
+                  name="Odbijene"
+                  dot={{ r: 4, fill: "#ef4444" }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-        </Card>
-      )}
+        ) : (
+          <p className="text-muted-foreground text-center py-8">Nema podataka za grafikon</p>
+        )}
+      </Card>
     </div>
   );
 }

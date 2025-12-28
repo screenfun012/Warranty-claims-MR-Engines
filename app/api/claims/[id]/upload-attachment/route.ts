@@ -57,15 +57,30 @@ export async function POST(
       },
     });
 
-    // Determine if it's an image or document
-    const isImage = file.type.startsWith("image/");
-    const isPdf = file.type === "application/pdf";
-    const isDocx = file.type.includes("wordprocessingml") || 
-                   file.type.includes("application/vnd.openxmlformats-officedocument.wordprocessingml") ||
-                   file.name.toLowerCase().endsWith(".docx");
+    // Determine file type - check extension first, then mimeType
+    const mimeType = file.type || "application/octet-stream";
+    const fileName = file.name || "";
+    const fileNameLower = fileName.toLowerCase();
+    
+    // Check by extension first (more reliable)
+    const isImageByExt = /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$/i.test(fileName);
+    const isPdfByExt = fileNameLower.endsWith(".pdf");
+    const isDocxByExt = fileNameLower.endsWith(".docx") || fileNameLower.endsWith(".doc");
+    
+    // Check by mimeType
+    const isImageByMime = mimeType.startsWith("image/");
+    const isPdfByMime = mimeType === "application/pdf" || mimeType.includes("pdf");
+    const isDocxByMime = mimeType.includes("wordprocessingml") || 
+                        mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml") ||
+                        mimeType.includes("application/msword");
+    
+    // Final determination (extension takes priority)
+    const isImage = isImageByExt || (isImageByMime && !isPdfByExt && !isDocxByExt);
+    const isPdf = isPdfByExt || (isPdfByMime && !isImageByExt && !isDocxByExt);
+    const isDocx = isDocxByExt || (isDocxByMime && !isImageByExt && !isPdfByExt);
 
-    // Create Photo if it's an image
-    if (isImage) {
+    // Create Photo if it's an image (and NOT a PDF/DOCX)
+    if (isImage && !isPdf && !isDocx) {
       await prisma.photo.create({
         data: {
           claimId: claim.id,
@@ -75,8 +90,8 @@ export async function POST(
       });
     }
 
-    // Create ClientDocument if it's PDF or DOCX
-    if (isPdf || isDocx) {
+    // Create ClientDocument if it's PDF or DOCX (and NOT an image)
+    if ((isPdf || isDocx) && !isImage) {
       await prisma.clientDocument.create({
         data: {
           claimId: claim.id,

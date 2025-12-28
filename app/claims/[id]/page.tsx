@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search } from "lucide-react";
+import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search, Languages } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 
@@ -60,8 +60,6 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
         return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400 animate-pulse" />;
       case "IN_ANALYSIS":
         return <StatusSpinner color="amber" />;
-      case "WAITING_CUSTOMER":
-        return <StatusSpinner color="yellow" />;
       case "CLOSED":
       case "APPROVED":
         return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 dark:text-green-400 fill-green-500 dark:fill-green-400" />;
@@ -87,8 +85,6 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
         return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20";
       case "IN_ANALYSIS":
         return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
-      case "WAITING_CUSTOMER":
-        return "border-yellow-200 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/20";
       case "CLOSED":
       case "APPROVED":
         return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20";
@@ -129,26 +125,26 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
 const statusLabels: Record<string, string> = {
   NEW: "NOVO",
   IN_ANALYSIS: "U OBRADI",
-  WAITING_CUSTOMER: "ČEKA KLIJENTA",
   APPROVED: "ODOBRENO",
   REJECTED: "ODBIJENO",
   CLOSED: "ZATVORENO",
 };
 
 export default function ClaimDetailPage() {
-  // Extract id from params to avoid enumeration issues in dev tools
-  const params = useParams<{ id: string }>();
-  const claimId = params.id as string;
   const router = useRouter();
+  // In Client Components, useParams and useSearchParams return direct values (not Promises)
+  const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
+  const claimId = params?.id as string;
   const [claim, setClaim] = useState<Claim | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
   const claimIdRef = useRef<string | null>(null);
+  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
 
-  const fetchClaim = async (retryCount = 0) => {
+  const fetchClaim = async (retryCount = 0, showLoading = true) => {
     try {
-      if (retryCount === 0) {
+      if (retryCount === 0 && showLoading) {
         setLoading(true);
       }
       
@@ -160,19 +156,18 @@ export default function ClaimDetailPage() {
         return;
       }
 
-      console.log(`[fetchClaim] Fetching claim ${currentClaimId} (attempt ${retryCount + 1}, type: ${typeof currentClaimId})`);
       const res = await fetch(`/api/claims/${currentClaimId}`);
       
       if (!res.ok) {
         const errorText = await res.text();
         console.error(`[fetchClaim] Failed to fetch claim: ${res.status}`, errorText);
         
-        // Retry up to 5 times if 404 (claim might still be creating)
-        if (res.status === 404 && retryCount < 5) {
-          console.log(`[fetchClaim] Retrying in 1 second (attempt ${retryCount + 1}/5)...`);
-          setTimeout(() => {
-            fetchClaim(retryCount + 1);
+        // Retry up to 2 times if 404 (claim might still be creating)
+        if (res.status === 404 && retryCount < 2) {
+          const timeoutId = setTimeout(() => {
+            fetchClaim(retryCount + 1, showLoading);
           }, 1000);
+          timeoutRefs.current.push(timeoutId);
           return;
         }
         
@@ -183,17 +178,16 @@ export default function ClaimDetailPage() {
       
       const data = await res.json();
       if (data.claim) {
-        console.log('[fetchClaim] Fetched claim. claimAcceptanceStatus:', data.claim.claimAcceptanceStatus);
         setClaim(data.claim);
         setLoading(false);
       } else {
         console.error("[fetchClaim] Claim not found in response:", data);
         // Retry if claim not in response
-        if (retryCount < 5) {
-          console.log(`[fetchClaim] Retrying in 1 second (attempt ${retryCount + 1}/5)...`);
-          setTimeout(() => {
-            fetchClaim(retryCount + 1);
+        if (retryCount < 2) {
+          const timeoutId = setTimeout(() => {
+            fetchClaim(retryCount + 1, showLoading);
           }, 1000);
+          timeoutRefs.current.push(timeoutId);
           return;
         }
         setClaim(null);
@@ -202,11 +196,11 @@ export default function ClaimDetailPage() {
     } catch (error) {
       console.error("[fetchClaim] Error fetching claim:", error);
       // Retry on error
-      if (retryCount < 5) {
-        console.log(`[fetchClaim] Retrying in 1 second (attempt ${retryCount + 1}/5)...`);
-        setTimeout(() => {
-          fetchClaim(retryCount + 1);
+      if (retryCount < 2) {
+        const timeoutId = setTimeout(() => {
+          fetchClaim(retryCount + 1, showLoading);
         }, 1000);
+        timeoutRefs.current.push(timeoutId);
         return;
       }
       setClaim(null);
@@ -214,37 +208,48 @@ export default function ClaimDetailPage() {
     }
   };
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+      timeoutRefs.current = [];
+    };
+  }, []);
+
   // Update claimIdRef when claimId changes
   useEffect(() => {
-    console.log(`[ClaimDetailPage] claimId changed to: ${claimId}`);
-    
     if (claimId) {
       claimIdRef.current = claimId;
-      console.log(`[ClaimDetailPage] Setting claimIdRef.current to ${claimId} and calling fetchClaim`);
       setActiveTab("overview"); // Reset tab when loading new claim
-      fetchClaim();
+      fetchClaim(0, true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimId]);
 
   // Refresh claim when refresh parameter is present (e.g., after linking from inbox)
   useEffect(() => {
+    if (!params || !searchParams) return;
     const refresh = searchParams.get('refresh');
-    const claimId = params.id as string;
-    if (refresh && claimId) {
-      claimIdRef.current = claimId;
+    const currentClaimId = (params as any)?.id as string;
+    if (refresh && currentClaimId) {
+      claimIdRef.current = currentClaimId;
       // Small delay to ensure backend is ready, then fetch
-      const timer = setTimeout(() => {
-        fetchClaim();
+      const timer1 = setTimeout(() => {
+        fetchClaim(0, false);
         // Remove refresh parameter from URL after a delay
-        setTimeout(() => {
-          router.replace(`/claims/${claimId}`, { scroll: false });
+        const timer2 = setTimeout(() => {
+          router.replace(`/claims/${currentClaimId}`, { scroll: false });
         }, 500);
+        timeoutRefs.current.push(timer2);
       }, 300);
-      return () => clearTimeout(timer);
+      timeoutRefs.current.push(timer1);
+      return () => {
+        clearTimeout(timer1);
+        timeoutRefs.current = timeoutRefs.current.filter(t => t !== timer1);
+      };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, params.id, router]);
+  }, [searchParams, params?.id, router]);
 
 
   const updateClaim = async (updates: Partial<Claim> | Claim) => {
@@ -266,7 +271,6 @@ export default function ClaimDetailPage() {
         delete (updateData as any).customer;
       }
       
-      console.log('[updateClaim] Partial update. Data:', updateData);
       
       // Update claim state immediately (optimistic update) - this makes header update instantly
       if (claim) {
@@ -390,26 +394,26 @@ export default function ClaimDetailPage() {
         </div>
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-5 w-full h-10">
-              <TabsTrigger value="overview" className="text-xs px-2">
-                <LayoutDashboard className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Overview</span>
+            <TabsList className="grid grid-cols-5 w-full h-10 relative z-10">
+              <TabsTrigger value="overview" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
+                <Languages className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">Translation</span>
               </TabsTrigger>
-              <TabsTrigger value="emails" className="text-xs px-2">
+              <TabsTrigger value="emails" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <Mail className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">Emails</span>
               </TabsTrigger>
-              <TabsTrigger value="documents" className="text-xs px-2">
+              <TabsTrigger value="documents" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <FileText className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">Docs</span>
               </TabsTrigger>
-              <TabsTrigger value="findings" className="text-xs px-2">
+              <TabsTrigger value="findings" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <Search className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">Findings</span>
               </TabsTrigger>
-              <TabsTrigger value="photos" className="text-xs px-2">
+              <TabsTrigger value="photos" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <ImageIcon className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Photos</span>
+                <span className="hidden sm:inline">Naši fajlovi</span>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
@@ -419,13 +423,13 @@ export default function ClaimDetailPage() {
               <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              <ClaimClientDocuments claim={claim} isReadOnly={claim.status === "CLOSED"} />
+              <ClaimClientDocuments claim={claim} isReadOnly={claim.status === "CLOSED"} onRefresh={() => fetchClaim(0, false)} />
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
               <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
             </TabsContent>
             <TabsContent value="photos" className="mt-4">
-              <ClaimPhotos claim={claim} isReadOnly={claim.status === "CLOSED"} />
+              <ClaimPhotos claim={claim} isReadOnly={claim.status === "CLOSED"} onRefresh={() => fetchClaim(0, false)} />
             </TabsContent>
           </Tabs>
         </div>
