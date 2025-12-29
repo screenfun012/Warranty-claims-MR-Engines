@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search, Languages } from "lucide-react";
+import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search, Languages, Folder } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 
@@ -412,7 +412,7 @@ export default function ClaimDetailPage() {
                 <span className="hidden sm:inline">Findings</span>
               </TabsTrigger>
               <TabsTrigger value="photos" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
-                <ImageIcon className="h-3.5 w-3.5 sm:mr-1.5" />
+                <Folder className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">Naši fajlovi</span>
               </TabsTrigger>
             </TabsList>

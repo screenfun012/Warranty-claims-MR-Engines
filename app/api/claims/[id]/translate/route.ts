@@ -15,10 +15,39 @@ export async function POST(
     const { id } = await params;
     const body = await request.json();
 
-    const { type, targetLang, sourceLang } = body;
+    const { type, targetLang, sourceLang, text } = body;
     const translator = getTranslator();
 
-    if (type === "summary") {
+    if (type === "text" && text) {
+      // Direct text translation (e.g., from email body)
+      const translated = await translator.translate({
+        text: text,
+        sourceLang: (sourceLang || "SR").toUpperCase(),
+        targetLang: targetLang.toUpperCase(),
+      });
+
+      // Save to summary field based on target language
+      const updateData: {
+        summaryEn?: string;
+        summarySr?: string;
+        summaryDe?: string;
+        summaryFr?: string;
+        summaryNl?: string;
+      } = {};
+      const targetLangUpper = targetLang.toUpperCase();
+      if (targetLangUpper === "EN") updateData.summaryEn = translated;
+      else if (targetLangUpper === "SR") updateData.summarySr = translated;
+      else if (targetLangUpper === "DE") updateData.summaryDe = translated;
+      else if (targetLangUpper === "FR") updateData.summaryFr = translated;
+      else if (targetLangUpper === "NL") updateData.summaryNl = translated;
+
+      await prisma.claim.update({
+        where: { id },
+        data: updateData,
+      });
+
+      return NextResponse.json({ translated });
+    } else if (type === "summary") {
       const claim = await prisma.claim.findUnique({ where: { id } });
       if (!claim) {
         return NextResponse.json({ error: "Claim not found" }, { status: 404 });

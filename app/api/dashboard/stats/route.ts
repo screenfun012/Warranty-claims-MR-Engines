@@ -25,12 +25,13 @@ export async function GET() {
     let claimsByStatus: Array<{ status: string; _count: { id: number } }> = [];
     try {
       try {
-        claimsByStatus = await prisma.claim.groupBy({
+        const result = await prisma.claim.groupBy({
           by: ["status"],
           _count: {
             id: true,
           },
         });
+        claimsByStatus = result as Array<{ status: string; _count: { id: number } }>;
       } catch (groupByError) {
         // Fallback for SQLite if groupBy fails
         console.warn("groupBy failed, using fallback:", groupByError);
@@ -128,7 +129,7 @@ export async function GET() {
     let claimsByCustomer: Array<{ customerId: string | null; _count: { id: number } }> = [];
     try {
       try {
-        claimsByCustomer = await prisma.claim.groupBy({
+        const customerResult = await prisma.claim.groupBy({
           by: ["customerId"],
           _count: {
             id: true,
@@ -145,6 +146,7 @@ export async function GET() {
           },
           take: 10,
         });
+        claimsByCustomer = customerResult as Array<{ customerId: string | null; _count: { id: number } }>;
       } catch (groupByError) {
         // Fallback for SQLite if groupBy fails
         console.warn("groupBy for customers failed, using fallback:", groupByError);

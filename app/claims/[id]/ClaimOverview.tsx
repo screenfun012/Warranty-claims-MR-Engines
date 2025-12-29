@@ -31,34 +31,73 @@ const LANGUAGES: LanguageConfig[] = [
   { code: "NL", name: "Dutch", field: "summaryNl", isBeta: true },
 ];
 
+import { getCleanEmailBody } from "@/lib/email/emailBodyCleaner";
+
+// Helper function to get email body text from first inbound message
+const getEmailBodyText = (claim: any): string => {
+  // Find first inbound message from email threads
+  const firstThread = claim.emailThreads?.[0];
+  if (firstThread?.messages) {
+    const firstInboundMessage = firstThread.messages.find((msg: any) => msg.direction === "INBOUND");
+    if (firstInboundMessage) {
+      return getCleanEmailBody({
+        bodyText: firstInboundMessage.bodyText,
+        bodyHtml: firstInboundMessage.bodyHtml,
+      });
+    }
+  }
+  return "";
+};
+
 export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOverviewProps) {
   const [translating, setTranslating] = useState(false);
   const [sourceLang, setSourceLang] = useState<string>("SR");
   const [targetLang, setTargetLang] = useState<string>("EN");
+  const [useEmailBody, setUseEmailBody] = useState(false);
 
-  // Initialize languages from existing summaries
+  // Get email body text
+  const emailBodyText = getEmailBodyText(claim);
+
+  // Initialize languages from existing summaries or email body
   useEffect(() => {
-    // If Serbian summary exists, use it as source
-    if (claim.summarySr) {
+    // If email body exists and no summary, use email body
+    if (emailBodyText && !claim.summarySr && !claim.summaryEn) {
+      setUseEmailBody(true);
       setSourceLang("SR");
+    } else if (claim.summarySr) {
+      setSourceLang("SR");
+      setUseEmailBody(false);
     } else if (claim.summaryEn) {
       setSourceLang("EN");
+      setUseEmailBody(false);
     } else {
       // Check other languages
       const langWithContent = LANGUAGES.find(lang => claim[lang.field]);
       if (langWithContent) {
         setSourceLang(langWithContent.code);
+        setUseEmailBody(false);
       }
     }
-  }, [claim]);
+  }, [claim, emailBodyText]);
 
   const getSummaryValue = (field: string) => {
     return claim[field] || "";
   };
 
+  const [sourceText, setSourceText] = useState("");
+
+  // Initialize source text when claim or useEmailBody changes
+  useEffect(() => {
+    if (useEmailBody) {
+      setSourceText(emailBodyText);
+    } else {
+      const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
+      setSourceText(sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "");
+    }
+  }, [useEmailBody, emailBodyText, sourceLang, claim]);
+
   const getSourceValue = () => {
-    const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
-    return sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "";
+    return sourceText;
   };
 
   const getTargetValue = () => {
@@ -122,22 +161,36 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
       return;
     }
 
-    const textToTranslate = getSourceValue();
-    if (!textToTranslate) {
-      alert(`No ${sourceLangConfig.name} summary to translate`);
+    const textToTranslate = sourceText; // Use current sourceText state (which can be edited)
+    if (!textToTranslate || !textToTranslate.trim()) {
+      if (useEmailBody) {
+        alert("No email body text to translate");
+      } else {
+        alert(`No ${sourceLangConfig.name} summary to translate`);
+      }
       return;
     }
 
     setTranslating(true);
     try {
+      // If using email body, send the text directly, otherwise use summary type
+      const requestBody = useEmailBody 
+        ? {
+            type: "text",
+            text: textToTranslate,
+            targetLang: targetLang.toUpperCase(),
+            sourceLang: sourceLang.toUpperCase(),
+          }
+        : {
+            type: "summary",
+            targetLang: targetLang.toUpperCase(),
+            sourceLang: sourceLang.toUpperCase(),
+          };
+
       const res = await fetch(`/api/claims/${claim.id}/translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "summary",
-          targetLang: targetLang.toUpperCase(),
-          sourceLang: sourceLang.toUpperCase(),
-        }),
+        body: JSON.stringify(requestBody),
       });
       const data = await res.json();
       if (data.translated) {
@@ -161,9 +214,27 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
 
   return (
     <Card className="p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Languages className="h-5 w-5 text-primary" />
-        <h2 className="text-lg font-semibold text-primary">Summary</h2>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-2">
+          <Languages className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold text-primary">Summary</h2>
+        </div>
+        {emailBodyText && (
+          <Button
+            variant={useEmailBody ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setUseEmailBody(!useEmailBody);
+              if (!useEmailBody) {
+                // When switching to email body, set source to SR
+                setSourceLang("SR");
+              }
+            }}
+            disabled={isReadOnly}
+          >
+            {useEmailBody ? "Koristi Email Body" : "Koristi Summary"}
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -193,9 +264,18 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           </div>
           <Textarea
             value={getSourceValue()}
-            onChange={(e) => !isReadOnly && handleSourceTextChange(e.target.value)}
+            onChange={(e) => {
+              if (!isReadOnly) {
+                const newValue = e.target.value;
+                setSourceText(newValue);
+                // Save to summary field
+                handleSourceTextChange(newValue);
+              }
+            }}
             rows={10}
-            placeholder={`Enter summary in ${sourceLangConfig?.name || sourceLang}...`}
+            placeholder={useEmailBody 
+              ? "Email body text (editable - extracted from first inbound email)" 
+              : `Enter summary in ${sourceLangConfig?.name || sourceLang}...`}
             disabled={isReadOnly}
             className="min-h-[200px] resize-y"
           />

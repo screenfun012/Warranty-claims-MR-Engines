@@ -6,6 +6,7 @@
 import { ImapFlow } from "imapflow";
 import { env } from "@/lib/config/env";
 import { getEmailConfig } from "@/lib/config/envLoader";
+import { cleanEmailBodyText, extractTextFromHtml } from "./emailBodyCleaner";
 
 export interface FetchedMessage {
   uid: string;
@@ -320,9 +321,24 @@ async function parseMessageBody(
       }
     }
 
+    // Clean the text and HTML to remove unwanted content
+    let cleanedText = parsed.text;
+    if (cleanedText) {
+      cleanedText = cleanEmailBodyText(cleanedText);
+    }
+    
+    // For HTML, we'll clean it when extracting text, but keep original for reference
+    let cleanedHtml = parsed.html;
+    if (cleanedHtml) {
+      // Remove HTML comments and styles from HTML
+      cleanedHtml = cleanedHtml
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    }
+
     return {
-      text: parsed.text || undefined,
-      html: parsed.html || undefined,
+      text: cleanedText || undefined,
+      html: cleanedHtml || undefined,
       attachments,
     };
   } catch (error) {

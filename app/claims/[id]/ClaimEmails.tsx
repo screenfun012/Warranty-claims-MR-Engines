@@ -7,9 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Upload, X, Paperclip, FileText, Image as ImageIcon, Mail } from "lucide-react";
+import { Paperclip, FileText, Image as ImageIcon, Mail, Check } from "lucide-react";
 import { FileViewerModal } from "@/components/file-viewer-modal";
 import { cn } from "@/lib/utils";
+import { getCleanEmailBody } from "@/lib/email/emailBodyCleaner";
 
 interface ClaimEmailsProps {
   claim: any;
@@ -17,17 +18,50 @@ interface ClaimEmailsProps {
   isReadOnly?: boolean;
 }
 
-interface UploadedFile {
-  file: File;
-  id: string;
-}
+// Helper function to extract email address from "Name <email@domain.com>" format
+const extractEmailAddress = (emailString: string | null | undefined): string => {
+  if (!emailString) return "";
+  
+  // Try to extract email from format like "Name <email@domain.com>" or just "email@domain.com"
+  const emailMatch = emailString.match(/<([^>]+)>/) || emailString.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+  if (emailMatch) {
+    return emailMatch[1] || emailMatch[0];
+  }
+  
+  return emailString.trim();
+};
+
+// Helper function to get the original sender email from claim's email threads
+const getOriginalSenderEmail = (claim: any): string => {
+  // Find the first email thread (usually the main one)
+  const firstThread = claim.emailThreads?.[0];
+  
+  if (firstThread) {
+    // Use originalSender from thread (this is the real customer email, even if forwarded)
+    if (firstThread.originalSender) {
+      return extractEmailAddress(firstThread.originalSender);
+    }
+    
+    // Fallback: find first inbound message and use its "from" field
+    const firstInboundMessage = firstThread.messages?.find((msg: any) => msg.direction === "INBOUND");
+    if (firstInboundMessage?.from) {
+      return extractEmailAddress(firstInboundMessage.from);
+    }
+  }
+  
+  // Final fallback: use customer email from claim
+  return extractEmailAddress(claim.customer?.email);
+};
 
 export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmailsProps) {
   const [sending, setSending] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
+  
+  // Get original sender email automatically
+  const originalSenderEmail = getOriginalSenderEmail(claim);
+  
   const [replyForm, setReplyForm] = useState({
-    to: claim.customer?.email || "",
+    to: originalSenderEmail,
     cc: "",
     subject: `Re: ${claim.emailThreads?.[0]?.subjectOriginal || "Claim"}`,
     text: "",
@@ -51,6 +85,10 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       setClaimAcceptanceStatus(newStatus);
       prevClaimIdRef.current = claim.id;
       prevStatusRef.current = claim.claimAcceptanceStatus;
+      
+      // Update "To" field with original sender when claim changes
+      const newOriginalSender = getOriginalSenderEmail(claim);
+      setReplyForm(prev => ({ ...prev, to: newOriginalSender }));
     } else if (claim.claimAcceptanceStatus && 
                claim.claimAcceptanceStatus !== prevStatusRef.current &&
                (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED")) {
@@ -58,7 +96,8 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       setClaimAcceptanceStatus(claim.claimAcceptanceStatus);
       prevStatusRef.current = claim.claimAcceptanceStatus;
     }
-  }, [claim.id, claim.claimAcceptanceStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claim.id, claim.claimAcceptanceStatus, claim.emailThreads, claim.customer]);
 
   // When acceptance status is selected, update claimAcceptanceStatus but keep status as is
   const handleAcceptanceStatusChange = async (value: string) => {
@@ -126,44 +165,54 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
   };
 
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append("file", file);
-
-        const res = await fetch(`/api/claims/${claim.id}/upload-attachment`, {
-          method: "POST",
-          body: formData,
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          setUploadedFiles((prev) => [
-            ...prev,
-            { file, id: data.attachment?.id || Date.now().toString() },
-          ]);
-        } else {
-          const errorData = await res.json();
-          alert(`Failed to upload ${file.name}: ${errorData.error}`);
+  // Get all internal files (from "Naši fajlovi" tab)
+  const internalFiles = (() => {
+    const files: any[] = [];
+    
+    // Add internal photos
+    if (claim.photos) {
+      claim.photos.forEach((photo: any) => {
+        if (photo.internalUpload === true || 
+            (photo.attachment?.source === "INTERNAL_TEARDOWN" || photo.attachment?.source === "OTHER")) {
+          if (photo.attachment) {
+            files.push({
+              ...photo.attachment,
+              type: 'image',
+            });
+          }
         }
-      }
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      alert("Failed to upload file");
-    } finally {
-      setUploading(false);
-      // Reset file input
-      e.target.value = "";
+      });
     }
-  };
+    
+    // Add internal documents (PDF/DOCX)
+    if (claim.clientDocuments) {
+      claim.clientDocuments.forEach((doc: any) => {
+        if (doc.attachment && 
+            (doc.attachment.source === "INTERNAL_TEARDOWN" || doc.attachment.source === "OTHER")) {
+          const exists = files.some((f: any) => f.id === doc.attachment.id);
+          if (!exists) {
+            files.push({
+              ...doc.attachment,
+              type: doc.attachment.mimeType?.includes("pdf") ? 'pdf' : 'docx',
+            });
+          }
+        }
+      });
+    }
+    
+    return files.sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
+  })();
 
-  const handleRemoveFile = (fileId: string) => {
-    setUploadedFiles((prev) => prev.filter((f) => f.id !== fileId));
+  const handleToggleAttachment = (attachmentId: string) => {
+    setSelectedAttachmentIds((prev) => 
+      prev.includes(attachmentId)
+        ? prev.filter((id) => id !== attachmentId)
+        : [...prev, attachmentId]
+    );
   };
 
   const handleSendEmail = async () => {
@@ -188,8 +237,8 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           : `Your warranty claim has been processed and We reject your claim.`;
       }
 
-      // Get attachment IDs from uploaded files
-      const attachmentIds = uploadedFiles.map((f) => f.id).filter((id) => id && !id.includes("temp"));
+      // Get attachment IDs from selected internal files
+      const attachmentIds = selectedAttachmentIds;
 
       // Send email - API will automatically set status to CLOSED
       const res = await fetch(`/api/claims/${claim.id}/send-email`, {
@@ -207,7 +256,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       if (data.success) {
         alert("Email sent successfully and claim status updated to CLOSED");
         setReplyForm({ ...replyForm, text: "" });
-        setUploadedFiles([]);
+        setSelectedAttachmentIds([]);
         // Force full page reload to ensure status is updated
         window.location.reload();
       } else {
@@ -316,7 +365,13 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                     )}
 
                     <div className="text-sm whitespace-pre-wrap break-words bg-background/50 p-3 rounded border">
-                      {message.bodyText || "(Nema teksta)"}
+                      {(() => {
+                        const cleanText = getCleanEmailBody({
+                          bodyText: message.bodyText,
+                          bodyHtml: message.bodyHtml,
+                        });
+                        return cleanText || "(Nema teksta)";
+                      })()}
                     </div>
 
                     {message.attachments && message.attachments.length > 0 && (
@@ -417,52 +472,57 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           </div>
 
           <div>
-            <Label htmlFor="file-upload">Attachments</Label>
-            <div className="mt-2">
-              <Input
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                disabled={uploading}
-                className="hidden"
-                id="file-upload"
-                aria-label="Upload files"
-                title="Upload files"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                disabled={uploading}
-                className="w-full"
-                onClick={() => document.getElementById("file-upload")?.click()}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {uploading ? "Uploading..." : "Upload Files"}
-              </Button>
-              {uploadedFiles.length > 0 && (
-                <div className="mt-2 space-y-2">
-                  {uploadedFiles.map((uploaded) => (
+            <Label>Prilozi (iz &quot;Naši fajlovi&quot;)</Label>
+            {internalFiles.length > 0 ? (
+              <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
+                {internalFiles.map((file: any) => {
+                  const isSelected = selectedAttachmentIds.includes(file.id);
+                  const isImage = file.type === 'image' || file.mimeType?.startsWith('image/');
+                  const isPdf = file.type === 'pdf' || file.mimeType?.includes('pdf');
+                  
+                  return (
                     <div
-                      key={uploaded.id}
-                      className="flex items-center justify-between p-2 bg-muted rounded"
+                      key={file.id}
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors",
+                        isSelected 
+                          ? "bg-primary/10 border border-primary" 
+                          : "bg-muted/50 hover:bg-muted border border-transparent"
+                      )}
+                      onClick={() => handleToggleAttachment(file.id)}
                     >
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-4 w-4" />
-                        <span className="text-sm">{uploaded.file.name}</span>
+                      <div className={cn(
+                        "flex h-5 w-5 items-center justify-center rounded border-2 transition-all shrink-0",
+                        isSelected
+                          ? "border-primary bg-primary"
+                          : "border-muted-foreground/40"
+                      )}>
+                        {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveFile(uploaded.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        {isImage ? (
+                          <ImageIcon className="h-4 w-4 text-blue-500 shrink-0" />
+                        ) : isPdf ? (
+                          <FileText className="h-4 w-4 text-red-500 shrink-0" />
+                        ) : (
+                          <Paperclip className="h-4 w-4 text-gray-500 shrink-0" />
+                        )}
+                        <span className="text-sm truncate">{file.fileName || `File ${file.id}`}</span>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nema internih fajlova za priložiti. Dodajte fajlove u tabu &quot;Naši fajlovi&quot;.
+              </p>
+            )}
+            {selectedAttachmentIds.length > 0 && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Odabrano: {selectedAttachmentIds.length} fajlova
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-4 border-t">
@@ -508,7 +568,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
             </div>
           </div>
 
-          <Button onClick={handleSendEmail} disabled={sending || uploading}>
+          <Button onClick={handleSendEmail} disabled={sending}>
             {sending ? "Sending..." : "Send Email"}
           </Button>
         </div>
