@@ -85,22 +85,41 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
   };
 
   const [sourceText, setSourceText] = useState("");
+  const [targetTexts, setTargetTexts] = useState<Record<string, string>>({});
+  const [isEditingSource, setIsEditingSource] = useState(false);
+  const [isEditingTarget, setIsEditingTarget] = useState<Record<string, boolean>>({});
 
-  // Initialize source text when claim or useEmailBody changes
+  // Initialize source text when claim or useEmailBody changes (only if not currently editing)
   useEffect(() => {
-    if (useEmailBody) {
-      setSourceText(emailBodyText);
-    } else {
-      const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
-      setSourceText(sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "");
+    if (!isEditingSource) {
+      if (useEmailBody) {
+        setSourceText(emailBodyText);
+      } else {
+        const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
+        setSourceText(sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "");
+      }
     }
-  }, [useEmailBody, emailBodyText, sourceLang, claim]);
+  }, [useEmailBody, emailBodyText, sourceLang, claim, isEditingSource]);
+
+  // Initialize target texts when claim changes (only if not currently editing that target)
+  useEffect(() => {
+    LANGUAGES.forEach(lang => {
+      if (!isEditingTarget[lang.code]) {
+        const value = getSummaryValue(lang.field);
+        setTargetTexts(prev => ({ ...prev, [lang.code]: value }));
+      }
+    });
+  }, [claim, isEditingTarget]);
 
   const getSourceValue = () => {
     return sourceText;
   };
 
   const getTargetValue = () => {
+    // Use local state if editing, otherwise use claim value
+    if (isEditingTarget[targetLang] !== undefined && isEditingTarget[targetLang]) {
+      return targetTexts[targetLang] ?? "";
+    }
     const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
     return targetLangConfig ? getSummaryValue(targetLangConfig.field) : "";
   };
@@ -192,6 +211,18 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
+      
+      if (!res.ok) {
+        const errorData = await res.json();
+        const errorMessage = errorData.error || "Unknown error";
+        // Remove duplicate "Translation failed:" prefix if present
+        const cleanError = errorMessage.startsWith("Translation failed: ") 
+          ? errorMessage.substring("Translation failed: ".length)
+          : errorMessage;
+        alert("Translation failed: " + cleanError);
+        return;
+      }
+      
       const data = await res.json();
       if (data.translated) {
         const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
@@ -199,11 +230,19 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           onUpdate({ [targetLangConfig.field]: data.translated });
         }
       } else {
-        alert("Translation failed: " + (data.error || "Unknown error"));
+        const errorMessage = data.error || "Unknown error";
+        const cleanError = errorMessage.startsWith("Translation failed: ") 
+          ? errorMessage.substring("Translation failed: ".length)
+          : errorMessage;
+        alert("Translation failed: " + cleanError);
       }
     } catch (error) {
       console.error("Translation error:", error);
-      alert("Translation failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const cleanError = errorMessage.startsWith("Translation failed: ") 
+        ? errorMessage.substring("Translation failed: ".length)
+        : errorMessage;
+      alert("Translation failed: " + cleanError);
     } finally {
       setTranslating(false);
     }
@@ -267,10 +306,14 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
             onChange={(e) => {
               if (!isReadOnly) {
                 const newValue = e.target.value;
+                setIsEditingSource(true);
                 setSourceText(newValue);
                 // Save to summary field
                 handleSourceTextChange(newValue);
               }
+            }}
+            onBlur={() => {
+              setIsEditingSource(false);
             }}
             rows={10}
             placeholder={useEmailBody 
@@ -307,7 +350,17 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           </div>
           <Textarea
             value={getTargetValue()}
-            onChange={(e) => !isReadOnly && handleTargetTextChange(e.target.value)}
+            onChange={(e) => {
+              if (!isReadOnly) {
+                const newValue = e.target.value;
+                setIsEditingTarget(prev => ({ ...prev, [targetLang]: true }));
+                setTargetTexts(prev => ({ ...prev, [targetLang]: newValue }));
+                handleTargetTextChange(newValue);
+              }
+            }}
+            onBlur={() => {
+              setIsEditingTarget(prev => ({ ...prev, [targetLang]: false }));
+            }}
             rows={10}
             placeholder={`Translated summary in ${targetLangConfig?.name || targetLang}...`}
             disabled={isReadOnly}

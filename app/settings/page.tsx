@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Save, Mail } from "lucide-react";
+import { Save, Mail, User } from "lucide-react";
+import { useSuperAdmin } from "@/lib/hooks/useSuperAdmin";
 
 interface EmailConfig {
   imapHost: string;
@@ -23,6 +24,7 @@ interface EmailConfig {
 }
 
 export default function SettingsPage() {
+  const { userEmail, setUserEmail, isSuperAdmin } = useSuperAdmin();
   const [config, setConfig] = useState<EmailConfig>({
     imapHost: "",
     imapPort: 993,
@@ -39,10 +41,12 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [localUserEmail, setLocalUserEmail] = useState(userEmail || "");
 
   useEffect(() => {
     fetchConfig();
-  }, []);
+    setLocalUserEmail(userEmail || "");
+  }, [userEmail]);
 
   const fetchConfig = async () => {
     try {
@@ -114,6 +118,77 @@ export default function SettingsPage() {
   return (
     <div className="p-8">
       <h1 className="text-3xl font-bold mb-6">Podešavanja</h1>
+
+      <Card className="p-6 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <User className="h-5 w-5" />
+          <h2 className="text-xl font-semibold">Korisnik</h2>
+        </div>
+        <div className="space-y-4 mb-6">
+          <div>
+            <Label>Email adresa (za super admin pristup)</Label>
+            <Input
+              value={localUserEmail}
+              onChange={(e) => setLocalUserEmail(e.target.value)}
+              placeholder="vas.email@mrgroup.rs"
+              type="email"
+            />
+            <p className="text-sm text-muted-foreground mt-1">
+              Postavite vašu email adresu da biste dobili super admin pristup (brisanje claims, inbox poruka, itd.)
+            </p>
+            {isSuperAdmin && (
+              <p className="text-sm text-green-600 mt-1 font-medium">
+                ✓ Super admin pristup aktivan
+              </p>
+            )}
+            <div className="flex gap-2 mt-2">
+              <Button
+                onClick={() => {
+                  if (!localUserEmail.trim()) {
+                    setMessage({ type: "error", text: "Molimo unesite email adresu" });
+                    return;
+                  }
+                  const trimmedEmail = localUserEmail.trim();
+                  console.log("[Settings] Saving email:", trimmedEmail);
+                  setUserEmail(trimmedEmail);
+                  setMessage({ type: "success", text: "Email adresa sačuvana. Super admin pristup je aktivan!" });
+                  setTimeout(() => setMessage(null), 5000);
+                  // Force a small delay to ensure state updates and trigger re-check
+                  setTimeout(() => {
+                    // Trigger custom event to force hook refresh
+                    window.dispatchEvent(new CustomEvent("userEmailUpdated", { detail: trimmedEmail }));
+                  }, 100);
+                }}
+                size="sm"
+              >
+                Sačuvaj email
+              </Button>
+              {isSuperAdmin && userEmail && (
+                <Button
+                  onClick={() => {
+                    if (confirm("Da li ste sigurni da želite da uklonite super admin pristup? Nećete moći da brišete claims i inbox poruke.")) {
+                      console.log("[Settings] Removing super admin access");
+                      localStorage.removeItem("userEmail");
+                      setLocalUserEmail("");
+                      setUserEmail("");
+                      setMessage({ type: "success", text: "Super admin pristup je uklonjen. Sada ste običan korisnik." });
+                      setTimeout(() => setMessage(null), 5000);
+                      // Trigger custom event to force hook refresh
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent("userEmailUpdated", { detail: "" }));
+                      }, 100);
+                    }
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Ukloni super admin pristup
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      </Card>
 
       <Card className="p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">

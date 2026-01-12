@@ -32,7 +32,7 @@ export async function POST(
       );
     }
 
-    const translator = getTranslator();
+    const translator = getTranslator(targetLang);
     const translated = await translator.translate({
       text: textToTranslate,
       sourceLang: sourceLang || "auto",

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical } from "lucide-react";
+import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSuperAdmin } from "@/lib/hooks/useSuperAdmin";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface EmailThread {
   id: string;
@@ -461,6 +463,7 @@ function ThreadDetail({
   onThreadUpdated: () => void;
 }) {
   const router = useRouter();
+  const { isSuperAdmin, userEmail } = useSuperAdmin();
   const [fullThread, setFullThread] = useState<EmailThread | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateClaim, setShowCreateClaim] = useState(false);
@@ -470,6 +473,8 @@ function ThreadDetail({
   const [translating, setTranslating] = useState<{ attachmentId: string; lang: string } | null>(null);
   const [expandedAttachments, setExpandedAttachments] = useState<Set<string>>(new Set());
   const [previewAttachment, setPreviewAttachment] = useState<{ id: string; fileName: string; mimeType: string } | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchFullThread = useCallback(async () => {
     setLoading(true);
@@ -691,6 +696,16 @@ function ThreadDetail({
                 Link to existing claim
               </Button>
             </>
+          )}
+          {isSuperAdmin && (
+            <Button 
+              variant="destructive" 
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={isDeleting}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              {isDeleting ? "Brisanje..." : "Obriši poruku"}
+            </Button>
           )}
         </div>
 
@@ -1016,6 +1031,43 @@ function ThreadDetail({
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={async () => {
+          if (!fullThread || !userEmail) return;
+          
+          setIsDeleting(true);
+          try {
+            const res = await fetch(`/api/inbox/${fullThread.id}/delete`, {
+              method: "DELETE",
+              headers: {
+                "X-User-Email": userEmail,
+              },
+            });
+
+            if (res.ok) {
+              // Navigate back to inbox list
+              onThreadUpdated();
+              onBack();
+            } else {
+              const errorData = await res.json();
+              alert(`Greška pri brisanju: ${errorData.error || "Nepoznata greška"}`);
+              setIsDeleting(false);
+            }
+          } catch (error) {
+            console.error("Error deleting email thread:", error);
+            alert("Greška pri brisanju poruke");
+            setIsDeleting(false);
+          }
+        }}
+        title="Brisanje poruke"
+        description="Da li ste sigurni da želite da obrišete ovu poruku? Ova akcija je nepovratna i obrišće sve povezane podatke."
+        confirmText="Obriši"
+        cancelText="Otkaži"
+        variant="destructive"
+      />
     </div>
   );
 }

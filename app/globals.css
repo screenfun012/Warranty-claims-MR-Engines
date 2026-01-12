@@ -187,6 +187,22 @@
     font-family: inherit;
   }
 
+  /* Dark mode - forsiraj svetlu boju teksta u email body-u */
+  .dark .email-body,
+  .dark .email-body * {
+    color: var(--foreground) !important;
+  }
+
+  /* Override inline stilove u dark mode-u */
+  .dark .email-body p,
+  .dark .email-body div,
+  .dark .email-body span,
+  .dark .email-body td,
+  .dark .email-body th,
+  .dark .email-body table {
+    color: var(--foreground) !important;
+  }
+
   /* Poštuj slike u email potpisima */
   .email-body img {
     max-width: 100%;

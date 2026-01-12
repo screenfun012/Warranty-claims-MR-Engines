@@ -29,23 +29,83 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
     const currentPendingSaves = new Map(pendingSaves);
     const currentClaimId = claim.id;
     
+    // Function to save all pending changes
+    const saveAllPending = async () => {
+      const promises = Array.from(currentPendingSaves.entries()).map(async ([sectionId, text]) => {
+        try {
+          const res = await fetch(`/api/claims/${currentClaimId}/report-sections/${sectionId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ textSr: text }),
+          });
+          if (res.ok) {
+            return { sectionId, success: true };
+          }
+          return { sectionId, success: false };
+        } catch (error) {
+          console.error("Error saving section:", error);
+          return { sectionId, success: false };
+        }
+      });
+      
+      await Promise.all(promises);
+      
+      // Update parent if onUpdate is provided
+      if (onUpdate && currentPendingSaves.size > 0) {
+        try {
+          const claimRes = await fetch(`/api/claims/${currentClaimId}`);
+          if (claimRes.ok) {
+            const claimData = await claimRes.json();
+            onUpdate({ reportSections: claimData.claim.reportSections });
+          }
+        } catch (error) {
+          console.error("Error refreshing claim after save:", error);
+        }
+      }
+    };
+    
+    // Save on visibility change (tab switch)
+    const handleVisibilityChange = () => {
+      if (document.hidden && currentPendingSaves.size > 0) {
+        saveAllPending();
+      }
+    };
+    
+    // Save on beforeunload (page unload)
+    const handleBeforeUnload = () => {
+      if (currentPendingSaves.size > 0) {
+        // Use fetch with keepalive for reliable save on page unload
+        currentPendingSaves.forEach((text, sectionId) => {
+          fetch(`/api/claims/${currentClaimId}/report-sections/${sectionId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ textSr: text }),
+            keepalive: true, // Allows request to complete even if page is unloading
+          }).catch(error => {
+            console.error("Error saving section on unload:", error);
+          });
+        });
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
       // Clear all timeouts
       saveTimeouts.current.forEach(timeout => clearTimeout(timeout));
       saveTimeouts.current.clear();
       
-      // Save any pending changes immediately
-      currentPendingSaves.forEach((text, sectionId) => {
-        fetch(`/api/claims/${currentClaimId}/report-sections/${sectionId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ textSr: text }),
-        }).catch(error => {
-          console.error("Error saving section on unmount:", error);
-        });
-      });
+      // Remove event listeners
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      // Save any pending changes immediately on unmount
+      if (currentPendingSaves.size > 0) {
+        saveAllPending();
+      }
     };
-  }, [pendingSaves, claim.id]);
+  }, [pendingSaves, claim.id, sections, onUpdate]);
 
   const sectionsByType = sections.reduce((acc: any, section: any) => {
     if (!acc[section.sectionType]) {
@@ -270,7 +330,16 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
               });
               if (res.ok) {
                 const data = await res.json();
-                setSections([...sections, data.section]);
+                const newSections = [...sections, data.section];
+                setSections(newSections);
+                // Update parent claim state
+                if (onUpdate) {
+                  const claimRes = await fetch(`/api/claims/${claim.id}`);
+                  if (claimRes.ok) {
+                    const claimData = await claimRes.json();
+                    onUpdate({ reportSections: claimData.claim.reportSections });
+                  }
+                }
               } else {
                 const errorData = await res.json();
                 alert("Failed to create section: " + (errorData.error || "Unknown error"));
@@ -303,6 +372,14 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                 if (res.ok) {
                   const data = await res.json();
                   setSections([data.section]);
+                  // Update parent claim state
+                  if (onUpdate) {
+                    const claimRes = await fetch(`/api/claims/${claim.id}`);
+                    if (claimRes.ok) {
+                      const claimData = await claimRes.json();
+                      onUpdate({ reportSections: claimData.claim.reportSections });
+                    }
+                  }
                 } else {
                   const errorData = await res.json();
                   alert("Failed to create section: " + (errorData.error || "Unknown error"));

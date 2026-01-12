@@ -40,8 +40,9 @@ class DeepLTranslator implements Translator {
     try {
       // Map language codes to DeepL format
       // DeepL supported languages: https://www.deepl.com/docs-api/translating-text/
+      // DeepL supports Serbian (SR) - use it directly
       const targetLangMap: Record<string, string> = {
-        SR: "SR", // Serbian
+        SR: "SR", // Serbian - DeepL supports it
         EN: "EN", // English (DeepL accepts both EN and EN-US, but EN is more universal)
         DE: "DE", // German
         NL: "NL", // Dutch
@@ -49,26 +50,25 @@ class DeepLTranslator implements Translator {
       };
 
       const sourceLangMap: Record<string, string> = {
-        SR: "SR", // Serbian - try explicit source language
+        SR: "SR", // Serbian - DeepL supports it
         EN: "EN", // English
         DE: "DE", // German
         NL: "NL", // Dutch
         FR: "FR", // French
       };
 
-      const target = targetLangMap[params.targetLang.toUpperCase()] || params.targetLang.toUpperCase();
+      const targetLangUpper = params.targetLang.toUpperCase();
+      let target = targetLangMap[targetLangUpper] || targetLangUpper;
       
       // Include source_lang if explicitly provided and not "auto"
-      // DeepL free API may not support SR as source_lang, so we skip it and let DeepL auto-detect
-      // This usually works better for Serbian
       let source: string | undefined = undefined;
-      if (params.sourceLang && params.sourceLang.toUpperCase() !== "AUTO" && params.sourceLang.toUpperCase() !== "SR") {
-        const mappedSource = sourceLangMap[params.sourceLang.toUpperCase()];
+      if (params.sourceLang && params.sourceLang.toUpperCase() !== "AUTO") {
+        const sourceLangUpper = params.sourceLang.toUpperCase();
+        const mappedSource = sourceLangMap[sourceLangUpper];
         if (mappedSource) {
           source = mappedSource;
         }
       }
-      // For SR, we don't send source_lang - DeepL will auto-detect which usually works better
 
       const bodyParams: Record<string, string> = {
         text: params.text,
@@ -80,25 +80,77 @@ class DeepLTranslator implements Translator {
         bodyParams.source_lang = source;
       }
 
-      const response = await fetch(this.baseUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `DeepL-Auth-Key ${this.apiKey}`,
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: new URLSearchParams(bodyParams),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
+      let response: Response;
+      try {
+        response = await fetch(this.baseUrl, {
+          method: "POST",
+          headers: {
+            "Authorization": `DeepL-Auth-Key ${this.apiKey}`,
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+          body: new URLSearchParams(bodyParams),
+          signal: controller.signal,
+        });
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          throw new Error("Translation request timed out. Please check your internet connection and try again.");
+        }
+        if (fetchError instanceof Error && fetchError.message.includes('fetch failed')) {
+          throw new Error("Failed to connect to translation service. Please check your internet connection and API key configuration.");
+        }
+        throw fetchError;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`DeepL API error: ${response.status} ${errorText}`);
+        let errorMessage = `DeepL API error: ${response.status}`;
+        if (errorText) {
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage += ` - ${errorData.message || errorText}`;
+          } catch {
+            errorMessage += ` - ${errorText}`;
+          }
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
-      return data.translations[0]?.text || params.text;
+      
+      // DeepL returns translations in a translations array
+      if (!data.translations || !Array.isArray(data.translations) || data.translations.length === 0) {
+        throw new Error("Translation failed: No translation returned from DeepL API");
+      }
+      
+      const translated = data.translations[0]?.text;
+      if (!translated) {
+        throw new Error("Translation failed: Empty translation returned from DeepL API");
+      }
+      
+      return translated;
     } catch (error) {
       console.error("DeepL translation error:", error);
-      throw new Error(`Translation failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes("fetch failed") || errorMessage.includes("Failed to connect")) {
+        throw new Error("Translation service unavailable. Please check your internet connection and API key configuration.");
+      }
+      if (errorMessage.includes("timeout")) {
+        throw new Error("Translation request timed out. Please try again.");
+      }
+      if (errorMessage.includes("401") || errorMessage.includes("403")) {
+        throw new Error("Invalid API key. Please check your TRANSLATION_API_KEY environment variable.");
+      }
+      
+      throw new Error(`Translation failed: ${errorMessage}`);
     }
   }
 }
@@ -190,13 +242,19 @@ class GoogleTranslator implements Translator {
 
 /**
  * Get the configured translator instance based on environment variables
+ * If target language is Serbian and provider is DeepL, warns that Serbian is not fully supported
  */
-export function getTranslator(): Translator {
+export function getTranslator(targetLang?: string): Translator {
   const provider = env.TRANSLATION_PROVIDER.toLowerCase();
   const apiKey = env.TRANSLATION_API_KEY;
 
   if (provider === "none" || !apiKey) {
     return new NullTranslator();
+  }
+
+  // Warn if trying to use DeepL for Serbian (not fully supported)
+  if (targetLang?.toUpperCase() === "SR" && provider === "deepl") {
+    console.warn("Warning: DeepL free API has limited support for Serbian. Consider using OpenAI provider for better Serbian translations.");
   }
 
   switch (provider) {

@@ -16,7 +16,7 @@ export async function POST(
     const body = await request.json();
 
     const { type, targetLang, sourceLang, text } = body;
-    const translator = getTranslator();
+    const translator = getTranslator(targetLang);
 
     if (type === "text" && text) {
       // Direct text translation (e.g., from email body)

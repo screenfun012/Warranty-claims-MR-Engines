@@ -22,6 +22,8 @@ import { ClaimEmails } from "./ClaimEmails";
 import { ClaimClientDocuments } from "./ClaimClientDocuments";
 import { ClaimFindings } from "./ClaimFindings";
 import { ClaimPhotos } from "./ClaimPhotos";
+import { useSuperAdmin } from "@/lib/hooks/useSuperAdmin";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface Claim {
   id: string;
@@ -141,6 +143,9 @@ export default function ClaimDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const claimIdRef = useRef<string | null>(null);
   const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
+  const { isSuperAdmin, userEmail } = useSuperAdmin();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchClaim = async (retryCount = 0, showLoading = true) => {
     try {
@@ -360,19 +365,15 @@ export default function ClaimDetailPage() {
           >
             ← Nazad
           </Button>
-          {claim.status === "CLOSED" && (
+          {claim.status === "CLOSED" && isSuperAdmin && (
             <Button 
               variant="destructive" 
               size="sm"
-              onClick={async () => {
-                if (!confirm("Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna.")) {
-                  return;
-                }
-                alert("Brisanje reklamacija je trenutno onemogućeno. Kontaktirajte super admin-a.");
-              }}
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={isDeleting}
               className="h-8"
             >
-              Obriši
+              {isDeleting ? "Brisanje..." : "Obriši"}
             </Button>
           )}
         </div>
@@ -417,23 +418,59 @@ export default function ClaimDetailPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
-              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
+              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} />
             </TabsContent>
             <TabsContent value="emails" className="mt-4">
-              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
+              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              <ClaimClientDocuments claim={claim} isReadOnly={claim.status === "CLOSED"} onRefresh={() => fetchClaim(0, false)} />
+              <ClaimClientDocuments claim={claim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} onRefresh={() => fetchClaim(0, false)} />
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
-              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
+              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} />
             </TabsContent>
             <TabsContent value="photos" className="mt-4">
-              <ClaimPhotos claim={claim} isReadOnly={claim.status === "CLOSED"} onRefresh={() => fetchClaim(0, false)} />
+              <ClaimPhotos claim={claim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} onRefresh={() => fetchClaim(0, false)} />
             </TabsContent>
           </Tabs>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={async () => {
+          if (!claim || !userEmail) return;
+          
+          setIsDeleting(true);
+          try {
+            const res = await fetch(`/api/claims/${claim.id}/delete`, {
+              method: "DELETE",
+              headers: {
+                "X-User-Email": userEmail,
+              },
+            });
+
+            if (res.ok) {
+              // Navigate back to claims list
+              router.push("/claims");
+            } else {
+              const errorData = await res.json();
+              alert(`Greška pri brisanju: ${errorData.error || "Nepoznata greška"}`);
+              setIsDeleting(false);
+            }
+          } catch (error) {
+            console.error("Error deleting claim:", error);
+            alert("Greška pri brisanju reklamacije");
+            setIsDeleting(false);
+          }
+        }}
+        title="Brisanje reklamacije"
+        description="Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna i obrišće sve povezane podatke."
+        confirmText="Obriši"
+        cancelText="Otkaži"
+        variant="destructive"
+      />
     </div>
   );
 }
