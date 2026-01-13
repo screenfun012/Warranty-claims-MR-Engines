@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -68,107 +69,68 @@ interface Claim {
   } | null;
 }
 
+const fetchThreads = async (): Promise<EmailThread[]> => {
+  const res = await fetch("/api/inbox");
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("API error:", res.status, text);
+    throw new Error(`API error: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.threads || [];
+};
+
+const checkForUpdates = async (lastCheck?: string | null): Promise<{ hasUpdates: boolean; lastUpdated: string }> => {
+  if (document.hidden) return { hasUpdates: false, lastUpdated: new Date().toISOString() };
+  
+  const url = lastCheck 
+    ? `/api/inbox/check-updates?lastCheck=${encodeURIComponent(lastCheck)}`
+    : '/api/inbox/check-updates';
+  
+  const res = await fetch(url);
+  if (!res.ok) return { hasUpdates: false, lastUpdated: new Date().toISOString() };
+  const data = await res.json();
+  return { 
+    hasUpdates: data.hasUpdates || false, 
+    lastUpdated: data.lastUpdated || new Date().toISOString() 
+  };
+};
+
 export default function InboxPage() {
   const router = useRouter();
-  const [threads, setThreads] = useState<EmailThread[]>([]);
-  const [filteredThreads, setFilteredThreads] = useState<EmailThread[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
-  const [lastCheckTime, setLastCheckTime] = useState<string | null>(null);
 
+  // Fetch threads sa React Query
+  const { 
+    data: threads = [], 
+    isLoading: loading,
+    refetch: refetchThreads 
+  } = useQuery({
+    queryKey: ["inboxThreads"],
+    queryFn: fetchThreads,
+    refetchInterval: 30000, // 30 sekundi umesto 5 (6x manje request-ova)
+    refetchIntervalInBackground: false,
+  });
+
+  // Get last updated time from threads
+  const lastCheckTime = useMemo(() => {
+    return threads.length > 0 ? threads[0]?.updatedAt : null;
+  }, [threads]);
+
+  // Listen for inbox-updated events
   useEffect(() => {
-    fetchThreads();
-    
-    // Listen for inbox-updated events (from other components)
     const handleInboxUpdate = () => {
-      fetchThreads();
+      refetchThreads();
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
     };
     window.addEventListener('inbox-updated', handleInboxUpdate);
-    
-    // Lightweight check for updates (faster than full fetch)
-    const checkForUpdates = async () => {
-      if (document.hidden) return; // Don't check when tab is hidden
-      
-      try {
-        const url = lastCheckTime 
-          ? `/api/inbox/check-updates?lastCheck=${encodeURIComponent(lastCheckTime)}`
-          : '/api/inbox/check-updates';
-        
-        const res = await fetch(url);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.hasUpdates) {
-            // New emails detected, fetch full list
-            fetchThreads();
-          }
-          if (data.lastUpdated) {
-            setLastCheckTime(data.lastUpdated);
-          }
-        }
-      } catch (error) {
-        console.error("Error checking for updates:", error);
-      }
-    };
-    
-    // Auto-refresh threads more frequently to catch new emails in real-time
-    // Lightweight check every 3 seconds if page is visible, full refresh every 30 seconds
-    let checkInterval: NodeJS.Timeout;
-    let fullRefreshInterval: NodeJS.Timeout;
-    
-    const setupRefresh = () => {
-      const isVisible = !document.hidden;
-      
-      // Clear existing intervals
-      if (checkInterval) clearInterval(checkInterval);
-      if (fullRefreshInterval) clearInterval(fullRefreshInterval);
-      
-      if (isVisible) {
-        // Lightweight check every 5 seconds when visible (optimized from 1 second)
-        checkInterval = setInterval(checkForUpdates, 5000);
-        // Full refresh every 30 seconds as backup (optimized from 15 seconds)
-        fullRefreshInterval = setInterval(() => {
-          fetchThreads();
-        }, 30000);
-      } else {
-        // Less frequent checks when hidden
-        checkInterval = setInterval(checkForUpdates, 30000);
-      }
-    };
-    
-    // Initial setup
-    setupRefresh();
-    
-    // Update interval when page visibility changes
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        // When tab becomes visible, immediately check for updates
-        checkForUpdates();
-        fetchThreads();
-      }
-      setupRefresh();
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Also refresh when window regains focus
-    const handleFocus = () => {
-      checkForUpdates();
-      fetchThreads();
-    };
-    window.addEventListener('focus', handleFocus);
-    
-    return () => {
-      if (checkInterval) clearInterval(checkInterval);
-      if (fullRefreshInterval) clearInterval(fullRefreshInterval);
-      window.removeEventListener('inbox-updated', handleInboxUpdate);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastCheckTime]);
+    return () => window.removeEventListener('inbox-updated', handleInboxUpdate);
+  }, [refetchThreads, queryClient]);
 
   // Debounce search input
   useEffect(() => {
@@ -178,50 +140,40 @@ export default function InboxPage() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Filter threads based on search query with Serbian Latin support
-  useEffect(() => {
+  // Filter threads based on search query with Serbian Latin support (memoized)
+  const filteredThreads = useMemo(() => {
     if (!searchQuery.trim()) {
-      setFilteredThreads(threads);
-      return;
+      return threads;
     }
 
     const normalizedQuery = normalizeSerbianLatin(searchQuery);
-    const filtered = threads.filter((thread) => {
+    return threads.filter((thread) => {
       const subject = normalizeSerbianLatin(thread.subjectOriginal || "");
       const sender = normalizeSerbianLatin(thread.originalSender || "");
       const claimCode = normalizeSerbianLatin(thread.claim?.claimCodeRaw || "");
       
       return subject.includes(normalizedQuery) || sender.includes(normalizedQuery) || claimCode.includes(normalizedQuery);
     });
-    setFilteredThreads(filtered);
   }, [threads, searchQuery]);
 
-  const fetchThreads = useCallback(async () => {
-    try {
-      const res = await fetch("/api/inbox");
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("API error:", res.status, text);
-        throw new Error(`API error: ${res.status}`);
-      }
-      const data = await res.json();
-      const fetchedThreads = data.threads || [];
-      setThreads(fetchedThreads);
-      // Initialize filtered threads (will be filtered by searchQuery in separate effect)
-      setFilteredThreads(fetchedThreads);
-      // Update last check time
-      if (fetchedThreads.length > 0) {
-        const mostRecent = fetchedThreads[0]?.updatedAt;
-        if (mostRecent) {
-          setLastCheckTime(mostRecent);
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching threads:", error);
-    } finally {
-      setLoading(false);
+  // Check for updates sa React Query
+  const { data: updateCheck } = useQuery({
+    queryKey: ["inboxUpdates", lastCheckTime],
+    queryFn: () => checkForUpdates(lastCheckTime),
+    enabled: !!lastCheckTime && !document.hidden,
+    refetchInterval: 15000, // 15 sekundi umesto 5 (3x manje request-ova)
+    refetchIntervalInBackground: false,
+  });
+
+  // Refetch kada se detektuju update-i
+  useEffect(() => {
+    if (updateCheck?.hasUpdates) {
+      refetchThreads();
+      // Trigger sidebar refresh
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+      window.dispatchEvent(new Event('inbox-updated'));
     }
-  }, []);
+  }, [updateCheck?.hasUpdates, refetchThreads, queryClient]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -255,7 +207,9 @@ export default function InboxPage() {
       setTimeout(() => {
         if (data.success) {
           alert(`Synced: ${data.newMessages} new messages, ${data.newThreads} new threads`);
-          fetchThreads();
+          refetchThreads();
+          queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+          window.dispatchEvent(new Event('inbox-updated'));
         } else {
           alert("Sync failed: " + data.error);
         }
@@ -329,12 +283,14 @@ export default function InboxPage() {
             thread={selectedThread} 
             onBack={() => {
               setSelectedThread(null);
-              fetchThreads(); // Refresh threads to update unread count
+              refetchThreads(); // Refresh threads to update unread count
+              queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
               // Trigger sidebar refresh
               window.dispatchEvent(new Event('inbox-updated'));
             }}
             onThreadUpdated={() => {
-              fetchThreads(); // Refresh threads when thread is updated (linked to claim)
+              refetchThreads(); // Refresh threads when thread is updated (linked to claim)
+              queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
               // Trigger sidebar refresh
               window.dispatchEvent(new Event('inbox-updated'));
             }}
@@ -406,13 +362,14 @@ export default function InboxPage() {
                               method: "POST",
                             });
                             if (res.ok) {
-                              // Update thread in local state immediately
-                              setThreads(prevThreads => 
-                                prevThreads.map(t => 
+                              // Update thread in React Query cache immediately
+                              queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) => 
+                                old?.map(t => 
                                   t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
-                                )
+                                ) || []
                               );
                               // Trigger sidebar refresh
+                              queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
                               window.dispatchEvent(new Event('inbox-updated'));
                             }
                           } catch (error) {
@@ -435,11 +392,13 @@ export default function InboxPage() {
                     method: "POST",
                   }).then((res) => {
                     if (res.ok) {
-                      setThreads(prevThreads => 
-                        prevThreads.map(t => 
+                      // Update thread in React Query cache immediately
+                      queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) => 
+                        old?.map(t => 
                           t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
-                        )
+                        ) || []
                       );
+                      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
                       window.dispatchEvent(new Event('inbox-updated'));
                     }
                   }).catch(console.error);

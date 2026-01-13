@@ -33,6 +33,7 @@ class DeepLTranslator implements Translator {
 
   constructor(apiKey: string, baseUrl?: string) {
     this.apiKey = apiKey;
+    // Use v2 translate endpoint - supports both form-urlencoded and JSON
     this.baseUrl = baseUrl || "https://api-free.deepl.com/v2/translate";
   }
 
@@ -70,14 +71,21 @@ class DeepLTranslator implements Translator {
         }
       }
 
-      const bodyParams: Record<string, string> = {
-        text: params.text,
-        target_lang: target,
-      };
+      // DeepL API - use form-urlencoded with tag_handling to preserve formatting
+      // Convert line breaks to <br> tags so DeepL preserves them, then convert back
+      const textWithHtmlBreaks = params.text
+        .replace(/\n\n/g, '<p>') // Double line breaks = paragraphs
+        .replace(/\n/g, '<br>'); // Single line breaks = line breaks
+      
+      const formData = new URLSearchParams();
+      formData.append('text', textWithHtmlBreaks);
+      formData.append('target_lang', target);
+      formData.append('tag_handling', 'html'); // Tell DeepL to preserve HTML tags
+      formData.append('split_sentences', '0'); // Don't split sentences
       
       // Only add source_lang if we have a valid mapped source language
       if (source) {
-        bodyParams.source_lang = source;
+        formData.append('source_lang', source);
       }
 
       const controller = new AbortController();
@@ -91,7 +99,7 @@ class DeepLTranslator implements Translator {
             "Authorization": `DeepL-Auth-Key ${this.apiKey}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: new URLSearchParams(bodyParams),
+          body: formData,
           signal: controller.signal,
         });
       } catch (fetchError) {
@@ -129,10 +137,24 @@ class DeepLTranslator implements Translator {
         throw new Error("Translation failed: No translation returned from DeepL API");
       }
       
-      const translated = data.translations[0]?.text;
+      let translated = data.translations[0]?.text;
       if (!translated) {
         throw new Error("Translation failed: Empty translation returned from DeepL API");
       }
+      
+      // Convert HTML tags back to line breaks
+      // DeepL with tag_handling=html will preserve <br> and <p> tags
+      translated = translated
+        .replace(/<p>/gi, '\n\n') // Convert <p> back to double line breaks
+        .replace(/<\/p>/gi, '') // Remove closing </p> tags
+        .replace(/<br\s*\/?>/gi, '\n') // Convert <br> back to single line breaks
+        .replace(/<br>/gi, '\n'); // Also handle <br> without closing
+      
+      // Clean up any remaining HTML tags (shouldn't be any, but just in case)
+      translated = translated.replace(/<[^>]+>/g, '');
+      
+      // Only trim leading/trailing whitespace, preserve all internal formatting
+      translated = translated.replace(/^[\s\u200B-\u200D\uFEFF]+|[\s\u200B-\u200D\uFEFF]+$/g, '');
       
       return translated;
     } catch (error) {

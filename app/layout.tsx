@@ -10,6 +10,7 @@ const publicSans = Public_Sans({
 
 import { MainLayout } from "@/components/layout/MainLayout";
 import { IdleSyncStarter } from "@/components/IdleSyncStarter";
+import { QueryProvider } from "@/lib/providers/query-provider";
 
 export const metadata: Metadata = {
   title: "MR Engines – Warranty Claims",
@@ -26,8 +27,10 @@ export default function RootLayout({
       <body
         className={`${publicSans.variable} antialiased`}
       >
-        <IdleSyncStarter />
-        <MainLayout>{children}</MainLayout>
+        <QueryProvider>
+          <IdleSyncStarter />
+          <MainLayout>{children}</MainLayout>
+        </QueryProvider>
       </body>
     </html>
   );

@@ -320,7 +320,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
               ? "Email body text (editable - extracted from first inbound email)" 
               : `Enter summary in ${sourceLangConfig?.name || sourceLang}...`}
             disabled={isReadOnly}
-            className="min-h-[200px] resize-y"
+            className="min-h-[200px] resize-y whitespace-pre-wrap"
           />
         </div>
 
@@ -364,7 +364,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
             rows={10}
             placeholder={`Translated summary in ${targetLangConfig?.name || targetLang}...`}
             disabled={isReadOnly}
-            className="min-h-[200px] resize-y"
+            className="min-h-[200px] resize-y whitespace-pre-wrap"
           />
         </div>
       </div>

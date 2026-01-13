@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -120,41 +121,42 @@ const getStatusColor = (status: string) => {
   return colors[status] || "bg-muted text-muted-foreground";
 };
 
+const fetchStats = async (): Promise<DashboardStats> => {
+  const res = await fetch("/api/dashboard/stats");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ error: "Unknown error" }));
+    throw new Error(errorData.error || "Failed to fetch stats");
+  }
+  return res.json();
+};
+
 export default function DashboardPage() {
   const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/dashboard/stats");
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-      }
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Fetch stats sa React Query
+  const { data: stats, isLoading: loading } = useQuery({
+    queryKey: ["dashboardStats"],
+    queryFn: fetchStats,
+    refetchInterval: 60000, // 60 sekundi umesto 30 (2x manje request-ova)
+    refetchIntervalInBackground: false,
+  });
 
+  // Listen for claim updates
   useEffect(() => {
-    fetchStats();
-    // Refresh stats every 30 seconds
-    const interval = setInterval(fetchStats, 30000);
-    
-    // Listen for claim updates
-    const handleClaimUpdate = () => fetchStats();
+    const handleClaimUpdate = () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    };
     window.addEventListener('claim-updated', handleClaimUpdate);
     window.addEventListener('claim-created', handleClaimUpdate);
+    window.addEventListener('claim-deleted', handleClaimUpdate);
     
     return () => {
-      clearInterval(interval);
       window.removeEventListener('claim-updated', handleClaimUpdate);
       window.removeEventListener('claim-created', handleClaimUpdate);
+      window.removeEventListener('claim-deleted', handleClaimUpdate);
     };
-  }, [fetchStats]);
+  }, [queryClient]);
 
   if (loading) {
     return (
@@ -169,7 +171,7 @@ export default function DashboardPage() {
       <div className="p-8">
         <Card className="p-6">
           <p className="text-destructive">Neuspešno učitavanje statistika</p>
-          <Button onClick={fetchStats} className="mt-4" variant="outline">
+          <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["dashboardStats"] })} className="mt-4" variant="outline">
             Pokušaj ponovo
           </Button>
         </Card>

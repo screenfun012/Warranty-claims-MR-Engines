@@ -10,7 +10,11 @@ export async function GET() {
   // Return cached stats if still valid
   const now = Date.now();
   if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
-    return NextResponse.json(cachedStats);
+    return NextResponse.json(cachedStats, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+      },
+    });
   }
   try {
     // Get total claims count
@@ -432,7 +436,15 @@ export async function GET() {
     cachedStats = stats;
     cacheTimestamp = now;
 
-    return NextResponse.json(stats);
+    // Update cache
+    cachedStats = stats;
+    cacheTimestamp = now;
+    
+    return NextResponse.json(stats, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+      },
+    });
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";

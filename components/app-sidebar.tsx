@@ -4,7 +4,8 @@ import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Inbox,
   FileText,
@@ -41,24 +42,27 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+const fetchUnreadCount = async (): Promise<number> => {
+  const res = await fetch("/api/inbox/unread-count");
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return data.count || 0;
+};
+
 export function AppSidebar() {
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState<number>(0);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
+  const queryClient = useQueryClient();
 
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const res = await fetch("/api/inbox/unread-count");
-      if (res.ok) {
-        const data = await res.json();
-        setUnreadCount(data.count || 0);
-      }
-    } catch (error) {
-      console.error("Error fetching unread count:", error);
-    }
-  }, []);
+  // React Query automatski cache-uje i deduplira request-e
+  const { data: unreadCount = 0 } = useQuery({
+    queryKey: ["unreadCount"],
+    queryFn: fetchUnreadCount,
+    refetchInterval: 10000, // 10 sekundi umesto 2 (5x manje request-ova)
+    refetchIntervalInBackground: false, // Ne refetch-uj kada je tab hidden
+  });
 
   useEffect(() => {
     // Check current theme
@@ -76,26 +80,17 @@ export function AppSidebar() {
       attributeFilter: ["class"],
     });
 
-    // Fetch unread count on mount (use setTimeout to avoid cascading renders warning)
-    setTimeout(() => {
-      fetchUnreadCount();
-    }, 0);
-
-    // Poll for unread count more frequently (every 2 seconds) to catch changes faster
-    const interval = setInterval(fetchUnreadCount, 2000);
-
-    // Listen for inbox updates
+    // Listen for inbox updates - invalidate query cache
     const handleInboxUpdate = () => {
-      fetchUnreadCount();
+      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
     };
     window.addEventListener('inbox-updated', handleInboxUpdate);
 
     return () => {
       observer.disconnect();
-      clearInterval(interval);
       window.removeEventListener('inbox-updated', handleInboxUpdate);
     };
-  }, [fetchUnreadCount]);
+  }, [queryClient]);
 
   return (
     <Sidebar>
