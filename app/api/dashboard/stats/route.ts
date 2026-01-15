@@ -7,8 +7,8 @@ let cachedStats: any = null;
 let cacheTimestamp = 0;
 const CACHE_DURATION = 5000; // 5 seconds
 
-// Function to invalidate cache (can be called from other routes)
-export function invalidateDashboardCache() {
+// Function to invalidate cache (internal use only)
+function invalidateDashboardCache() {
   cachedStats = null;
   cacheTimestamp = 0;
 }
