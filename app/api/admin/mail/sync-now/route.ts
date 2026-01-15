@@ -1,13 +1,29 @@
 /**
- * API route for manual mail sync
- * POST /api/admin/mail/sync-now
+ * API route for mail sync
+ * GET /api/admin/mail/sync-now - Called by Vercel Cron
+ * POST /api/admin/mail/sync-now - Manual sync
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 
+// GET - Called by Vercel Cron
+export async function GET(request: NextRequest) {
+  // Verify it's from Vercel Cron
+  const isVercelCron = request.headers.get("x-vercel-cron") === "true";
+  if (!isVercelCron) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return runSync();
+}
+
+// POST - Manual sync (authenticated users)
 export async function POST() {
+  return runSync();
+}
+
+async function runSync() {
   try {
     // Check if email is configured
     if (!isEmailConfigured()) {
@@ -21,6 +37,7 @@ export async function POST() {
     }
 
     const result = await syncNewEmails();
+    console.log("[Mail Sync] Result:", result);
     
     return NextResponse.json({
       success: true,
