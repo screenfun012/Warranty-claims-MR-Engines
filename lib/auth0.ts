@@ -115,16 +115,16 @@ export const auth0: Auth0Client = new Proxy({} as Auth0Client, {
     // During build, use mock
     if (!client) {
       const mock = createMockAuth0Client();
-      const value = (mock as Record<string | symbol, unknown>)[prop];
+      const value = (mock as unknown as Record<string | symbol, unknown>)[prop];
       if (typeof value === 'function') {
-        return value.bind(mock);
+        return (value as Function).bind(mock);
       }
       return value;
     }
     
-    const value = (client as Record<string | symbol, unknown>)[prop];
+    const value = (client as unknown as Record<string | symbol, unknown>)[prop];
     if (typeof value === 'function') {
-      return value.bind(client);
+      return (value as Function).bind(client);
     }
     return value;
   },
