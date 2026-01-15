@@ -11,8 +11,6 @@ const nextConfig: NextConfig = {
     AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
     AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
   },
-  // Configure Turbopack (Next.js 16 default)
-  turbopack: {},
   // Enable better source maps for debugging (for webpack fallback)
   webpack: (config, { dev, isServer }) => {
     if (dev) {
