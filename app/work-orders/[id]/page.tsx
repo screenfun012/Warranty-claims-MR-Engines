@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,21 +46,21 @@ const statusColors: Record<string, string> = {
 
 export default function WorkOrderDetailPage() {
   const router = useRouter();
-  // In Next.js 16, useParams may return a Promise, so we use React.use()
-  const params = use(useParams());
+  const params = useParams();
+  const id = params?.id as string | undefined;
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (params?.id) {
+    if (id) {
       fetchWorkOrder();
     }
-  }, [params?.id]);
+  }, [id]);
 
   const fetchWorkOrder = async () => {
-    if (!params?.id) return;
+    if (!id) return;
     try {
-      const res = await fetch(`/api/work-orders/${params.id}`);
+      const res = await fetch(`/api/work-orders/${id}`);
       const data = await res.json();
       setWorkOrder(data.workOrder);
     } catch (error) {
