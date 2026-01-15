@@ -32,6 +32,21 @@ const nextConfig: NextConfig = {
       };
     }
     
+    // Ignore README.md files in node_modules (fix for @libsql packages)
+    config.module.rules.push({
+      test: /\.md$/,
+      type: 'asset/source',
+      include: /node_modules/,
+    });
+    
+    // Externalize libsql on server to avoid bundling issues
+    if (isServer) {
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push('@libsql/client', '@libsql/isomorphic-fetch');
+      }
+    }
+    
     if (!dev && !isServer) {
       // Code splitting optimizacije za production
       config.optimization = {
