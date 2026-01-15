@@ -4,6 +4,8 @@
  * 
  * This endpoint receives email data as JSON and processes it the same way
  * as the IMAP sync, creating threads, messages, and saving attachments.
+ * 
+ * Updated: 2026-01-15
  */
 
 import { NextRequest, NextResponse } from "next/server";
