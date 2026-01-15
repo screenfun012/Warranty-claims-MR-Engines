@@ -5,7 +5,6 @@
  */
 
 import { ImapFlow } from "imapflow";
-import { env } from "@/lib/config/env";
 import { getEmailConfig } from "@/lib/config/envLoader";
 import { cleanEmailBodyText, extractTextFromHtml } from "./emailBodyCleaner";
 
@@ -31,16 +30,15 @@ export interface FetchedMessage {
 
 /**
  * Get a configured IMAP client instance
- * Checks database config first, then falls back to env vars
  */
-export async function getImapClient(): Promise<ImapFlow> {
-  const dbConfig = await getEmailConfig();
+export function getImapClient(): ImapFlow {
+  const config = getEmailConfig();
   
-  const host = dbConfig?.imapHost || env.IMAP_HOST;
-  const user = dbConfig?.imapUser || env.IMAP_USER;
-  const pass = dbConfig?.imapPass || env.IMAP_PASS;
-  const port = dbConfig?.imapPort ?? env.IMAP_PORT;
-  const tls = dbConfig?.imapTls ?? env.IMAP_TLS;
+  const host = config.imapServer;
+  const user = config.imapUserEmail;
+  const pass = config.imapUserPass;
+  const port = config.imapPort;
+  const tls = config.imapTls;
 
   console.log("IMAP Config:", {
     host,
@@ -49,15 +47,14 @@ export async function getImapClient(): Promise<ImapFlow> {
     tls,
     hasPassword: !!pass,
     passwordLength: pass?.length || 0,
-    fromDatabase: !!dbConfig,
   });
 
   if (!host || !user) {
-    throw new Error("IMAP configuration is missing. Please configure email settings in Settings page or set IMAP_HOST and IMAP_USER in your .env file.");
+    throw new Error("IMAP configuration is missing. Please set IMAP_SERVER and IMAP_USER_EMAIL in your .env file.");
   }
 
   if (!pass) {
-    throw new Error("IMAP password is missing. Please set IMAP_PASS in your .env file or enable 'Remember credentials' in Settings and enter the password.");
+    throw new Error("IMAP password is missing. Please set IMAP_USER_PASS in your .env file.");
   }
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
@@ -70,7 +67,7 @@ export async function getImapClient(): Promise<ImapFlow> {
       user,
       pass: pass,
     },
-    logger: true, // Enable logging for debugging
+    logger: true,
   });
 }
 
@@ -264,8 +261,8 @@ export async function fetchNewMessagesSince(
       // Provide more helpful error messages
       const errorMsg = error.message.toLowerCase();
       if (errorMsg.includes("enotfound") || errorMsg.includes("getaddrinfo")) {
-        const config = await getEmailConfig();
-        throw new Error(`Cannot resolve IMAP host "${config?.imapHost || env.IMAP_HOST}". Please check if the host is correct (e.g., mail.mrgroup.rs).`);
+        const config = getEmailConfig();
+        throw new Error(`Cannot resolve IMAP host "${config.imapServer}". Please check if the host is correct (e.g., mail.mrgroup.rs).`);
       }
       if (errorMsg.includes("econnrefused") || errorMsg.includes("connection refused")) {
         throw new Error(`Connection refused. Please check IMAP host and port. Common ports: 993 (TLS), 143 (STARTTLS).`);

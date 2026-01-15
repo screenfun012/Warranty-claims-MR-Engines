@@ -6,7 +6,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { fetchNewMessagesSince, type FetchedMessage } from "./imapClient";
 import { env } from "@/lib/config/env";
-import { getEmailConfig } from "@/lib/config/envLoader";
+import { isEmailConfigured } from "@/lib/config/envLoader";
 import {
   saveAttachmentForUnassignedThread,
   saveAttachmentForClaim,
@@ -29,12 +29,8 @@ export async function syncNewEmails(): Promise<SyncResult> {
     return { newMessages: 0, newThreads: 0, newClaims: 0 };
   }
 
-  // Check if email is configured (from database or env)
-  const dbConfig = await getEmailConfig();
-  const imapHost = dbConfig?.imapHost || env.IMAP_HOST;
-  const imapUser = dbConfig?.imapUser || env.IMAP_USER;
-
-  if (!imapHost || !imapUser) {
+  // Check if email is configured
+  if (!isEmailConfigured()) {
     return { newMessages: 0, newThreads: 0, newClaims: 0 };
   }
 

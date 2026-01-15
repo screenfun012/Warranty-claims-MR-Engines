@@ -6,7 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { getImapIdleClient } from "@/lib/email/imapIdleClient";
-import { getEmailConfig } from "@/lib/config/envLoader";
+import { getEmailConfig, isEmailConfigured } from "@/lib/config/envLoader";
 import { env } from "@/lib/config/env";
 import { getImapClient } from "@/lib/email/imapClient";
 
@@ -16,18 +16,16 @@ export async function GET() {
     const useIdle = env.MAIL_SYNC_USE_IDLE;
     
     // Check email config
-    const dbConfig = await getEmailConfig();
-    const imapHost = dbConfig?.imapHost || env.IMAP_HOST;
-    const imapUser = dbConfig?.imapUser || env.IMAP_USER;
+    const config = getEmailConfig();
     
-    if (!imapHost || !imapUser) {
+    if (!isEmailConfigured()) {
       return NextResponse.json({
         success: false,
         error: "Email not configured",
         details: {
           useIdle,
-          hasHost: !!imapHost,
-          hasUser: !!imapUser,
+          hasServer: !!config.imapServer,
+          hasUser: !!config.imapUserEmail,
         },
       });
     }
@@ -41,8 +39,8 @@ export async function GET() {
       success: true,
       config: {
         useIdle,
-        imapHost,
-        imapUser: imapUser.substring(0, 3) + "***", // Mask email
+        imapServer: config.imapServer,
+        imapUserEmail: config.imapUserEmail.substring(0, 3) + "***", // Mask email
         mailSyncEnabled: env.MAIL_SYNC_ENABLED,
       },
       status: {
@@ -81,21 +79,19 @@ export async function POST() {
     }
 
     // Check email config
-    const dbConfig = await getEmailConfig();
-    const imapHost = dbConfig?.imapHost || env.IMAP_HOST;
-    const imapUser = dbConfig?.imapUser || env.IMAP_USER;
+    const config = getEmailConfig();
     
-    if (!imapHost || !imapUser) {
+    if (!isEmailConfigured()) {
       return NextResponse.json({
         success: false,
-        error: "Email not configured",
+        error: "Email not configured. Set IMAP_SERVER, IMAP_USER_EMAIL, IMAP_USER_PASS in .env file.",
       });
     }
 
     // Test 1: Try to create IMAP client
     let clientTest = { success: false, error: "" };
     try {
-      const client = await getImapClient();
+      const client = getImapClient();
       await client.connect();
       clientTest = { success: true, error: "" };
       await client.logout();
@@ -149,8 +145,8 @@ export async function POST() {
       },
       config: {
         useIdle,
-        imapHost,
-        imapUser: imapUser.substring(0, 3) + "***",
+        imapServer: config.imapServer,
+        imapUserEmail: config.imapUserEmail.substring(0, 3) + "***",
       },
       message: clientTest.success && idleTest.success
         ? "IDLE test successful - IDLE is active and listening for new emails"

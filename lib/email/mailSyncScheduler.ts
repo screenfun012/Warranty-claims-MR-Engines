@@ -5,7 +5,7 @@
  */
 
 import { syncNewEmails } from "./mailSyncService";
-import { getEmailConfig } from "@/lib/config/envLoader";
+import { isEmailConfigured } from "@/lib/config/envLoader";
 import { env } from "@/lib/config/env";
 import { getImapIdleClient } from "./imapIdleClient";
 
@@ -35,11 +35,7 @@ export async function startIdleSync(): Promise<void> {
     return;
   }
 
-  const dbConfig = await getEmailConfig();
-  const imapHost = dbConfig?.imapHost || env.IMAP_HOST;
-  const imapUser = dbConfig?.imapUser || env.IMAP_USER;
-
-  if (!imapHost || !imapUser) {
+  if (!isEmailConfigured()) {
     console.log("[AutoSync] Email not configured, not starting auto-sync");
     return;
   }

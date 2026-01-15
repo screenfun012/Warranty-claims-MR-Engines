@@ -7,7 +7,7 @@ import { ImapFlow } from "imapflow";
 import { getImapClient } from "./imapClient";
 import { syncNewEmails } from "./mailSyncService";
 import { env } from "@/lib/config/env";
-import { getEmailConfig } from "@/lib/config/envLoader";
+import { getEmailConfig, isEmailConfigured } from "@/lib/config/envLoader";
 
 export class ImapIdleClient {
   private client: ImapFlow | null = null;
@@ -43,11 +43,7 @@ export class ImapIdleClient {
       return;
     }
 
-    const dbConfig = await getEmailConfig();
-    const imapHost = dbConfig?.imapHost || env.IMAP_HOST;
-    const imapUser = dbConfig?.imapUser || env.IMAP_USER;
-
-    if (!imapHost || !imapUser) {
+    if (!isEmailConfigured()) {
       console.log("[IMAP IDLE] Email not configured, not starting IDLE");
       return;
     }

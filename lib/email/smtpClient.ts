@@ -5,7 +5,6 @@
  */
 
 import nodemailer from "nodemailer";
-import { env } from "@/lib/config/env";
 import { prisma } from "@/lib/db/prisma";
 import { getEmailConfig } from "@/lib/config/envLoader";
 
@@ -25,19 +24,18 @@ export interface SendEmailParams {
 
 /**
  * Get a configured SMTP transporter
- * Checks database config first, then falls back to env vars
  */
-async function getSmtpTransporter() {
-  const dbConfig = await getEmailConfig();
+function getSmtpTransporter() {
+  const config = getEmailConfig();
   
-  const host = dbConfig?.smtpHost || env.SMTP_HOST;
-  const user = dbConfig?.smtpUser || env.SMTP_USER;
-  const pass = dbConfig?.smtpPass || env.SMTP_PASS;
-  const port = dbConfig?.smtpPort ?? env.SMTP_PORT;
-  const tls = dbConfig?.smtpTls ?? env.SMTP_TLS;
+  const host = config.smtpServer;
+  const user = config.smtpUserEmail;
+  const pass = config.smtpUserPass;
+  const port = config.smtpPort;
+  const tls = config.smtpTls;
 
   if (!host || !user) {
-    throw new Error("SMTP configuration is missing. Please configure email settings in Settings page or set SMTP_HOST and SMTP_USER in your .env file.");
+    throw new Error("SMTP configuration is missing. Please set SMTP_SERVER and SMTP_USER_EMAIL in your .env file.");
   }
 
   return nodemailer.createTransport({
@@ -60,13 +58,11 @@ export async function sendEmail(params: SendEmailParams): Promise<{
   messageId: string;
   response: string;
 }> {
-  const transporter = await getSmtpTransporter();
-
-  const dbConfig = await getEmailConfig();
-  const smtpUser = dbConfig?.smtpUser || env.SMTP_USER;
+  const transporter = getSmtpTransporter();
+  const config = getEmailConfig();
 
   const mailOptions = {
-    from: smtpUser,
+    from: config.smtpUserEmail,
     to: Array.isArray(params.to) ? params.to.join(", ") : params.to,
     cc: params.cc ? (Array.isArray(params.cc) ? params.cc.join(", ") : params.cc) : undefined,
     subject: params.subject,
@@ -98,14 +94,13 @@ export async function sendEmailAndSave(params: SendEmailParams & {
   const sendResult = await sendEmail(params);
 
   // Save to database
-  const dbConfig = await getEmailConfig();
-  const smtpUser = dbConfig?.smtpUser || env.SMTP_USER;
+  const config = getEmailConfig();
 
   const emailMessage = await prisma.emailMessage.create({
     data: {
       emailThreadId: params.emailThreadId,
       direction: "OUTBOUND",
-      from: smtpUser,
+      from: config.smtpUserEmail,
       to: Array.isArray(params.to) ? params.to.join(", ") : params.to,
       cc: params.cc ? (Array.isArray(params.cc) ? params.cc.join(", ") : params.cc) : undefined,
       subject: params.subject,

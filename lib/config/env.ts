@@ -1,7 +1,6 @@
 /**
  * Environment variable configuration and validation
  * All configuration must be via environment variables (12-factor style)
- * Email config can also come from database (EmailConfig model) - use getEmailConfig() for that
  */
 
 function getEnv(key: string, defaultValue?: string): string {
@@ -36,20 +35,18 @@ export const env = {
   // Database
   DATABASE_URL: getEnv("DATABASE_URL", "file:./dev.db"),
 
-  // Email (IMAP) - optional, can be empty if email sync is disabled
-  // Note: For runtime config from database, use getEmailConfig() from envLoader.ts
-  IMAP_HOST: getEnv("IMAP_HOST", ""),
+  // Email (IMAP) - for receiving emails
+  IMAP_SERVER: getEnv("IMAP_SERVER", ""),
   IMAP_PORT: getEnvNumber("IMAP_PORT", 993),
-  IMAP_USER: getEnv("IMAP_USER", ""),
-  IMAP_PASS: getEnv("IMAP_PASS", ""),
+  IMAP_USER_EMAIL: getEnv("IMAP_USER_EMAIL", ""),
+  IMAP_USER_PASS: getEnv("IMAP_USER_PASS", ""),
   IMAP_TLS: getEnvBoolean("IMAP_TLS", true),
 
-  // Email (SMTP) - optional, can be empty if email sending is not needed
-  // Note: For runtime config from database, use getEmailConfig() from envLoader.ts
-  SMTP_HOST: getEnv("SMTP_HOST", ""),
-  SMTP_PORT: getEnvNumber("SMTP_PORT", 587),
-  SMTP_USER: getEnv("SMTP_USER", ""),
-  SMTP_PASS: getEnv("SMTP_PASS", ""),
+  // Email (SMTP) - for sending emails
+  SMTP_SERVER: getEnv("SMTP_SERVER", ""),
+  SMTP_PORT: getEnvNumber("SMTP_PORT", 465),
+  SMTP_USER_EMAIL: getEnv("SMTP_USER_EMAIL", ""),
+  SMTP_USER_PASS: getEnv("SMTP_USER_PASS", ""),
   SMTP_TLS: getEnvBoolean("SMTP_TLS", true),
 
   // File storage
@@ -67,6 +64,5 @@ export const env = {
   MAIL_SYNC_ENABLED: getEnvBoolean("MAIL_SYNC_ENABLED", true),
   MAIL_SYNC_INTERVAL_SECONDS: getEnvNumber("MAIL_SYNC_INTERVAL_SECONDS", 300),
   MAIL_SYNC_MAX_MESSAGES_PER_RUN: getEnvNumber("MAIL_SYNC_MAX_MESSAGES_PER_RUN", 50),
-  MAIL_SYNC_USE_IDLE: getEnvBoolean("MAIL_SYNC_USE_IDLE", true), // Use IMAP IDLE for real-time notifications
-
+  MAIL_SYNC_USE_IDLE: getEnvBoolean("MAIL_SYNC_USE_IDLE", true),
 };

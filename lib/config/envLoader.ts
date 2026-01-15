@@ -1,80 +1,53 @@
 /**
- * Load environment variables from database (EmailConfig) or fallback to env vars
- * This allows runtime configuration via UI
+ * Email configuration helper
+ * Returns email config from environment variables
  */
 
-import { prisma } from "@/lib/db/prisma";
+import { env } from "@/lib/config/env";
 
-let cachedConfig: {
-  imapHost?: string;
-  imapPort?: number;
-  imapUser?: string;
-  imapPass?: string;
-  imapTls?: boolean;
-  smtpHost?: string;
-  smtpPort?: number;
-  smtpUser?: string;
-  smtpPass?: string;
-  smtpTls?: boolean;
-} | null = null;
-
-let cacheTimestamp = 0;
-const CACHE_TTL = 60000; // 1 minute cache
-
-/**
- * Get email configuration from database or env vars
- */
-export async function getEmailConfig() {
-  const now = Date.now();
-  
-  // Return cached config if still valid
-  if (cachedConfig && (now - cacheTimestamp) < CACHE_TTL) {
-    return cachedConfig;
-  }
-
-  try {
-    const dbConfig = await prisma.emailConfig.findUnique({
-      where: { id: "default" },
-    });
-
-    if (dbConfig) {
-      // Always include passwords if they exist in database, regardless of rememberCredentials
-      // The rememberCredentials flag only controls whether to save new passwords
-      cachedConfig = {
-        imapHost: dbConfig.imapHost || undefined,
-        imapPort: dbConfig.imapPort || undefined,
-        imapUser: dbConfig.imapUser || undefined,
-        imapPass: dbConfig.imapPass || undefined, // Always use password if it exists
-        imapTls: dbConfig.imapTls,
-        smtpHost: dbConfig.smtpHost || undefined,
-        smtpPort: dbConfig.smtpPort || undefined,
-        smtpUser: dbConfig.smtpUser || undefined,
-        smtpPass: dbConfig.smtpPass || undefined, // Always use password if it exists
-        smtpTls: dbConfig.smtpTls,
-      };
-      cacheTimestamp = now;
-      console.log("Email config loaded from database:", {
-        imapHost: cachedConfig.imapHost,
-        imapUser: cachedConfig.imapUser,
-        hasImapPass: !!cachedConfig.imapPass,
-        imapPassLength: cachedConfig.imapPass?.length || 0,
-      });
-      return cachedConfig;
-    }
-  } catch (error) {
-    console.error("Error loading email config from database:", error);
-  }
-
-  // Fallback to env vars
-  cachedConfig = null;
-  return null;
+export interface EmailConfig {
+  imapServer: string;
+  imapPort: number;
+  imapUserEmail: string;
+  imapUserPass: string;
+  imapTls: boolean;
+  smtpServer: string;
+  smtpPort: number;
+  smtpUserEmail: string;
+  smtpUserPass: string;
+  smtpTls: boolean;
 }
 
 /**
- * Clear the config cache (call after updating config)
+ * Get email configuration from environment variables
  */
-export function clearEmailConfigCache() {
-  cachedConfig = null;
-  cacheTimestamp = 0;
+export function getEmailConfig(): EmailConfig {
+  return {
+    imapServer: env.IMAP_SERVER,
+    imapPort: env.IMAP_PORT,
+    imapUserEmail: env.IMAP_USER_EMAIL,
+    imapUserPass: env.IMAP_USER_PASS,
+    imapTls: env.IMAP_TLS,
+    smtpServer: env.SMTP_SERVER,
+    smtpPort: env.SMTP_PORT,
+    smtpUserEmail: env.SMTP_USER_EMAIL,
+    smtpUserPass: env.SMTP_USER_PASS,
+    smtpTls: env.SMTP_TLS,
+  };
+}
+
+/**
+ * Check if email configuration is valid (all required fields set)
+ */
+export function isEmailConfigured(): boolean {
+  const config = getEmailConfig();
+  return !!(
+    config.imapServer &&
+    config.imapUserEmail &&
+    config.imapUserPass &&
+    config.smtpServer &&
+    config.smtpUserEmail &&
+    config.smtpUserPass
+  );
 }
 

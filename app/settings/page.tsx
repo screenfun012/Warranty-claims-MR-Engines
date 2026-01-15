@@ -2,76 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Save, Mail } from "lucide-react";
-import { useUser } from "@auth0/nextjs-auth0/client";
-
-// Role hierarchy for permission checks
-const ROLE_LEVELS: Record<string, number> = {
-  VIEWER: 0,
-  OPERATOR: 1,
-  ADMIN: 2,
-  SUPER_ADMIN: 3,
-};
-
-function hasMinRole(userRole: string | undefined, minRole: string): boolean {
-  const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
-  const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
-  return userLevel >= requiredLevel;
-}
+import { Mail, Lock, CheckCircle, XCircle } from "lucide-react";
 
 interface EmailConfig {
-  imapHost: string;
+  imapServer: string;
   imapPort: number;
-  imapUser: string;
-  imapPass: string;
+  imapUserEmail: string;
+  imapUserPass: string;
   imapTls: boolean;
-  smtpHost: string;
+  smtpServer: string;
   smtpPort: number;
-  smtpUser: string;
-  smtpPass: string;
+  smtpUserEmail: string;
+  smtpUserPass: string;
   smtpTls: boolean;
-  rememberCredentials: boolean;
 }
 
 export default function SettingsPage() {
-  const { user } = useUser();
-  interface Auth0User {
-    role?: string;
-    roles?: string[];
-    'https://mr-engines-warranty/roles'?: string[] | string;
-    app_metadata?: {
-      roles?: string[] | string;
-    };
-  }
-  const auth0User = user as Auth0User | undefined;
-  
-  // Get role from various possible locations
-  const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
-  const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
-  
-  // Permission checks
-  const canEdit = hasMinRole(userRole, "SUPER_ADMIN"); // Only SUPER_ADMIN can edit settings
-  
-  const [config, setConfig] = useState<EmailConfig>({
-    imapHost: "",
-    imapPort: 993,
-    imapUser: "",
-    imapPass: "",
-    imapTls: true,
-    smtpHost: "",
-    smtpPort: 587,
-    smtpUser: "",
-    smtpPass: "",
-    smtpTls: true,
-    rememberCredentials: true,
-  });
+  const [config, setConfig] = useState<EmailConfig | null>(null);
+  const [configured, setConfigured] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   useEffect(() => {
     fetchConfig();
@@ -82,57 +34,13 @@ export default function SettingsPage() {
       const res = await fetch("/api/settings/email");
       if (res.ok) {
         const data = await res.json();
-        if (data.config) {
-          setConfig({
-            ...data.config,
-            imapPass: data.config.imapPass ? "••••••••" : "",
-            smtpPass: data.config.smtpPass ? "••••••••" : "",
-          });
-        }
+        setConfig(data.config);
+        setConfigured(data.configured);
       }
     } catch (error) {
       console.error("Error fetching config:", error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    setMessage(null);
-    try {
-      const res = await fetch("/api/settings/email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setMessage({ type: "success", text: "Email konfiguracija je sačuvana!" });
-        // Ako je rememberCredentials false, obriši šifre iz state-a
-        if (!config.rememberCredentials) {
-          setConfig((prev) => ({
-            ...prev,
-            imapPass: "",
-            smtpPass: "",
-          }));
-        } else {
-          // Inače, postavi placeholder
-          setConfig((prev) => ({
-            ...prev,
-            imapPass: prev.imapPass || "••••••••",
-            smtpPass: prev.smtpPass || "••••••••",
-          }));
-        }
-      } else {
-        setMessage({ type: "error", text: data.error || "Greška pri čuvanju konfiguracije" });
-      }
-    } catch (error) {
-      console.error("Error saving config:", error);
-      setMessage({ type: "error", text: "Greška pri čuvanju konfiguracije" });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -149,79 +57,73 @@ export default function SettingsPage() {
       <h1 className="text-3xl font-bold mb-6">Podešavanja</h1>
 
       <Card className="p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Mail className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Email Konfiguracija</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            <h2 className="text-xl font-semibold">Email Konfiguracija</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {configured ? (
+              <Badge variant="default" className="bg-green-600">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Konfigurisano
+              </Badge>
+            ) : (
+              <Badge variant="destructive">
+                <XCircle className="h-3 w-3 mr-1" />
+                Nije konfigurisano
+              </Badge>
+            )}
+          </div>
         </div>
 
-        {message && (
-          <div
-            className={`mb-4 p-3 rounded ${
-              message.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-            }`}
-          >
-            {message.text}
-          </div>
-        )}
+        <div className="mb-4 p-3 rounded bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 flex items-center gap-2">
+          <Lock className="h-4 w-4" />
+          <span>Email kredencijali su definisani u .env fajlu i ne mogu se menjati kroz interfejs.</span>
+        </div>
 
         <div className="space-y-6">
-          {!canEdit && (
-            <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-              Samo SUPER_ADMIN može menjati email konfiguraciju.
-            </div>
-          )}
-
           <div>
             <h3 className="text-lg font-medium mb-4">IMAP (Primanje emaila)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>IMAP Host</Label>
+                <Label>IMAP Server</Label>
                 <Input
-                  value={config.imapHost}
-                  onChange={(e) => setConfig({ ...config, imapHost: e.target.value })}
-                  placeholder="mail.mrgroup.rs"
-                  disabled={!canEdit}
+                  value={config?.imapServer || ""}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
               <div>
                 <Label>IMAP Port</Label>
                 <Input
-                  type="number"
-                  value={config.imapPort}
-                  onChange={(e) => setConfig({ ...config, imapPort: parseInt(e.target.value) || 993 })}
-                  disabled={!canEdit}
+                  value={config?.imapPort || 993}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
               <div>
-                <Label>Email adresa (IMAP User)</Label>
+                <Label>Email adresa</Label>
                 <Input
-                  value={config.imapUser}
-                  onChange={(e) => setConfig({ ...config, imapUser: e.target.value })}
-                  placeholder="claims@mrgrup.rs"
-                  disabled={!canEdit}
+                  value={config?.imapUserEmail || ""}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
               <div>
-                <Label>Šifra (IMAP Pass)</Label>
+                <Label>Šifra</Label>
                 <Input
                   type="password"
-                  value={config.imapPass === "••••••••" ? "" : config.imapPass}
-                  onChange={(e) => setConfig({ ...config, imapPass: e.target.value })}
-                  placeholder={config.imapPass === "••••••••" ? "Unesite novu šifru ili ostavite prazno" : "Unesite šifru"}
-                  disabled={!canEdit}
+                  value={config?.imapUserPass || ""}
+                  disabled
+                  className="bg-muted"
                 />
-                {config.imapPass === "••••••••" && (
-                  <p className="text-sm text-muted-foreground mt-1">Šifra je sačuvana. Unesite novu šifru da je promenite.</p>
-                )}
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="imap-tls"
-                  checked={config.imapTls}
-                  onCheckedChange={(checked) => setConfig({ ...config, imapTls: checked })}
-                  disabled={!canEdit}
-                />
-                <Label htmlFor="imap-tls">Koristi TLS/SSL</Label>
+              <div className="flex items-center gap-2">
+                <Label>TLS/SSL:</Label>
+                <Badge variant={config?.imapTls ? "default" : "secondary"}>
+                  {config?.imapTls ? "Uključeno" : "Isključeno"}
+                </Badge>
               </div>
             </div>
           </div>
@@ -230,78 +132,62 @@ export default function SettingsPage() {
             <h3 className="text-lg font-medium mb-4">SMTP (Slanje emaila)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label>SMTP Host</Label>
+                <Label>SMTP Server</Label>
                 <Input
-                  value={config.smtpHost}
-                  onChange={(e) => setConfig({ ...config, smtpHost: e.target.value })}
-                  placeholder="mail.mrgroup.rs"
-                  disabled={!canEdit}
+                  value={config?.smtpServer || ""}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
               <div>
                 <Label>SMTP Port</Label>
                 <Input
-                  type="number"
-                  value={config.smtpPort}
-                  onChange={(e) => setConfig({ ...config, smtpPort: parseInt(e.target.value) || 587 })}
-                  disabled={!canEdit}
+                  value={config?.smtpPort || 587}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
               <div>
-                <Label>Email adresa (SMTP User)</Label>
+                <Label>Email adresa</Label>
                 <Input
-                  value={config.smtpUser}
-                  onChange={(e) => setConfig({ ...config, smtpUser: e.target.value })}
-                  placeholder="claims@mrgrup.rs"
-                  disabled={!canEdit}
+                  value={config?.smtpUserEmail || ""}
+                  disabled
+                  className="bg-muted"
                 />
               </div>
               <div>
-                <Label>Šifra (SMTP Pass)</Label>
+                <Label>Šifra</Label>
                 <Input
                   type="password"
-                  value={config.smtpPass === "••••••••" ? "" : config.smtpPass}
-                  onChange={(e) => setConfig({ ...config, smtpPass: e.target.value })}
-                  placeholder={config.smtpPass === "••••••••" ? "Unesite novu šifru ili ostavite prazno" : "Unesite šifru"}
-                  disabled={!canEdit}
+                  value={config?.smtpUserPass || ""}
+                  disabled
+                  className="bg-muted"
                 />
-                {config.smtpPass === "••••••••" && (
-                  <p className="text-sm text-muted-foreground mt-1">Šifra je sačuvana. Unesite novu šifru da je promenite.</p>
-                )}
               </div>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="smtp-tls"
-                  checked={config.smtpTls}
-                  onCheckedChange={(checked) => setConfig({ ...config, smtpTls: checked })}
-                  disabled={!canEdit}
-                />
-                <Label htmlFor="smtp-tls">Koristi TLS/SSL</Label>
+              <div className="flex items-center gap-2">
+                <Label>TLS/SSL:</Label>
+                <Badge variant={config?.smtpTls ? "default" : "secondary"}>
+                  {config?.smtpTls ? "Uključeno" : "Isključeno"}
+                </Badge>
               </div>
             </div>
           </div>
 
           <div className="border-t pt-4">
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="remember"
-                checked={config.rememberCredentials}
-                onCheckedChange={(checked) => setConfig({ ...config, rememberCredentials: checked })}
-                disabled={!canEdit}
-              />
-              <Label htmlFor="remember">Zapamti email i šifru</Label>
+            <h3 className="text-sm font-medium mb-2">Environment varijable za .env fajl:</h3>
+            <div className="bg-muted p-3 rounded font-mono text-xs space-y-1">
+              <div>IMAP_SERVER=mail.example.com</div>
+              <div>IMAP_PORT=993</div>
+              <div>IMAP_USER_EMAIL=claims@example.com</div>
+              <div>IMAP_USER_PASS=your_password</div>
+              <div>IMAP_TLS=true</div>
+              <div className="mt-2">SMTP_SERVER=mail.example.com</div>
+              <div>SMTP_PORT=587</div>
+              <div>SMTP_USER_EMAIL=claims@example.com</div>
+              <div>SMTP_USER_PASS=your_password</div>
+              <div>SMTP_TLS=true</div>
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              Ako je isključeno, šifre se neće čuvati u bazi podataka i moraćete ih unositi svaki put.
-            </p>
           </div>
-
-          {canEdit && (
-            <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto">
-              <Save className="h-4 w-4 mr-2" />
-              {saving ? "Čuvanje..." : "Sačuvaj konfiguraciju"}
-            </Button>
-          )}
         </div>
       </Card>
     </div>

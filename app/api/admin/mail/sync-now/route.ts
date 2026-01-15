@@ -5,21 +5,16 @@
 
 import { NextResponse } from "next/server";
 import { syncNewEmails } from "@/lib/email/mailSyncService";
-import { getEmailConfig } from "@/lib/config/envLoader";
-import { env } from "@/lib/config/env";
+import { isEmailConfigured } from "@/lib/config/envLoader";
 
 export async function POST() {
   try {
-    // Check if email is configured (from database or env)
-    const dbConfig = await getEmailConfig();
-    const imapHost = dbConfig?.imapHost || env.IMAP_HOST;
-    const imapUser = dbConfig?.imapUser || env.IMAP_USER;
-
-    if (!imapHost || !imapUser) {
+    // Check if email is configured
+    if (!isEmailConfigured()) {
       return NextResponse.json(
         {
           success: false,
-          error: "IMAP is not configured. Please configure email settings in Settings page or set IMAP_HOST and IMAP_USER in your .env file.",
+          error: "IMAP is not configured. Please set IMAP_SERVER, IMAP_USER_EMAIL, and IMAP_USER_PASS in your .env file.",
         },
         { status: 400 }
       );
