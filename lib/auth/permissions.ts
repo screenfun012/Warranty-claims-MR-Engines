@@ -29,7 +29,7 @@ export async function getUserRole(): Promise<Role | null> {
   const role = user?.role || user?.roles?.[0] || null;
   
   // Validate that role is one of our defined roles
-  if (role && Object.values(ROLES).includes(role)) {
+  if (role && (Object.values(ROLES) as string[]).includes(role)) {
     return role as Role;
   }
   
