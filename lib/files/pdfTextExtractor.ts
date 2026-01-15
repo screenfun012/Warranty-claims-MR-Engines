@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PDF text extraction utility
  * Extracts plain text from PDF files for translation

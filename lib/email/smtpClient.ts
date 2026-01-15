@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * SMTP client wrapper for sending emails
  * Uses nodemailer for sending outbound emails

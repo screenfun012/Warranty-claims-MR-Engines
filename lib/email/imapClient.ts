@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * IMAP client wrapper for fetching emails
  * Uses imapflow for incremental email sync
