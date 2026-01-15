@@ -1,18 +1,33 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
-// Cache stats for 10 seconds to reduce database load
+// Cache stats for 5 seconds to reduce database load but keep it responsive
 let cachedStats: any = null;
 let cacheTimestamp = 0;
-const CACHE_DURATION = 10000; // 10 seconds
+const CACHE_DURATION = 5000; // 5 seconds
+
+// Function to invalidate cache (can be called from other routes)
+export function invalidateDashboardCache() {
+  cachedStats = null;
+  cacheTimestamp = 0;
+}
 
 export async function GET() {
+  try {
+    // VIEWER+ can view dashboard
+    await requirePermission(PERMISSIONS.CLAIMS_READ);
+  } catch (error) {
+    const permError = createPermissionError(error);
+    return NextResponse.json({ error: permError.message }, { status: permError.status });
+  }
+
   // Return cached stats if still valid
   const now = Date.now();
   if (cachedStats && (now - cacheTimestamp) < CACHE_DURATION) {
     return NextResponse.json(cachedStats, {
       headers: {
-        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
       },
     });
   }
@@ -442,7 +457,7 @@ export async function GET() {
     
     return NextResponse.json(stats, {
       headers: {
-        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+        'Cache-Control': 'public, s-maxage=5, stale-while-revalidate=10',
       },
     });
   } catch (error) {

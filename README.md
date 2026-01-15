@@ -20,7 +20,8 @@ A local-first, testable web application for handling engine warranty claims for 
 - **Language**: TypeScript
 - **UI**: Tailwind CSS + shadcn/ui components
 - **ORM**: Prisma
-- **Database**: SQLite (local dev), PostgreSQL (production-ready)
+- **Database**: SQLite (local dev), Turso (production - cloud SQLite)
+- **Authentication**: Auth0 with role-based access control (RBAC)
 - **Email**: imapflow (IMAP), nodemailer (SMTP), mailparser (MIME parsing)
 - **PDF**: pdf-parse (text extraction), react-pdf (viewing)
 - **Translation**: Pluggable providers (DeepL, OpenAI, Google)
@@ -81,7 +82,18 @@ All configuration is done via environment variables (12-factor style). See `.env
 ### Database
 - `DATABASE_URL`: Database connection string
   - SQLite (dev): `file:./dev.db`
-  - PostgreSQL (prod): `postgresql://user:password@localhost:5432/dbname`
+  - Turso (prod): `libsql://your-db-name-username.turso.io?authToken=your-token`
+  - See `TURSO_SETUP.md` for detailed Turso setup instructions
+
+### Auth0 (Authentication)
+- `AUTH0_SECRET`: Secret for session encryption (generate with `openssl rand -hex 32`)
+- `AUTH0_BASE_URL`: Your application URL (e.g., `https://your-app.vercel.app`)
+- `AUTH0_ISSUER_BASE_URL`: Your Auth0 domain (e.g., `https://your-tenant.auth0.com`)
+- `AUTH0_CLIENT_ID`: Auth0 application client ID
+- `AUTH0_CLIENT_SECRET`: Auth0 application client secret
+- `AUTH0_MANAGEMENT_DOMAIN`: Auth0 domain for Management API (same as `AUTH0_ISSUER_BASE_URL` without `https://`)
+- `AUTH0_MANAGEMENT_CLIENT_ID`: Auth0 Machine-to-Machine application client ID
+- `AUTH0_MANAGEMENT_CLIENT_SECRET`: Auth0 Machine-to-Machine application client secret
 
 ### Email (IMAP)
 - `IMAP_HOST`: IMAP server hostname (e.g., `imap.example.com`)
@@ -101,6 +113,13 @@ All configuration is done via environment variables (12-factor style). See `.env
 - `FILE_ROOT_PATH`: Root path for storing attachments (absolute or relative)
   - Example: `./storage` (relative) or `/var/app/storage` (absolute)
   - Files are organized by claim year and claim code
+  - **Note:** On Vercel, use Vercel Blob storage (see below)
+
+### Vercel Blob Storage (Production)
+- `BLOB_READ_WRITE_TOKEN`: Vercel Blob read/write token (optional)
+  - If set, application uses Vercel Blob instead of filesystem
+  - Get token from: Vercel Dashboard → Storage → Create Blob Store
+  - If not set, uses filesystem (files are ephemeral on Vercel)
 
 ### Translation
 - `TRANSLATION_PROVIDER`: Provider to use (`deepl`, `openai`, `google`, or `none`)
@@ -231,13 +250,23 @@ npm start
 
 ## Deployment
 
-The application is structured for easy deployment:
+### Vercel Deployment
 
-1. **Environment Variables**: Set all required environment variables
-2. **Database**: Use PostgreSQL in production (update `DATABASE_URL`)
-3. **File Storage**: Mount a volume for `FILE_ROOT_PATH` or use cloud storage
-4. **Docker**: Create a Dockerfile and docker-compose.yml (not included, but straightforward)
-5. **Background Jobs**: Implement a scheduler for mail sync (e.g., using node-cron or a job queue)
+1. **Environment Variables**: Set all required environment variables in Vercel dashboard
+2. **Database**: Use Turso for production (see `TURSO_SETUP.md` for setup)
+3. **File Storage**: Vercel has ephemeral filesystem - consider using cloud storage (S3, Cloudflare R2) for production
+4. **Auth0 Setup**: Configure Auth0 Universal Login and create Machine-to-Machine app for Management API
+5. **Run Migrations**: After deployment, run `npx prisma migrate deploy` to apply migrations to Turso
+
+### Auth0 Configuration
+
+1. Create Auth0 application (Single Page Application or Regular Web Application)
+2. Create Machine-to-Machine application for Management API access
+3. Grant necessary scopes: `read:users`, `update:users`, `read:roles`, `create:role_members`, `delete:role_members`
+4. Configure roles in Auth0 Dashboard (SUPER_ADMIN, ADMIN, OPERATOR, VIEWER)
+5. Assign roles to users
+
+See `Dokumentacija/ROLE_SETUP_GUIDE.md` for detailed Auth0 role setup instructions.
 
 ## Future Enhancements
 

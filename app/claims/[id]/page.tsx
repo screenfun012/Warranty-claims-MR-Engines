@@ -1,18 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { FileText, Mail, Image as ImageIcon, CheckCircle2, Loader2, XCircle, Circle, LayoutDashboard, Search, Languages, Folder } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
+import { FileText, Mail, CheckCircle2, XCircle, Circle, Search, Languages, Folder } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 
 // This is a large component - importing sub-components
@@ -22,8 +18,22 @@ import { ClaimEmails } from "./ClaimEmails";
 import { ClaimClientDocuments } from "./ClaimClientDocuments";
 import { ClaimFindings } from "./ClaimFindings";
 import { ClaimPhotos } from "./ClaimPhotos";
-import { useSuperAdmin } from "@/lib/hooks/useSuperAdmin";
+import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
+// Role hierarchy for permission checks
+const ROLE_LEVELS: Record<string, number> = {
+  VIEWER: 0,
+  OPERATOR: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
+};
+
+function hasMinRole(userRole: string | undefined, minRole: string): boolean {
+  const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
+  const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
+  return userLevel >= requiredLevel;
+}
 
 interface Claim {
   id: string;
@@ -33,6 +43,7 @@ interface Claim {
   claimYear: number | null;
   status: string;
   claimAcceptanceStatus: string | null;
+  processingEmailSentAt: string | null;
   customer: any;
   workOrder: any;
   engineType: string | null;
@@ -132,139 +143,84 @@ const statusLabels: Record<string, string> = {
   CLOSED: "ZATVORENO",
 };
 
+// Fetch function for React Query
+const fetchClaimData = async (claimId: string): Promise<Claim> => {
+  const res = await fetch(`/api/claims/${claimId}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch claim: ${res.status}`);
+  }
+  const data = await res.json();
+  if (!data.claim) {
+    throw new Error("Claim not found");
+  }
+  return data.claim;
+};
+
 export default function ClaimDetailPage() {
   const router = useRouter();
-  // In Client Components, useParams and useSearchParams return direct values (not Promises)
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const claimId = params?.id as string;
-  const [claim, setClaim] = useState<Claim | null>(null);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  
   const [activeTab, setActiveTab] = useState("overview");
-  const claimIdRef = useRef<string | null>(null);
-  const timeoutRefs = useRef<NodeJS.Timeout[]>([]);
-  const { isSuperAdmin, userEmail } = useSuperAdmin();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  const { user } = useUser();
+  interface Auth0User {
+    role?: string;
+    roles?: string[];
+    'https://mr-engines-warranty/roles'?: string[] | string;
+    app_metadata?: { roles?: string[] | string };
+  }
+  const auth0User = user as Auth0User | undefined;
+  
+  // Get role from various possible locations
+  const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
+  const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
+  
+  // Permission checks
+  const isSuperAdmin = hasMinRole(userRole, "SUPER_ADMIN");
+  const canEdit = hasMinRole(userRole, "OPERATOR");
+  const canDelete = isSuperAdmin;
 
-  const fetchClaim = async (retryCount = 0, showLoading = true) => {
-    try {
-      if (retryCount === 0 && showLoading) {
-        setLoading(true);
-      }
-      
-      const currentClaimId = claimIdRef.current || claimId;
-      if (!currentClaimId) {
-        console.error("No claim ID available");
-        setClaim(null);
-        setLoading(false);
-        return;
-      }
+  // React Query for data fetching with caching
+  const { data: claim, isLoading: loading, refetch } = useQuery({
+    queryKey: ['claim', claimId],
+    queryFn: () => fetchClaimData(claimId),
+    enabled: !!claimId,
+    staleTime: 60 * 1000, // 1 minute - data stays fresh
+    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
+    retry: 2,
+    retryDelay: 1000,
+  });
 
-      const res = await fetch(`/api/claims/${currentClaimId}`);
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`[fetchClaim] Failed to fetch claim: ${res.status}`, errorText);
-        
-        // Retry up to 2 times if 404 (claim might still be creating)
-        if (res.status === 404 && retryCount < 2) {
-          const timeoutId = setTimeout(() => {
-            fetchClaim(retryCount + 1, showLoading);
-          }, 1000);
-          timeoutRefs.current.push(timeoutId);
-          return;
-        }
-        
-        setClaim(null);
-        setLoading(false);
-        return;
-      }
-      
-      const data = await res.json();
-      if (data.claim) {
-        setClaim(data.claim);
-        setLoading(false);
-      } else {
-        console.error("[fetchClaim] Claim not found in response:", data);
-        // Retry if claim not in response
-        if (retryCount < 2) {
-          const timeoutId = setTimeout(() => {
-            fetchClaim(retryCount + 1, showLoading);
-          }, 1000);
-          timeoutRefs.current.push(timeoutId);
-          return;
-        }
-        setClaim(null);
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error("[fetchClaim] Error fetching claim:", error);
-      // Retry on error
-      if (retryCount < 2) {
-        const timeoutId = setTimeout(() => {
-          fetchClaim(retryCount + 1, showLoading);
-        }, 1000);
-        timeoutRefs.current.push(timeoutId);
-        return;
-      }
-      setClaim(null);
-      setLoading(false);
-    }
-  };
-
-  // Cleanup timeouts on unmount
-  useEffect(() => {
-    return () => {
-      timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
-      timeoutRefs.current = [];
-    };
-  }, []);
-
-  // Update claimIdRef when claimId changes
+  // Reset tab when claim ID changes
   useEffect(() => {
     if (claimId) {
-      claimIdRef.current = claimId;
-      setActiveTab("overview"); // Reset tab when loading new claim
-      fetchClaim(0, true);
+      setActiveTab("overview");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimId]);
 
-  // Refresh claim when refresh parameter is present (e.g., after linking from inbox)
+  // Handle refresh parameter
   useEffect(() => {
-    if (!params || !searchParams) return;
-    const refresh = searchParams.get('refresh');
-    const currentClaimId = (params as any)?.id as string;
-    if (refresh && currentClaimId) {
-      claimIdRef.current = currentClaimId;
-      // Small delay to ensure backend is ready, then fetch
-      const timer1 = setTimeout(() => {
-        fetchClaim(0, false);
-        // Remove refresh parameter from URL after a delay
-        const timer2 = setTimeout(() => {
-          router.replace(`/claims/${currentClaimId}`, { scroll: false });
-        }, 500);
-        timeoutRefs.current.push(timer2);
-      }, 300);
-      timeoutRefs.current.push(timer1);
-      return () => {
-        clearTimeout(timer1);
-        timeoutRefs.current = timeoutRefs.current.filter(t => t !== timer1);
-      };
+    if (!searchParams) return;
+    const refresh = typeof searchParams === 'object' && 'get' in searchParams ? searchParams.get('refresh') : null;
+    if (refresh && claimId) {
+      refetch();
+      router.replace(`/claims/${claimId}`, { scroll: false });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, params?.id, router]);
+  }, [searchParams, claimId, refetch, router]);
 
 
-  const updateClaim = async (updates: Partial<Claim> | Claim) => {
+  const updateClaim = useCallback(async (updates: Partial<Claim> | Claim) => {
     try {
       const updateKeys = Object.keys(updates);
       
-      // If a full claim object is passed (from API response), set it directly
+      // If a full claim object is passed (from API response), update cache directly
       if (updateKeys.length > 15 && 'id' in updates && (updates as Claim).id === claim?.id) {
-        console.log('[updateClaim] Setting full claim object. claimAcceptanceStatus:', (updates as Claim).claimAcceptanceStatus);
-        setClaim(updates as Claim);
+        queryClient.setQueryData(['claim', claimId], updates as Claim);
         return;
       }
 
@@ -276,14 +232,12 @@ export default function ClaimDetailPage() {
         delete (updateData as any).customer;
       }
       
-      
-      // Update claim state immediately (optimistic update) - this makes header update instantly
+      // Optimistic update - update cache immediately
+      const previousClaim = claim;
       if (claim) {
-        const updatedClaim = { ...claim, ...updateData } as Claim;
-        setClaim(updatedClaim);
+        queryClient.setQueryData(['claim', claimId], { ...claim, ...updateData });
       }
       
-      // Send API request to save changes to database
       // Skip API call for claimAcceptanceStatus as it's handled by ClaimEmails component
       if (!('claimAcceptanceStatus' in updateData)) {
         try {
@@ -296,8 +250,8 @@ export default function ClaimDetailPage() {
           if (!res.ok) {
             console.error('[updateClaim] API error:', res.status);
             // Revert optimistic update on error
-            if (claim) {
-              setClaim(claim);
+            if (previousClaim) {
+              queryClient.setQueryData(['claim', claimId], previousClaim);
             }
             throw new Error(`API error: ${res.status}`);
           }
@@ -309,26 +263,42 @@ export default function ClaimDetailPage() {
               ...data.claim,
               claimAcceptanceStatus: claim?.claimAcceptanceStatus ?? data.claim.claimAcceptanceStatus,
             };
-            // Update with server response to ensure consistency
-            setClaim(preservedClaim);
+            queryClient.setQueryData(['claim', claimId], preservedClaim);
           }
         } catch (error) {
           console.error("Error saving claim update:", error);
           // Revert optimistic update on error
-          if (claim) {
-            setClaim(claim);
+          if (previousClaim) {
+            queryClient.setQueryData(['claim', claimId], previousClaim);
           }
         }
       }
     } catch (error) {
       console.error("Error updating claim:", error);
     }
-  };
+  }, [claim, claimId, queryClient]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size="lg" text="Učitavanje reklamacije..." />
+      <div className="p-4 space-y-4">
+        {/* Skeleton Header */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-32" />
+          </div>
+          <Skeleton className="h-8 w-20" />
+        </div>
+        {/* Skeleton Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-1">
+            <Skeleton className="h-[400px] w-full rounded-lg" />
+          </div>
+          <div className="lg:col-span-3">
+            <Skeleton className="h-10 w-full mb-4" />
+            <Skeleton className="h-[350px] w-full rounded-lg" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -336,7 +306,10 @@ export default function ClaimDetailPage() {
   if (!claim) {
     return (
       <div className="p-8">
-        <p>Claim not found</p>
+        <p className="text-muted-foreground">Reklamacija nije pronađena</p>
+        <Button variant="outline" onClick={() => router.push("/claims")} className="mt-4">
+          ← Nazad na listu
+        </Button>
       </div>
     );
   }
@@ -365,7 +338,7 @@ export default function ClaimDetailPage() {
           >
             ← Nazad
           </Button>
-          {claim.status === "CLOSED" && isSuperAdmin && (
+          {claim.status === "CLOSED" && canDelete && (
             <Button 
               variant="destructive" 
               size="sm"
@@ -391,7 +364,7 @@ export default function ClaimDetailPage() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-1">
-          <ClaimMetadata claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED"} />
+          <ClaimMetadata claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
         </div>
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -418,37 +391,35 @@ export default function ClaimDetailPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
-              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} />
+              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
             </TabsContent>
             <TabsContent value="emails" className="mt-4">
-              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} />
+              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              <ClaimClientDocuments claim={claim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} onRefresh={() => fetchClaim(0, false)} />
+              <ClaimClientDocuments claim={claim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} onRefresh={() => refetch()} />
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
-              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} />
+              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
             </TabsContent>
             <TabsContent value="photos" className="mt-4">
-              <ClaimPhotos claim={claim} isReadOnly={claim.status === "CLOSED" && !isSuperAdmin} onRefresh={() => fetchClaim(0, false)} />
+              <ClaimPhotos claim={claim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} onRefresh={() => refetch()} />
             </TabsContent>
           </Tabs>
         </div>
       </div>
 
+      {/* Delete confirmation dialog */}
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         onConfirm={async () => {
-          if (!claim || !userEmail) return;
+          if (!claim) return;
           
           setIsDeleting(true);
           try {
             const res = await fetch(`/api/claims/${claim.id}/delete`, {
               method: "DELETE",
-              headers: {
-                "X-User-Email": userEmail,
-              },
             });
 
             if (res.ok) {

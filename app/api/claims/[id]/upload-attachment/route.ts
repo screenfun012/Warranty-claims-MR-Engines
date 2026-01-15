@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { saveAttachmentForClaim } from "@/lib/files/fileStorage";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // OPERATOR+ can upload attachments
+    await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
+    
     const { id: claimId } = await params;
 
     // Verify claim exists
@@ -109,6 +113,10 @@ export async function POST(
     });
   } catch (error) {
     console.error("Error uploading attachment:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to upload attachment" },
       { status: 500 }

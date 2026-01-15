@@ -6,8 +6,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Save, Mail, User } from "lucide-react";
-import { useSuperAdmin } from "@/lib/hooks/useSuperAdmin";
+import { Save, Mail } from "lucide-react";
+import { useUser } from "@auth0/nextjs-auth0/client";
+
+// Role hierarchy for permission checks
+const ROLE_LEVELS: Record<string, number> = {
+  VIEWER: 0,
+  OPERATOR: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
+};
+
+function hasMinRole(userRole: string | undefined, minRole: string): boolean {
+  const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
+  const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
+  return userLevel >= requiredLevel;
+}
 
 interface EmailConfig {
   imapHost: string;
@@ -24,7 +38,24 @@ interface EmailConfig {
 }
 
 export default function SettingsPage() {
-  const { userEmail, setUserEmail, isSuperAdmin } = useSuperAdmin();
+  const { user } = useUser();
+  interface Auth0User {
+    role?: string;
+    roles?: string[];
+    'https://mr-engines-warranty/roles'?: string[] | string;
+    app_metadata?: {
+      roles?: string[] | string;
+    };
+  }
+  const auth0User = user as Auth0User | undefined;
+  
+  // Get role from various possible locations
+  const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
+  const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
+  
+  // Permission checks
+  const canEdit = hasMinRole(userRole, "SUPER_ADMIN"); // Only SUPER_ADMIN can edit settings
+  
   const [config, setConfig] = useState<EmailConfig>({
     imapHost: "",
     imapPort: 993,
@@ -41,12 +72,10 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [localUserEmail, setLocalUserEmail] = useState(userEmail || "");
 
   useEffect(() => {
     fetchConfig();
-    setLocalUserEmail(userEmail || "");
-  }, [userEmail]);
+  }, []);
 
   const fetchConfig = async () => {
     try {
@@ -121,77 +150,6 @@ export default function SettingsPage() {
 
       <Card className="p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
-          <User className="h-5 w-5" />
-          <h2 className="text-xl font-semibold">Korisnik</h2>
-        </div>
-        <div className="space-y-4 mb-6">
-          <div>
-            <Label>Email adresa (za super admin pristup)</Label>
-            <Input
-              value={localUserEmail}
-              onChange={(e) => setLocalUserEmail(e.target.value)}
-              placeholder="vas.email@mrgroup.rs"
-              type="email"
-            />
-            <p className="text-sm text-muted-foreground mt-1">
-              Postavite vašu email adresu da biste dobili super admin pristup (brisanje claims, inbox poruka, itd.)
-            </p>
-            {isSuperAdmin && (
-              <p className="text-sm text-green-600 mt-1 font-medium">
-                ✓ Super admin pristup aktivan
-              </p>
-            )}
-            <div className="flex gap-2 mt-2">
-              <Button
-                onClick={() => {
-                  if (!localUserEmail.trim()) {
-                    setMessage({ type: "error", text: "Molimo unesite email adresu" });
-                    return;
-                  }
-                  const trimmedEmail = localUserEmail.trim();
-                  console.log("[Settings] Saving email:", trimmedEmail);
-                  setUserEmail(trimmedEmail);
-                  setMessage({ type: "success", text: "Email adresa sačuvana. Super admin pristup je aktivan!" });
-                  setTimeout(() => setMessage(null), 5000);
-                  // Force a small delay to ensure state updates and trigger re-check
-                  setTimeout(() => {
-                    // Trigger custom event to force hook refresh
-                    window.dispatchEvent(new CustomEvent("userEmailUpdated", { detail: trimmedEmail }));
-                  }, 100);
-                }}
-                size="sm"
-              >
-                Sačuvaj email
-              </Button>
-              {isSuperAdmin && userEmail && (
-                <Button
-                  onClick={() => {
-                    if (confirm("Da li ste sigurni da želite da uklonite super admin pristup? Nećete moći da brišete claims i inbox poruke.")) {
-                      console.log("[Settings] Removing super admin access");
-                      localStorage.removeItem("userEmail");
-                      setLocalUserEmail("");
-                      setUserEmail("");
-                      setMessage({ type: "success", text: "Super admin pristup je uklonjen. Sada ste običan korisnik." });
-                      setTimeout(() => setMessage(null), 5000);
-                      // Trigger custom event to force hook refresh
-                      setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent("userEmailUpdated", { detail: "" }));
-                      }, 100);
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                >
-                  Ukloni super admin pristup
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
           <Mail className="h-5 w-5" />
           <h2 className="text-xl font-semibold">Email Konfiguracija</h2>
         </div>
@@ -207,6 +165,12 @@ export default function SettingsPage() {
         )}
 
         <div className="space-y-6">
+          {!canEdit && (
+            <div className="mb-4 p-3 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+              Samo SUPER_ADMIN može menjati email konfiguraciju.
+            </div>
+          )}
+
           <div>
             <h3 className="text-lg font-medium mb-4">IMAP (Primanje emaila)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -216,6 +180,7 @@ export default function SettingsPage() {
                   value={config.imapHost}
                   onChange={(e) => setConfig({ ...config, imapHost: e.target.value })}
                   placeholder="mail.mrgroup.rs"
+                  disabled={!canEdit}
                 />
               </div>
               <div>
@@ -224,6 +189,7 @@ export default function SettingsPage() {
                   type="number"
                   value={config.imapPort}
                   onChange={(e) => setConfig({ ...config, imapPort: parseInt(e.target.value) || 993 })}
+                  disabled={!canEdit}
                 />
               </div>
               <div>
@@ -232,6 +198,7 @@ export default function SettingsPage() {
                   value={config.imapUser}
                   onChange={(e) => setConfig({ ...config, imapUser: e.target.value })}
                   placeholder="claims@mrgrup.rs"
+                  disabled={!canEdit}
                 />
               </div>
               <div>
@@ -241,6 +208,7 @@ export default function SettingsPage() {
                   value={config.imapPass === "••••••••" ? "" : config.imapPass}
                   onChange={(e) => setConfig({ ...config, imapPass: e.target.value })}
                   placeholder={config.imapPass === "••••••••" ? "Unesite novu šifru ili ostavite prazno" : "Unesite šifru"}
+                  disabled={!canEdit}
                 />
                 {config.imapPass === "••••••••" && (
                   <p className="text-sm text-muted-foreground mt-1">Šifra je sačuvana. Unesite novu šifru da je promenite.</p>
@@ -251,6 +219,7 @@ export default function SettingsPage() {
                   id="imap-tls"
                   checked={config.imapTls}
                   onCheckedChange={(checked) => setConfig({ ...config, imapTls: checked })}
+                  disabled={!canEdit}
                 />
                 <Label htmlFor="imap-tls">Koristi TLS/SSL</Label>
               </div>
@@ -266,6 +235,7 @@ export default function SettingsPage() {
                   value={config.smtpHost}
                   onChange={(e) => setConfig({ ...config, smtpHost: e.target.value })}
                   placeholder="mail.mrgroup.rs"
+                  disabled={!canEdit}
                 />
               </div>
               <div>
@@ -274,6 +244,7 @@ export default function SettingsPage() {
                   type="number"
                   value={config.smtpPort}
                   onChange={(e) => setConfig({ ...config, smtpPort: parseInt(e.target.value) || 587 })}
+                  disabled={!canEdit}
                 />
               </div>
               <div>
@@ -282,6 +253,7 @@ export default function SettingsPage() {
                   value={config.smtpUser}
                   onChange={(e) => setConfig({ ...config, smtpUser: e.target.value })}
                   placeholder="claims@mrgrup.rs"
+                  disabled={!canEdit}
                 />
               </div>
               <div>
@@ -291,6 +263,7 @@ export default function SettingsPage() {
                   value={config.smtpPass === "••••••••" ? "" : config.smtpPass}
                   onChange={(e) => setConfig({ ...config, smtpPass: e.target.value })}
                   placeholder={config.smtpPass === "••••••••" ? "Unesite novu šifru ili ostavite prazno" : "Unesite šifru"}
+                  disabled={!canEdit}
                 />
                 {config.smtpPass === "••••••••" && (
                   <p className="text-sm text-muted-foreground mt-1">Šifra je sačuvana. Unesite novu šifru da je promenite.</p>
@@ -301,6 +274,7 @@ export default function SettingsPage() {
                   id="smtp-tls"
                   checked={config.smtpTls}
                   onCheckedChange={(checked) => setConfig({ ...config, smtpTls: checked })}
+                  disabled={!canEdit}
                 />
                 <Label htmlFor="smtp-tls">Koristi TLS/SSL</Label>
               </div>
@@ -313,6 +287,7 @@ export default function SettingsPage() {
                 id="remember"
                 checked={config.rememberCredentials}
                 onCheckedChange={(checked) => setConfig({ ...config, rememberCredentials: checked })}
+                disabled={!canEdit}
               />
               <Label htmlFor="remember">Zapamti email i šifru</Label>
             </div>
@@ -321,10 +296,12 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto">
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Čuvanje..." : "Sačuvaj konfiguraciju"}
-          </Button>
+          {canEdit && (
+            <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto">
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Čuvanje..." : "Sačuvaj konfiguraciju"}
+            </Button>
+          )}
         </div>
       </Card>
     </div>

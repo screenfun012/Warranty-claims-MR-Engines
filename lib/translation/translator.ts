@@ -59,7 +59,7 @@ class DeepLTranslator implements Translator {
       };
 
       const targetLangUpper = params.targetLang.toUpperCase();
-      let target = targetLangMap[targetLangUpper] || targetLangUpper;
+      const target = targetLangMap[targetLangUpper] || targetLangUpper;
       
       // Include source_lang if explicitly provided and not "auto"
       let source: string | undefined = undefined;

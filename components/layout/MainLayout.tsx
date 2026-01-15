@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -40,6 +41,14 @@ function SidebarTriggerWithTooltip() {
 }
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isAuthPage = pathname === "/login" || !pathname;
+
+  // Na login/register stranicama, ne prikazuj sidebar
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
   return (
     <SidebarProvider>
       <AppSidebar />

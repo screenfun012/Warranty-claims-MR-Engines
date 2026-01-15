@@ -138,8 +138,9 @@ export default function DashboardPage() {
   const { data: stats, isLoading: loading } = useQuery({
     queryKey: ["dashboardStats"],
     queryFn: fetchStats,
-    refetchInterval: 60000, // 60 sekundi umesto 30 (2x manje request-ova)
+    refetchInterval: 120000, // 120 sekundi (2 minuta) umesto 60 (2x manje request-ova)
     refetchIntervalInBackground: false,
+    staleTime: 60 * 1000, // 60 sekundi - data je fresh 60 sekundi
   });
 
   // Listen for claim updates

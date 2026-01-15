@@ -1,17 +1,18 @@
 /**
  * API routes for claims
- * GET /api/claims - List claims with filters
- * POST /api/claims - Create new claim (optional, can be done via UI form)
+ * GET /api/claims - List claims with filters (VIEWER+)
+ * POST /api/claims - Create new claim (OPERATOR+)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { sendEmailAndSave } from "@/lib/email/smtpClient";
-import { getClaimProcessingEmailTemplate } from "@/lib/email/emailTemplates";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function GET(request: NextRequest) {
   try {
+    // VIEWER+ can read claims
+    await requirePermission(PERMISSIONS.CLAIMS_READ);
     const searchParams = request.nextUrl.searchParams;
     const statusParams = searchParams.getAll("status"); // Get all status values for multi-select
     const claimCode = searchParams.get("claimCode");
@@ -137,6 +138,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ claims });
   } catch (error) {
     console.error("Error fetching claims:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: "Failed to fetch claims" },
       { status: 500 }
@@ -146,6 +151,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // OPERATOR+ can create claims
+    await requirePermission(PERMISSIONS.CLAIMS_CREATE);
+    
     const body = await request.json();
     console.log("[create-claim] Creating new claim with data:", { 
       emailThreadId: body.emailThreadId,
@@ -298,82 +306,8 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(`[create-claim] Summary: ${photosCreated} photos, ${documentsCreated} documents created`);
-
-        // Auto-send email to customer when claim is created from inbox
-        try {
-          // Use originalSender from thread first (this is the real customer email)
-          // Fallback to first message from if originalSender is not available
-          let customerEmail: string | null = thread.originalSender || (thread.messages[0]?.from) || null;
-          
-          // Extract email address from "from" field (handle "Name <email@domain.com>" format)
-          if (customerEmail) {
-            // Try to extract email from format like "Name <email@domain.com>" or just "email@domain.com"
-            const emailMatch = customerEmail.match(/<([^>]+)>/) || customerEmail.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
-            if (emailMatch) {
-              customerEmail = emailMatch[1] || emailMatch[0];
-            }
-            
-            // Validate email format
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(customerEmail)) {
-              console.log(`[create-claim] Invalid email format: ${customerEmail}, skipping auto-email`);
-              customerEmail = null as string | null;
-            }
-            
-            // Skip known invalid/system email addresses
-            const invalidEmails = ['cpanel@', 'noreply@', 'no-reply@', 'mailer-daemon@', 'postmaster@', 'bounce@', 'return@'];
-            if (customerEmail && invalidEmails.some(invalid => customerEmail!.toLowerCase().includes(invalid))) {
-              console.log(`[create-claim] Skipping system/invalid email: ${customerEmail}`);
-              customerEmail = null;
-            }
-          }
-          
-          if (customerEmail) {
-            // Get base URL for logo and links - use request origin if available
-            const baseUrl = request.nextUrl.origin || 
-                           process.env.NEXT_PUBLIC_APP_URL || 
-                           (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-                           "http://localhost:3000";
-            
-            const emailTemplate = getClaimProcessingEmailTemplate({
-              claimCode: claim.claimCodeRaw || undefined,
-              customerName: claim.customer?.name || undefined,
-              status: claim.status,
-              baseUrl,
-            });
-            
-            // Create or get email thread for this claim
-            let emailThread = await prisma.emailThread.findFirst({
-              where: { claimId: claim.id },
-            });
-            
-            if (!emailThread) {
-              emailThread = await prisma.emailThread.create({
-                data: {
-                  claimId: claim.id,
-                  subjectOriginal: emailTemplate.subject,
-                  originalSender: customerEmail,
-                },
-              });
-            }
-
-            const emailResult = await sendEmailAndSave({
-              emailThreadId: emailThread.id,
-              claimId: claim.id,
-              to: customerEmail,
-              subject: emailTemplate.subject,
-              text: emailTemplate.text,
-              html: emailTemplate.html,
-            });
-
-            console.log(`[create-claim] Auto-sent processing email to ${customerEmail} (messageId: ${emailResult.messageId})`);
-          } else {
-            console.log(`[create-claim] No valid customer email found, skipping auto-email`);
-          }
-        } catch (emailError) {
-          console.error("[create-claim] Error sending auto-email:", emailError);
-          // Don't fail claim creation if email fails
-        }
+        // NOTE: Email se NE šalje pri kreiranju reklamacije
+        // Email se šalje tek kada se unese claim code (u PATCH endpointu)
       }
     }
 
@@ -458,6 +392,10 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     console.error("Error creating claim:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create claim" },
       { status: 500 }

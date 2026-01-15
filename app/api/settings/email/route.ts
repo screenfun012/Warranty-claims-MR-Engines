@@ -1,15 +1,19 @@
 /**
  * API route for email configuration
- * GET /api/settings/email - Get email config
- * POST /api/settings/email - Save email config
+ * GET /api/settings/email - Get email config (ADMIN+)
+ * POST /api/settings/email - Save email config (SUPER_ADMIN only)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { clearEmailConfigCache } from "@/lib/config/envLoader";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function GET() {
   try {
+    // ADMIN+ can view settings
+    await requirePermission(PERMISSIONS.SETTINGS_READ);
+    
     const config = await prisma.emailConfig.findUnique({
       where: { id: "default" },
     });
@@ -28,6 +32,10 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Error fetching email config:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: "Failed to fetch email config" },
       { status: 500 }
@@ -37,6 +45,9 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    // Only SUPER_ADMIN can update settings
+    await requirePermission(PERMISSIONS.SETTINGS_UPDATE);
+    
     const body = await request.json();
     const {
       imapHost,
@@ -110,6 +121,10 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error saving email config:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to save email config" },
       { status: 500 }

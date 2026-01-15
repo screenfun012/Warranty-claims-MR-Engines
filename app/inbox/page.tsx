@@ -23,8 +23,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useSuperAdmin } from "@/lib/hooks/useSuperAdmin";
+import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
+// Role hierarchy for permission checks
+const ROLE_LEVELS: Record<string, number> = {
+  VIEWER: 0,
+  OPERATOR: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
+};
+
+function hasMinRole(userRole: string | undefined, minRole: string): boolean {
+  const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
+  const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
+  return userLevel >= requiredLevel;
+}
 
 interface EmailThread {
   id: string;
@@ -113,8 +127,9 @@ export default function InboxPage() {
   } = useQuery({
     queryKey: ["inboxThreads"],
     queryFn: fetchThreads,
-    refetchInterval: 30000, // 30 sekundi umesto 5 (6x manje request-ova)
+    refetchInterval: 60000, // 60 sekundi umesto 30 (2x manje request-ova)
     refetchIntervalInBackground: false,
+    staleTime: 30 * 1000, // 30 sekundi - data je fresh 30 sekundi
   });
 
   // Get last updated time from threads
@@ -161,8 +176,9 @@ export default function InboxPage() {
     queryKey: ["inboxUpdates", lastCheckTime],
     queryFn: () => checkForUpdates(lastCheckTime),
     enabled: !!lastCheckTime && !document.hidden,
-    refetchInterval: 15000, // 15 sekundi umesto 5 (3x manje request-ova)
+    refetchInterval: 45000, // 45 sekundi umesto 15 (3x manje request-ova)
     refetchIntervalInBackground: false,
+    staleTime: 20 * 1000, // 20 sekundi - data je fresh 20 sekundi
   });
 
   // Refetch kada se detektuju update-i
@@ -422,7 +438,26 @@ function ThreadDetail({
   onThreadUpdated: () => void;
 }) {
   const router = useRouter();
-  const { isSuperAdmin, userEmail } = useSuperAdmin();
+  const { user } = useUser();
+  interface Auth0User {
+    email?: string;
+    role?: string;
+    roles?: string[];
+    'https://mr-engines-warranty/roles'?: string[] | string;
+    app_metadata?: {
+      roles?: string[] | string;
+    };
+  }
+  const auth0User = user as Auth0User | undefined;
+  
+  // Get role from various possible locations
+  const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
+  const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
+  
+  // Permission checks
+  const canDelete = hasMinRole(userRole, "SUPER_ADMIN"); // Only SUPER_ADMIN can delete
+  const canCreate = hasMinRole(userRole, "OPERATOR"); // OPERATOR+ can create claims
+  const userEmail = auth0User?.email || null;
   const [fullThread, setFullThread] = useState<EmailThread | null>(null);
   const [loading, setLoading] = useState(true);
   const [showCreateClaim, setShowCreateClaim] = useState(false);
@@ -644,7 +679,7 @@ function ThreadDetail({
         </div>
 
         <div className="flex gap-2 mb-4">
-          {!fullThread.claimId && (
+          {!fullThread.claimId && canCreate && (
             <>
               <Button onClick={() => setShowCreateClaim(true)}>
                 <Plus className="h-4 w-4 mr-2" />
@@ -656,7 +691,7 @@ function ThreadDetail({
               </Button>
             </>
           )}
-          {isSuperAdmin && (
+          {canDelete && (
             <Button 
               variant="destructive" 
               onClick={() => setShowDeleteDialog(true)}
@@ -749,7 +784,7 @@ function ThreadDetail({
                 </h4>
                 <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 overflow-hidden">
                   {message.attachments.map((attachment) => {
-                    const isImage = attachment.mimeType.startsWith("image/");
+                    const isImage = attachment.mimeType?.startsWith("image/") || false;
                     const isPdf = attachment.mimeType === "application/pdf";
                     const isDocx = attachment.mimeType.includes("wordprocessingml") || 
                                   attachment.mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml") ||
@@ -959,7 +994,7 @@ function ThreadDetail({
           </DialogHeader>
           {previewAttachment && (
             <div className="mt-4">
-              {previewAttachment.mimeType.startsWith("image/") ? (
+              {previewAttachment.mimeType?.startsWith("image/") ? (
                 <img 
                   src={`/api/files/${previewAttachment.id}`}
                   alt={previewAttachment.fileName}
@@ -999,12 +1034,9 @@ function ThreadDetail({
           
           setIsDeleting(true);
           try {
-            const res = await fetch(`/api/inbox/${fullThread.id}/delete`, {
-              method: "DELETE",
-              headers: {
-                "X-User-Email": userEmail,
-              },
-            });
+          const res = await fetch(`/api/inbox/${fullThread.id}/delete`, {
+            method: "DELETE",
+          });
 
             if (res.ok) {
               // Navigate back to inbox list

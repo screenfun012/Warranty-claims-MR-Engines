@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { usePathname } from "next/navigation";
 
 /**
  * Client component that starts automatic email sync when the app loads
@@ -9,8 +10,13 @@ import { useEffect, useRef } from "react";
  */
 export function IdleSyncStarter() {
   const hasStarted = useRef(false);
+  const pathname = usePathname();
+  const isAuthPage = pathname === "/login" || !pathname;
 
   useEffect(() => {
+    // Ne pokreći sync na login/register stranicama
+    if (isAuthPage) return;
+
     // Only start once
     if (hasStarted.current) return;
     hasStarted.current = true;
@@ -30,7 +36,7 @@ export function IdleSyncStarter() {
       .catch((error) => {
         console.error("[AutoSync] Failed to start automatic email sync:", error);
       });
-  }, []);
+  }, [isAuthPage]);
 
   return null; // This component doesn't render anything
 }

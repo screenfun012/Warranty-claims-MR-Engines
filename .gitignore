@@ -55,3 +55,6 @@ prisma/dev.db
 # storage (uploaded files)
 /storage/*
 !/storage/.gitkeep
+
+# Dokumentacija
+/Dokumentacija

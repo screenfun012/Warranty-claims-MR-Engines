@@ -46,8 +46,8 @@ const statusColors: Record<string, string> = {
 
 export default function WorkOrderDetailPage() {
   const router = useRouter();
-  // In Client Components, useParams returns direct values (not Promises)
-  const params = useParams();
+  // In Next.js 16, useParams may return a Promise, so we use React.use()
+  const params = use(useParams());
   const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
   const [loading, setLoading] = useState(true);
 

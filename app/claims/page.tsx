@@ -8,10 +8,26 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle } from "lucide-react";
+import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
+import { useUser } from "@auth0/nextjs-auth0/client";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
+// Role hierarchy for permission checks
+const ROLE_LEVELS: Record<string, number> = {
+  VIEWER: 0,
+  OPERATOR: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
+};
+
+function hasMinRole(userRole: string | undefined, minRole: string): boolean {
+  const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
+  const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
+  return userLevel >= requiredLevel;
+}
 
 interface Claim {
   id: string;
@@ -113,9 +129,27 @@ const statusLabels: Record<string, string> = {
 
 export default function ClaimsPage() {
   const router = useRouter();
+  const { user } = useUser();
+  
+  // Get user role
+  interface Auth0User {
+    role?: string;
+    roles?: string[];
+    'https://mr-engines-warranty/roles'?: string[] | string;
+    app_metadata?: { roles?: string[] | string };
+  }
+  const auth0User = user as Auth0User | undefined;
+  const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
+  const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
+  const isSuperAdmin = hasMinRole(userRole, "SUPER_ADMIN");
+  
   const [claims, setClaims] = useState<Claim[]>([]);
   const [allClaims, setAllClaims] = useState<Claim[]>([]); // Store all claims for suggestions
   const [loading, setLoading] = useState(true);
+  const [deleteClaimId, setDeleteClaimId] = useState<string | null>(null);
+  const [unlockClaimId, setUnlockClaimId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const [filters, setFilters] = useState({
     status: [] as string[], // Changed to array for multi-select
     claimCode: "",
@@ -306,6 +340,56 @@ export default function ClaimsPage() {
       window.removeEventListener('claim-updated', handleClaimUpdate);
     };
   }, [fetchClaims]);
+
+  // Delete claim handler (SUPER_ADMIN only)
+  const handleDeleteClaim = async (claimId: string) => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch(`/api/claims/${claimId}/delete`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        // Remove from local state
+        setClaims(prev => prev.filter(c => c.id !== claimId));
+        setAllClaims(prev => prev.filter(c => c.id !== claimId));
+        setDeleteClaimId(null);
+        // Dispatch event to update dashboard
+        window.dispatchEvent(new CustomEvent('claim-deleted'));
+      } else {
+        const data = await res.json();
+        alert(`Greška: ${data.error || "Neuspešno brisanje"}`);
+      }
+    } catch (error) {
+      alert("Greška pri brisanju reklamacije");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Unlock claim handler (SUPER_ADMIN only)
+  const handleUnlockClaim = async (claimId: string) => {
+    setIsUnlocking(true);
+    try {
+      const res = await fetch(`/api/claims/${claimId}/unlock`, {
+        method: "POST",
+      });
+      if (res.ok) {
+        // Update local state
+        setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: "IN_ANALYSIS" } : c));
+        setAllClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: "IN_ANALYSIS" } : c));
+        setUnlockClaimId(null);
+        // Dispatch event to update dashboard
+        window.dispatchEvent(new CustomEvent('claim-updated'));
+      } else {
+        const data = await res.json();
+        alert(`Greška: ${data.error || "Neuspešno otključavanje"}`);
+      }
+    } catch (error) {
+      alert("Greška pri otključavanju reklamacije");
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
 
   // Close status dropdown when clicking outside
   useEffect(() => {
@@ -655,6 +739,7 @@ export default function ClaimsPage() {
             { key: "engineCode", label: "Engine Code" },
             { key: "assignedTo", label: "Assigned To" },
             { key: "created", label: "Created" },
+            ...(isSuperAdmin ? [{ key: "actions", label: "Akcije" }] : []),
           ]}
           data={claims.map((claim, index) => ({
             claimCode: (
@@ -673,6 +758,42 @@ export default function ClaimsPage() {
                 {new Date(claim.createdAt).toLocaleDateString()}
               </span>
             ),
+            ...(isSuperAdmin ? {
+              actions: (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  {claim.status === "CLOSED" ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setUnlockClaimId(claim.id);
+                      }}
+                      title="Otključaj reklamaciju"
+                    >
+                      <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </Button>
+                  ) : (
+                    <div className="h-7 w-7 flex items-center justify-center" title="Reklamacija je otključana">
+                      <Unlock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                    </div>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-red-100 dark:hover:bg-red-900/30"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteClaimId(claim.id);
+                    }}
+                    title="Obriši reklamaciju"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </Button>
+                </div>
+              ),
+            } : {}),
           }))}
           emptyMessage={
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -696,6 +817,30 @@ export default function ClaimsPage() {
           onRowClick={(row, index) => router.push(`/claims/${claims[index].id}`)}
         />
       </Card>
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={!!deleteClaimId}
+        onOpenChange={(open) => !open && setDeleteClaimId(null)}
+        onConfirm={() => deleteClaimId && handleDeleteClaim(deleteClaimId)}
+        title="Brisanje reklamacije"
+        description="Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna."
+        confirmText={isDeleting ? "Brisanje..." : "Obriši"}
+        cancelText="Otkaži"
+        variant="destructive"
+      />
+
+      {/* Unlock confirmation dialog */}
+      <ConfirmDialog
+        open={!!unlockClaimId}
+        onOpenChange={(open) => !open && setUnlockClaimId(null)}
+        onConfirm={() => unlockClaimId && handleUnlockClaim(unlockClaimId)}
+        title="Otključavanje reklamacije"
+        description="Da li ste sigurni da želite da otključate ovu reklamaciju? Status će biti promenjen na 'U obradi'."
+        confirmText={isUnlocking ? "Otključavanje..." : "Otključaj"}
+        cancelText="Otkaži"
+        variant="default"
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Hash, Building2, Settings, User, FolderOpen, FileCode } from "lucide-react";
+import { Hash, Building2, Settings, User, FolderOpen, FileCode, Mail, CheckCircle2, Loader2 } from "lucide-react";
 
 interface ClaimMetadataProps {
   claim: {
@@ -19,6 +19,7 @@ interface ClaimMetadataProps {
     customerReference: string | null;
     invoiceNumber: string | null;
     serverFolderPath: string | null;
+    processingEmailSentAt: string | null; // ISO date string
     assignedTo: {
       id: string;
       fullName: string;
@@ -33,35 +34,103 @@ interface ClaimMetadataProps {
 }
 
 export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMetadataProps) {
+  // Local state for all editable fields - prevents race conditions while typing
+  const [claimCode, setClaimCode] = useState(claim.claimCodeRaw || "");
+  const [prefix, setPrefix] = useState(claim.claimPrefix || "");
+  const [engineType, setEngineType] = useState(claim.engineType || "");
+  const [engineCode, setEngineCode] = useState(claim.mrEngineCode || "");
   const [assignedToName, setAssignedToName] = useState(claim.assignedTo?.fullName || "");
   const [customerName, setCustomerName] = useState(claim.customer?.name || "");
-  const [isEditingCustomerName, setIsEditingCustomerName] = useState(false);
-  const [isEditingAssignedToName, setIsEditingAssignedToName] = useState(false);
+  
+  // Track which fields are being edited
+  const [editingField, setEditingField] = useState<string | null>(null);
+  // Initialize notificationSent from database value
+  const [notificationSent, setNotificationSent] = useState(!!claim.processingEmailSentAt);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
   
   const prevClaimIdRef = useRef(claim.id);
+  
+  // Send processing notification email
+  const sendProcessingNotification = async () => {
+    if (!claimCode || isSendingNotification) return;
+    
+    setIsSendingNotification(true);
+    try {
+      const res = await fetch(`/api/claims/${claim.id}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "processing" }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Greška pri slanju emaila");
+      }
+      
+      setNotificationSent(true);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Greška pri slanju emaila");
+      setNotificationSent(false);
+    } finally {
+      setIsSendingNotification(false);
+    }
+  };
 
-  // Only update local state when claim ID changes (new claim loaded), not when editing
+  // Sync local state when claim changes (new claim loaded or external update)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (prevClaimIdRef.current !== claim.id) {
-      // New claim loaded, reset local state
+      // New claim loaded, reset all local state
+      setClaimCode(claim.claimCodeRaw || "");
+      setPrefix(claim.claimPrefix || "");
+      setEngineType(claim.engineType || "");
+      setEngineCode(claim.mrEngineCode || "");
       setAssignedToName(claim.assignedTo?.fullName || "");
       setCustomerName(claim.customer?.name || "");
-      setIsEditingCustomerName(false);
-      setIsEditingAssignedToName(false);
+      setEditingField(null);
+      setNotificationSent(!!claim.processingEmailSentAt);
       prevClaimIdRef.current = claim.id;
-    } else if (!isEditingCustomerName && !isEditingAssignedToName) {
-      // Claim updated from outside (e.g., after API call), update if not editing
-      const newAssignedToName = claim.assignedTo?.fullName || "";
-      const newCustomerName = claim.customer?.name || "";
-      
-      if (newAssignedToName !== assignedToName) {
-        setAssignedToName(newAssignedToName);
+    } else if (!editingField) {
+      // External update (e.g., from another tab), sync if not editing
+      if (claim.claimCodeRaw !== claimCode) setClaimCode(claim.claimCodeRaw || "");
+      if (claim.claimPrefix !== prefix) setPrefix(claim.claimPrefix || "");
+      if (claim.engineType !== engineType) setEngineType(claim.engineType || "");
+      if (claim.mrEngineCode !== engineCode) setEngineCode(claim.mrEngineCode || "");
+      if (claim.assignedTo?.fullName !== assignedToName) setAssignedToName(claim.assignedTo?.fullName || "");
+      if (claim.customer?.name !== customerName) setCustomerName(claim.customer?.name || "");
+      // Sync notification status
+      if (!!claim.processingEmailSentAt !== notificationSent) setNotificationSent(!!claim.processingEmailSentAt);
+    }
+  }, [claim.id, claim.claimCodeRaw, claim.claimPrefix, claim.engineType, claim.mrEngineCode, claim.assignedTo?.fullName, claim.customer?.name, claim.processingEmailSentAt, editingField]);
+
+  // Save field on blur
+  const handleFieldBlur = (field: string, value: string) => {
+    setEditingField(null);
+    
+    // Get original value
+    let originalValue: string | null = null;
+    switch (field) {
+      case 'claimCodeRaw': originalValue = claim.claimCodeRaw; break;
+      case 'claimPrefix': originalValue = claim.claimPrefix; break;
+      case 'engineType': originalValue = claim.engineType; break;
+      case 'mrEngineCode': originalValue = claim.mrEngineCode; break;
+    }
+    
+    // Only save if value changed
+    if (value !== (originalValue || "")) {
+      const updates: Record<string, unknown> = { [field]: value };
+      // Auto-change status to IN_ANALYSIS if currently NEW
+      if (claim.status === "NEW") {
+        updates.status = "IN_ANALYSIS";
       }
-      if (newCustomerName !== customerName) {
-        setCustomerName(newCustomerName);
+      onUpdate(updates);
+      
+      // Reset notification when claim code changes
+      if (field === 'claimCodeRaw') {
+        setNotificationSent(false);
       }
     }
-  }, [claim.id, claim.assignedTo?.fullName, claim.customer?.name]);
+  };
   return (
     <Card className="p-6">
       <h2 className="text-lg font-semibold mb-6 text-primary flex items-center gap-2">
@@ -75,19 +144,52 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             Claim Code
           </Label>
           <Input
-            value={claim.claimCodeRaw || ""}
-            onChange={(e) => {
-              if (!isReadOnly) {
-                onUpdate({ 
-                  claimCodeRaw: e.target.value,
-                  ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
-                });
-              }
-            }}
+            value={claimCode}
+            onChange={(e) => setClaimCode(e.target.value)}
+            onFocus={() => setEditingField('claimCodeRaw')}
+            onBlur={(e) => handleFieldBlur('claimCodeRaw', e.target.value)}
             placeholder="MR1234/25"
             disabled={isReadOnly}
             className="h-9"
           />
+          {/* Notification checkbox - only show when claim has code and is in analysis */}
+          {claimCode && claim.status === "IN_ANALYSIS" && !isReadOnly && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="notificationConfirm"
+                checked={notificationSent}
+                disabled={isSendingNotification || notificationSent}
+                onChange={(e) => {
+                  if (e.target.checked && !notificationSent) {
+                    sendProcessingNotification();
+                  }
+                }}
+                className="h-4 w-4 rounded border-input cursor-pointer disabled:cursor-not-allowed"
+              />
+              <label 
+                htmlFor="notificationConfirm" 
+                className={`text-sm flex items-center gap-2 cursor-pointer ${notificationSent ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
+              >
+                {isSendingNotification ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Slanje...
+                  </>
+                ) : notificationSent ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    Obaveštenje poslato
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    Potvrdi i pošalji obaveštenje klijentu
+                  </>
+                )}
+              </label>
+            </div>
+          )}
         </div>
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -95,15 +197,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             Prefix
           </Label>
           <Input 
-            value={claim.claimPrefix || ""} 
-            onChange={(e) => {
-              if (!isReadOnly) {
-                onUpdate({ 
-                  claimPrefix: e.target.value,
-                  ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
-                });
-              }
-            }}
+            value={prefix} 
+            onChange={(e) => setPrefix(e.target.value)}
+            onFocus={() => setEditingField('claimPrefix')}
+            onBlur={(e) => handleFieldBlur('claimPrefix', e.target.value)}
             placeholder="MR"
             disabled={isReadOnly}
             className="h-9"
@@ -118,19 +215,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             value={customerName}
             placeholder="Customer name"
             disabled={isReadOnly}
-            onFocus={() => {
-              if (!isReadOnly) {
-                setIsEditingCustomerName(true);
-              }
-            }}
-            onChange={(e) => {
-              if (isReadOnly) return;
-              const newName = e.target.value;
-              setCustomerName(newName);
-            }}
+            onFocus={() => setEditingField('customerName')}
+            onChange={(e) => setCustomerName(e.target.value)}
             onBlur={async (e) => {
+              setEditingField(null);
               if (isReadOnly) return;
-              setIsEditingCustomerName(false);
               const newName = e.target.value.trim();
               const currentName = claim.customer?.name || "";
               
@@ -197,15 +286,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium mb-2">Engine Type</Label>
           <Input
-            value={claim.engineType || ""}
-            onChange={(e) => {
-              if (!isReadOnly) {
-                onUpdate({ 
-                  engineType: e.target.value,
-                  ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
-                });
-              }
-            }}
+            value={engineType}
+            onChange={(e) => setEngineType(e.target.value)}
+            onFocus={() => setEditingField('engineType')}
+            onBlur={(e) => handleFieldBlur('engineType', e.target.value)}
             disabled={isReadOnly}
             className="h-9"
           />
@@ -213,15 +297,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium mb-2">Engine Code</Label>
           <Input
-            value={claim.mrEngineCode || ""}
-            onChange={(e) => {
-              if (!isReadOnly) {
-                onUpdate({ 
-                  mrEngineCode: e.target.value,
-                  ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
-                });
-              }
-            }}
+            value={engineCode}
+            onChange={(e) => setEngineCode(e.target.value)}
+            onFocus={() => setEditingField('mrEngineCode')}
+            onBlur={(e) => handleFieldBlur('mrEngineCode', e.target.value)}
             placeholder="Engine code"
             disabled={isReadOnly}
             className="h-9"
@@ -236,18 +315,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             value={assignedToName}
             placeholder="Assigned user"
             disabled={isReadOnly}
-            onFocus={() => {
-              if (!isReadOnly) {
-                setIsEditingAssignedToName(true);
-              }
-            }}
-            onChange={(e) => {
-              if (isReadOnly) return;
-              setAssignedToName(e.target.value);
-            }}
+            onFocus={() => setEditingField('assignedTo')}
+            onChange={(e) => setAssignedToName(e.target.value)}
             onBlur={async (e) => {
+              setEditingField(null);
               if (isReadOnly) return;
-              setIsEditingAssignedToName(false);
               const newName = e.target.value.trim();
               const currentName = claim.assignedTo?.fullName || "";
               

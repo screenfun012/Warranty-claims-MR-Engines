@@ -54,6 +54,8 @@ export const env = {
 
   // File storage
   FILE_ROOT_PATH: getEnv("FILE_ROOT_PATH", "./storage"),
+  // Vercel Blob (optional - if set, uses Blob instead of filesystem)
+  BLOB_READ_WRITE_TOKEN: getEnv("BLOB_READ_WRITE_TOKEN", ""),
 
   // Translation
   TRANSLATION_PROVIDER: getEnv("TRANSLATION_PROVIDER", "none"),
@@ -67,6 +69,4 @@ export const env = {
   MAIL_SYNC_MAX_MESSAGES_PER_RUN: getEnvNumber("MAIL_SYNC_MAX_MESSAGES_PER_RUN", 50),
   MAIL_SYNC_USE_IDLE: getEnvBoolean("MAIL_SYNC_USE_IDLE", true), // Use IMAP IDLE for real-time notifications
 
-  // Super admin
-  SUPER_ADMIN_EMAIL: getEnv("SUPER_ADMIN_EMAIL", ""), // Email of super admin user
 };

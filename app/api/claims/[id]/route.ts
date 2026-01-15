@@ -1,18 +1,22 @@
 /**
  * API routes for individual claims
- * GET /api/claims/[id] - Get claim details
- * PATCH /api/claims/[id] - Update claim
+ * GET /api/claims/[id] - Get claim details (VIEWER+)
+ * PATCH /api/claims/[id] - Update claim (OPERATOR+)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { parseClaimCode } from "@/lib/domain/claimCode";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // VIEWER+ can read claims
+    await requirePermission(PERMISSIONS.CLAIMS_READ);
+    
     const { id } = await params;
     console.log(`[GET /api/claims/${id}] Fetching claim with ID: ${id} (type: ${typeof id})`);
 
@@ -125,6 +129,10 @@ export async function GET(
     return NextResponse.json({ claim });
   } catch (error) {
     console.error("Error fetching claim:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: "Failed to fetch claim" },
       { status: 500 }
@@ -138,9 +146,28 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    // OPERATOR+ can update claims
+    await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
+    
     const body = await request.json();
 
     console.log(`[PATCH /api/claims/${id}] Updating claim with data:`, JSON.stringify(body, null, 2));
+
+    // Dohvati postojeću reklamaciju da proverimo da li je claimCodeRaw prvi put setovan
+    const existingClaim = await prisma.claim.findUnique({
+      where: { id },
+      include: {
+        customer: true,
+        emailThreads: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!existingClaim) {
+      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+    }
 
     // If claimCodeRaw is being updated, parse it
     // If claimPrefix is being updated separately, allow it
@@ -151,6 +178,18 @@ export async function PATCH(
       updateData.claimPrefix = parsed.prefix;
       updateData.claimNumber = parsed.number;
       updateData.claimYear = parsed.year;
+
+      // Proveri da li je ovo prvi put da se unosi claim code
+      const wasEmpty = !existingClaim.claimCodeRaw || existingClaim.claimCodeRaw.trim() === '';
+      const isNowFilled = parsed.raw && parsed.raw.trim() !== '';
+      
+      if (wasEmpty && isNowFilled) {
+        // Automatski promeni status na IN_ANALYSIS ako je trenutno NEW
+        if (existingClaim.status === 'NEW') {
+          updateData.status = 'IN_ANALYSIS';
+          console.log(`[PATCH /api/claims/${id}] Auto-changing status from NEW to IN_ANALYSIS`);
+        }
+      }
     } else if (body.claimPrefix !== undefined) {
       // Allow direct prefix update
       updateData.claimPrefix = body.claimPrefix;
@@ -449,11 +488,14 @@ export async function PATCH(
     }
 
     console.log(`[PATCH /api/claims/${id}] Final claim.claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
-
     console.log(`[PATCH /api/claims/${id}] Successfully updated claim. claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
     return NextResponse.json({ claim });
   } catch (error) {
     console.error(`[PATCH /api/claims/${id}] Error updating claim:`, error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     const errorStack = error instanceof Error ? error.stack : undefined;
     console.error(`[PATCH /api/claims/${id}] Error details:`, { errorMessage, errorStack });

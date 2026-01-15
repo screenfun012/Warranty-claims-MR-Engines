@@ -1,29 +1,21 @@
 /**
  * DELETE /api/inbox/[id]/delete
- * Delete an email thread (super admin only)
+ * Delete an email thread (SUPER_ADMIN only)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { isSuperAdmin } from "@/lib/auth/permissions";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Only SUPER_ADMIN can delete inbox items
+    await requirePermission(PERMISSIONS.INBOX_DELETE);
+    
     const { id } = await params;
-    
-    // Get user email from header (X-User-Email)
-    const userEmail = request.headers.get("X-User-Email");
-    
-    // Check if user is super admin
-    if (!isSuperAdmin(userEmail)) {
-      return NextResponse.json(
-        { error: "Unauthorized: Super admin access required" },
-        { status: 403 }
-      );
-    }
 
     // Verify thread exists
     const thread = await prisma.emailThread.findUnique({
@@ -69,6 +61,10 @@ export async function DELETE(
     });
   } catch (error) {
     console.error("Error deleting email thread:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       { error: `Failed to delete email thread: ${errorMessage}` },

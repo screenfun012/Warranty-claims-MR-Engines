@@ -59,7 +59,7 @@ export function Sidebar() {
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">
         {navigation.map((item) => {
-          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/");
+          const isActive = Boolean(pathname === item.href || (pathname && item.href && pathname.startsWith(item.href + "/")));
           const showBadge = item.showBadge && unreadCount > 0;
           
           return (

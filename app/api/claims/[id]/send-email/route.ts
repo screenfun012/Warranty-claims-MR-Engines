@@ -6,15 +6,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { sendEmailAndSave } from "@/lib/email/smtpClient";
-import { getAttachmentFilePath } from "@/lib/files/fileStorage";
-import { getClaimStatusEmailTemplate } from "@/lib/email/emailTemplates";
-import fs from "fs";
+import { readAttachmentFile } from "@/lib/files/fileStorage";
+import { getClaimStatusEmailTemplate, getClaimProcessingEmailTemplate } from "@/lib/email/emailTemplates";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // OPERATOR+ can send emails
+    await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
+    
     const { id } = await params;
     const body = await request.json();
 
@@ -26,6 +29,13 @@ export async function POST(
         emailThreads: {
           take: 1,
           orderBy: { createdAt: "desc" },
+          include: {
+            messages: {
+              where: { direction: 'INBOUND' },
+              orderBy: { date: 'desc' },
+              take: 1,
+            },
+          },
         },
       },
     });
@@ -67,40 +77,102 @@ export async function POST(
 
       attachments = await Promise.all(
         attachmentRecords.map(async (att) => {
-          // Get absolute path using fileStorage utility
-          const absolutePath = getAttachmentFilePath(att.filePath);
-          
-          // Check if file exists
-          if (!fs.existsSync(absolutePath)) {
-            console.error(`Attachment file not found: ${absolutePath} (relative: ${att.filePath})`);
+          try {
+            // Read file content as buffer (works for both filesystem and Blob)
+            const fileContent = await readAttachmentFile(att.filePath);
+            
+            return {
+              filename: att.fileName,
+              content: fileContent,
+              contentType: att.mimeType,
+            };
+          } catch (error) {
+            console.error(`Attachment file not found: ${att.filePath}`, error);
             throw new Error(`Attachment file not found: ${att.fileName}`);
           }
-          
-          // Read file content as buffer
-          const fileContent = fs.readFileSync(absolutePath);
-          
-          return {
-            filename: att.fileName,
-            content: fileContent,
-            contentType: att.mimeType,
-          };
         })
       );
     }
 
-    // Generate email template if claimAcceptanceStatus is provided
+    // Determine recipient - use provided "to" or auto-detect from last inbound message
+    let recipientEmail = body.to;
+    if (!recipientEmail && body.type === "processing") {
+      // Auto-detect recipient from last inbound message
+      const lastInboundMessage = claim.emailThreads[0]?.messages?.[0];
+      recipientEmail = lastInboundMessage?.from || null;
+      
+      if (recipientEmail) {
+        // Extract email address if in format "Name <email@domain.com>"
+        const emailMatch = recipientEmail.match(/<([^>]+)>/) || recipientEmail.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
+        if (emailMatch) {
+          recipientEmail = emailMatch[1] || emailMatch[0];
+        }
+        
+        // Validate email format
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(recipientEmail)) {
+          recipientEmail = null;
+        }
+        
+        // Skip system emails
+        const invalidEmails = ['cpanel@', 'noreply@', 'no-reply@', 'mailer-daemon@', 'postmaster@', 'bounce@', 'return@'];
+        if (recipientEmail && invalidEmails.some(invalid => recipientEmail!.toLowerCase().includes(invalid))) {
+          recipientEmail = null;
+        }
+      }
+      
+      if (!recipientEmail) {
+        return NextResponse.json(
+          { error: "Ne mogu pronaći email adresu primaoca. Proverite da reklamacija ima povezan email thread sa validnim pošiljaocem." },
+          { status: 400 }
+        );
+      }
+    }
+    
+    if (!recipientEmail) {
+      return NextResponse.json(
+        { error: "Email adresa primaoca je obavezna" },
+        { status: 400 }
+      );
+    }
+
+    // Generate email template based on type
     let emailSubject = body.subject;
     let emailText = body.text || body.body;
     let emailHtml = body.html;
 
-    if (body.claimAcceptanceStatus && (body.claimAcceptanceStatus === "ACCEPTED" || body.claimAcceptanceStatus === "REJECTED")) {
-      // Get base URL for logo and links - use request origin if available
-      const baseUrl = request.nextUrl.origin || 
-                     process.env.NEXT_PUBLIC_APP_URL || 
-                     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-                     "http://localhost:3000";
+    // Get base URL for logo and links
+    const baseUrl = request.nextUrl.origin || 
+                   process.env.NEXT_PUBLIC_APP_URL || 
+                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+                   "http://localhost:3000";
+
+    if (body.type === "processing") {
+      // Processing email - claim is being worked on
+      if (!claim.claimCodeRaw) {
+        return NextResponse.json(
+          { error: "Claim code mora biti unet pre slanja obaveštenja" },
+          { status: 400 }
+        );
+      }
       
-      // Use the new template for status emails
+      const template = getClaimProcessingEmailTemplate({
+        claimCode: claim.claimCodeRaw,
+        customerName: claim.customer?.name || undefined,
+        status: "IN_ANALYSIS",
+        baseUrl,
+      });
+      
+      emailSubject = template.subject;
+      emailText = template.text;
+      emailHtml = template.html;
+      
+      console.log(`[send-email] Sending processing email to ${recipientEmail} for claim ${claim.claimCodeRaw}`);
+      
+      // Mark that processing email was sent (will be saved after email is sent)
+      body._isProcessingEmail = true;
+    } else if (body.claimAcceptanceStatus && (body.claimAcceptanceStatus === "ACCEPTED" || body.claimAcceptanceStatus === "REJECTED")) {
+      // Use the template for status emails
       const template = getClaimStatusEmailTemplate(
         body.claimAcceptanceStatus,
         {
@@ -125,13 +197,26 @@ export async function POST(
     const result = await sendEmailAndSave({
       emailThreadId: threadId,
       claimId: id,
-      to: body.to,
+      to: recipientEmail,
       cc: body.cc,
       subject: emailSubject,
       text: emailText,
       html: emailHtml,
       attachments: attachments.length > 0 ? attachments : undefined,
     });
+
+    // After successful email send, update processingEmailSentAt if it was a processing email
+    if (body._isProcessingEmail || body.type === "processing") {
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE Claim SET processingEmailSentAt = datetime('now'), updatedAt = datetime('now') WHERE id = ?`,
+          id
+        );
+        console.log(`[send-email] Updated processingEmailSentAt for claim ${id}`);
+      } catch (updateError) {
+        console.error("Error updating processingEmailSentAt:", updateError);
+      }
+    }
 
     // After successful email send, update claim status to CLOSED if acceptance status is provided
     if (body.claimAcceptanceStatus && (body.claimAcceptanceStatus === "ACCEPTED" || body.claimAcceptanceStatus === "REJECTED")) {
@@ -168,9 +253,14 @@ export async function POST(
       success: true,
       emailMessageId: result.emailMessageId,
       messageId: result.messageId,
+      processingEmailSent: body._isProcessingEmail || body.type === "processing",
     });
   } catch (error) {
     console.error("Error sending email:", error);
+    const permError = createPermissionError(error);
+    if (permError.status !== 500) {
+      return NextResponse.json({ error: permError.message }, { status: permError.status });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to send email" },
       { status: 500 }

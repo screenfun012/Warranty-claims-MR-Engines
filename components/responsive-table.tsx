@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 interface ResponsiveTableProps {
   headers: Array<{ key: string; label: string; className?: string }>;
   data: Array<Record<string, React.ReactNode>>;
-  emptyMessage?: string;
+  emptyMessage?: React.ReactNode;
   onRowClick?: (row: Record<string, React.ReactNode>, index: number) => void;
   className?: string;
 }

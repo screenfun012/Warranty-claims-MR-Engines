@@ -9,11 +9,20 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5 * 1000, // 5 seconds - data is fresh for 5 seconds
+            staleTime: 30 * 1000, // 30 seconds - data is fresh for 30 seconds (6x duže)
             gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
             refetchOnWindowFocus: false, // Don't refetch on window focus
-            refetchOnReconnect: true, // Refetch on reconnect
-            retry: 1, // Retry failed requests once
+            refetchOnReconnect: false, // Don't refetch on reconnect (optimizacija)
+            retry: (failureCount, error) => {
+              // Ne retry-uj ako je 401 (unauthorized) ili 204 (no content) - korisnik nije ulogovan
+              if (error && typeof error === 'object' && 'status' in error) {
+                const status = error.status as number;
+                if (status === 401 || status === 204) {
+                  return false;
+                }
+              }
+              return failureCount < 1; // Retry other errors once
+            },
           },
         },
       })
