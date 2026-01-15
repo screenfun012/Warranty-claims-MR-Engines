@@ -38,7 +38,7 @@ export async function GET(
       // (this handles migration period)
       try {
         const fileBuffer = await readAttachmentFile(attachment.filePath);
-        return new NextResponse(fileBuffer, {
+        return new NextResponse(new Uint8Array(fileBuffer), {
           headers: {
             "Content-Type": attachment.mimeType,
             "Content-Disposition": `inline; filename="${attachment.fileName}"`,
@@ -60,7 +60,7 @@ export async function GET(
 
     const fileBuffer = await readAttachmentFile(attachment.filePath);
 
-    return new NextResponse(fileBuffer, {
+    return new NextResponse(new Uint8Array(fileBuffer), {
       headers: {
         "Content-Type": attachment.mimeType,
         "Content-Disposition": `inline; filename="${attachment.fileName}"`,
