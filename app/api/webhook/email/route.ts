@@ -1,9 +1,10 @@
 /**
- * Webhook endpoint for receiving emails from Cloudmailin or similar services
+ * Webhook endpoint for receiving emails from SendGrid Inbound Parse or Cloudmailin
  * POST /api/webhook/email
  * 
- * This endpoint receives email data as JSON and processes it the same way
- * as the IMAP sync, creating threads, messages, and saving attachments.
+ * Supports both:
+ * - SendGrid Inbound Parse (multipart/form-data)
+ * - Cloudmailin (JSON)
  * 
  * Updated: 2026-01-15
  */
@@ -61,27 +62,108 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Parse the webhook payload
-    const payload: CloudmailinPayload = await request.json();
-    console.log("[Email Webhook] Payload received:", {
-      from: payload.headers?.from || payload.envelope?.from,
-      to: payload.headers?.to || payload.envelope?.to,
-      subject: payload.headers?.subject,
-      hasPlain: !!payload.plain,
-      hasHtml: !!payload.html,
-      attachmentCount: payload.attachments?.length || 0,
-    });
+    const contentType = request.headers.get("content-type") || "";
+    let from = "";
+    let to = "";
+    let cc = "";
+    let subject = "(No Subject)";
+    let messageId: string | null = null;
+    let inReplyTo: string | null = null;
+    let date = new Date();
+    let bodyText = "";
+    let bodyHtml = "";
+    let attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
 
-    // Extract email data
-    const from = payload.headers?.from || payload.envelope?.from || "";
-    const to = payload.headers?.to || payload.envelope?.to || "";
-    const cc = payload.headers?.cc || "";
-    const subject = payload.headers?.subject || "(No Subject)";
-    const messageId = payload.headers?.message_id || null;
-    const inReplyTo = payload.headers?.in_reply_to || null;
-    const date = payload.headers?.date ? new Date(payload.headers.date) : new Date();
-    const bodyText = payload.plain || "";
-    const bodyHtml = payload.html || "";
+    // Detect format and parse accordingly
+    if (contentType.includes("multipart/form-data")) {
+      // SendGrid Inbound Parse format
+      const formData = await request.formData();
+      
+      from = (formData.get("from") as string) || "";
+      to = (formData.get("to") as string) || "";
+      subject = (formData.get("subject") as string) || "(No Subject)";
+      bodyText = (formData.get("text") as string) || "";
+      bodyHtml = (formData.get("html") as string) || "";
+      
+      // Parse headers if provided
+      const headersStr = formData.get("headers") as string;
+      if (headersStr) {
+        try {
+          const headers = JSON.parse(headersStr);
+          messageId = headers["Message-ID"] || headers["Message-Id"] || null;
+          inReplyTo = headers["In-Reply-To"] || null;
+          cc = headers["Cc"] || headers["CC"] || "";
+          if (headers["Date"]) {
+            date = new Date(headers["Date"]);
+          }
+        } catch (e) {
+          console.log("[Email Webhook] Error parsing headers:", e);
+        }
+      }
+
+      // Process attachments from SendGrid
+      const attachmentInfo = formData.get("attachment-info");
+      if (attachmentInfo) {
+        try {
+          const attachmentList = JSON.parse(attachmentInfo as string);
+          for (const [index, info] of Object.entries(attachmentList)) {
+            const file = formData.get(`attachment${index}`);
+            if (file && file instanceof File) {
+              const buffer = Buffer.from(await file.arrayBuffer());
+              attachments.push({
+                filename: (info as any).filename || file.name || `attachment-${index}`,
+                mimeType: (info as any).type || file.type || "application/octet-stream",
+                buffer,
+              });
+            }
+          }
+        } catch (e) {
+          console.log("[Email Webhook] Error parsing attachment-info:", e);
+        }
+      }
+
+      console.log("[Email Webhook] SendGrid payload received:", {
+        from,
+        to,
+        subject,
+        hasPlain: !!bodyText,
+        hasHtml: !!bodyHtml,
+        attachmentCount: attachments.length,
+      });
+    } else {
+      // Cloudmailin JSON format
+      const payload: CloudmailinPayload = await request.json();
+      
+      from = payload.headers?.from || payload.envelope?.from || "";
+      to = payload.headers?.to || payload.envelope?.to || "";
+      cc = payload.headers?.cc || "";
+      subject = payload.headers?.subject || "(No Subject)";
+      messageId = payload.headers?.message_id || null;
+      inReplyTo = payload.headers?.in_reply_to || null;
+      date = payload.headers?.date ? new Date(payload.headers.date) : new Date();
+      bodyText = payload.plain || "";
+      bodyHtml = payload.html || "";
+
+      // Process Cloudmailin attachments (base64)
+      if (payload.attachments) {
+        for (const att of payload.attachments) {
+          attachments.push({
+            filename: att.file_name,
+            mimeType: att.content_type,
+            buffer: Buffer.from(att.content, "base64"),
+          });
+        }
+      }
+
+      console.log("[Email Webhook] Cloudmailin payload received:", {
+        from,
+        to,
+        subject,
+        hasPlain: !!bodyText,
+        hasHtml: !!bodyHtml,
+        attachmentCount: attachments.length,
+      });
+    }
 
     // Check for duplicate message
     if (messageId) {
@@ -149,12 +231,9 @@ export async function POST(request: NextRequest) {
 
     // Process attachments
     let attachmentCount = 0;
-    if (payload.attachments && payload.attachments.length > 0) {
-      for (const attachment of payload.attachments) {
+    if (attachments.length > 0) {
+      for (const attachment of attachments) {
         try {
-          // Decode base64 content
-          const buffer = Buffer.from(attachment.content, "base64");
-          
           let filePath: string;
           if (thread.claimId) {
             const claim = await prisma.claim.findUnique({
@@ -163,33 +242,33 @@ export async function POST(request: NextRequest) {
             if (claim) {
               filePath = await saveAttachmentForClaim({
                 claim,
-                fileBuffer: buffer,
-                originalFileName: attachment.file_name,
-                mimeType: attachment.content_type,
+                fileBuffer: attachment.buffer,
+                originalFileName: attachment.filename,
+                mimeType: attachment.mimeType,
                 subfolder: "03_attachments",
               });
             } else {
               filePath = await saveAttachmentForUnassignedThread({
                 threadId: thread.id,
-                fileBuffer: buffer,
-                originalFileName: attachment.file_name,
-                mimeType: attachment.content_type,
+                fileBuffer: attachment.buffer,
+                originalFileName: attachment.filename,
+                mimeType: attachment.mimeType,
               });
             }
           } else {
             filePath = await saveAttachmentForUnassignedThread({
               threadId: thread.id,
-              fileBuffer: buffer,
-              originalFileName: attachment.file_name,
-              mimeType: attachment.content_type,
+              fileBuffer: attachment.buffer,
+              originalFileName: attachment.filename,
+              mimeType: attachment.mimeType,
             });
           }
 
           await prisma.attachment.create({
             data: {
               emailMessageId: emailMessage.id,
-              fileName: attachment.file_name,
-              mimeType: attachment.content_type,
+              fileName: attachment.filename,
+              mimeType: attachment.mimeType,
               filePath,
               isRelevant: true,
               source: "CLIENT",
@@ -197,9 +276,9 @@ export async function POST(request: NextRequest) {
           });
           
           attachmentCount++;
-          console.log("[Email Webhook] Saved attachment:", attachment.file_name);
+          console.log("[Email Webhook] Saved attachment:", attachment.filename);
         } catch (error) {
-          console.error("[Email Webhook] Error saving attachment:", attachment.file_name, error);
+          console.error("[Email Webhook] Error saving attachment:", attachment.filename, error);
         }
       }
     }
