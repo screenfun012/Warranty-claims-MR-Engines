@@ -80,8 +80,8 @@ export function getImapClient(): ImapFlow {
       maxVersion: 'TLSv1.3', // Allow newer TLS versions
       // Completely skip hostname verification
       checkServerIdentity: () => {
-        // Always return undefined to skip hostname verification
-        return undefined;
+        // Return null to skip hostname verification (some libraries expect null instead of undefined)
+        return null as any;
       },
       // Additional options to handle self-signed certificates
       requestCert: false, // Don't request client certificate
