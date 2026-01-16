@@ -59,17 +59,12 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections through TCP proxy, we need special handling
-  // TCP proxy forwards raw bytes, but TLS handshake may not work correctly
-  // Try to use STARTTLS if TLS is enabled but we're using a non-standard port (proxy)
-  const isProxyPort = port === 1993 || port === 1465;
-  const useStartTLS = isProxyPort && tls;
-  const useDirectTLS = tls && !isProxyPort;
-
+  // For proxy connections, TCP proxy forwards raw TLS bytes
+  // We need to disable all TLS validation to allow connection through proxy
   return new ImapFlow({
     host,
     port,
-    secure: useDirectTLS, // true only for direct TLS (port 993), false for STARTTLS
+    secure: tls, // true for port 993 (direct TLS)
     auth: {
       user,
       pass: pass,
@@ -77,21 +72,15 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // For STARTTLS (proxy connections)
-    ...(useStartTLS ? {
-      requireTLS: true, // Require STARTTLS upgrade
-      tlsOptions: {
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2',
-      },
-    } : {}),
-    // For direct TLS (non-proxy connections)
-    ...(useDirectTLS ? {
-      tlsOptions: {
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2',
-      },
-    } : {}),
+    // Completely disable TLS validation for proxy connections
+    // TCP proxy forwards TLS but certificate validation always fails
+    tlsOptions: tls ? {
+      rejectUnauthorized: false, // Don't validate certificate
+      minVersion: 'TLSv1', // Allow older TLS versions
+      maxVersion: 'TLSv1.3', // Allow newer TLS versions
+      // Don't verify hostname
+      checkServerIdentity: () => undefined, // Skip hostname verification
+    } : undefined,
   });
 }
 
