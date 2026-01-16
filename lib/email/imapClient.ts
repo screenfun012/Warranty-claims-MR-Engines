@@ -59,10 +59,21 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
+  // For proxy connections, we need to handle TLS certificate validation
+  // TCP proxy forwards raw TLS, but certificate validation may fail
+  const tlsConfig = tls ? {
+    secure: true,
+    tlsOptions: {
+      rejectUnauthorized: false, // Allow self-signed certificates through proxy
+      minVersion: 'TLSv1.2',
+    },
+  } : {
+    secure: false,
+  };
+
   return new ImapFlow({
     host,
     port,
-    secure: tls,
     auth: {
       user,
       pass: pass,
@@ -70,11 +81,7 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Disable strict TLS for proxy connections (Tailscale proxy)
-    // Proxy server forwards TLS but certificate validation may fail
-    tlsOptions: {
-      rejectUnauthorized: false, // Allow self-signed certificates through proxy
-    },
+    ...tlsConfig,
   });
 }
 
