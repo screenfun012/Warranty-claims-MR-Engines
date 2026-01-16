@@ -49,22 +49,21 @@ console.log(`IMAP: ${IMAP_TCP_PORT} -> ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT} (TLS)
 console.log(`SMTP: ${SMTP_TCP_PORT} -> ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT} (TLS)`);
 console.log(`Health: http://localhost:${HEALTH_PORT}/health`);
 
-// TLS Tunnel Proxy for IMAP
-// Accepts raw TCP from client (which will do TLS handshake), forwards as TLS to Synology
+// Raw TCP Proxy for IMAP (passthrough)
+// Forwards raw TCP bytes - TLS handshake happens directly between client and Synology
 const imapTcpServer = net.createServer((clientSocket) => {
   console.log('[IMAP Proxy] New connection from', clientSocket.remoteAddress);
   
-  // Create TLS connection to Synology
-  const serverSocket = tls.connect({
+  // Create raw TCP connection to Synology
+  const serverSocket = net.createConnection({
     host: SYNO_IMAP_HOST,
-    port: SYNO_IMAP_PORT,
-    rejectUnauthorized: false, // Accept self-signed certs from Synology
+    port: SYNO_IMAP_PORT
   }, () => {
     console.log(`[IMAP Proxy] Connected to ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT}`);
   });
 
-  // Pipe bidirectional: client (raw TCP, will do TLS) <-> server (TLS to Synology)
-  // The client will send TLS handshake bytes, we forward them as-is to Synology via TLS
+  // Pipe bidirectional: raw TCP passthrough
+  // Client does TLS handshake, we forward bytes as-is to Synology
   clientSocket.pipe(serverSocket, { end: false });
   serverSocket.pipe(clientSocket, { end: false });
 
@@ -87,16 +86,15 @@ const imapTcpServer = net.createServer((clientSocket) => {
   });
 });
 
-// TLS Tunnel Proxy for SMTP
-// Accepts raw TCP from client (which will do TLS handshake), forwards as TLS to Synology
+// Raw TCP Proxy for SMTP (passthrough)
+// Forwards raw TCP bytes - TLS handshake happens directly between client and Synology
 const smtpTcpServer = net.createServer((clientSocket) => {
   console.log('[SMTP Proxy] New connection from', clientSocket.remoteAddress);
   
-  // Create TLS connection to Synology
-  const serverSocket = tls.connect({
+  // Create raw TCP connection to Synology
+  const serverSocket = net.createConnection({
     host: SYNO_SMTP_HOST,
-    port: SYNO_SMTP_PORT,
-    rejectUnauthorized: false, // Accept self-signed certs from Synology
+    port: SYNO_SMTP_PORT
   }, () => {
     console.log(`[SMTP Proxy] Connected to ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT}`);
   });
