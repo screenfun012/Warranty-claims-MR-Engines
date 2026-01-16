@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/admin/mail/sync-now",
-      "schedule": "0 * * * *"
-    }
-  ]
-}

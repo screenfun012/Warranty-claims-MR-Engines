@@ -1,19 +1,38 @@
 /**
  * File storage utilities
- * Supports both filesystem (dev/local) and Vercel Blob (production)
- * Automatically detects which storage to use based on BLOB_READ_WRITE_TOKEN env var
+ * Supports filesystem (dev/local), Vercel Blob (production), and WebDAV (Synology)
+ * Priority: WebDAV > Blob > Filesystem
+ * Automatically detects which storage to use based on env vars
  */
 
 import { promises as fs } from "fs";
 import path from "path";
 import { env } from "@/lib/config/env";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import type { Claim } from "@prisma/client";
 import { sanitizeClaimCodeForPath } from "@/lib/domain/claimCode";
 import { put, del, list } from "@vercel/blob";
+import { createClient } from "webdav";
+import type { WebDAVClient } from "webdav";
 
-// Check if we should use Blob storage
-const USE_BLOB = !!env.BLOB_READ_WRITE_TOKEN;
+// Check which storage to use (priority: WebDAV > Blob > Filesystem)
+const USE_WEBDAV = !!(env.WEBDAV_URL && env.WEBDAV_USERNAME && env.WEBDAV_PASSWORD);
+const USE_BLOB = !USE_WEBDAV && !!env.BLOB_READ_WRITE_TOKEN;
+
+// Initialize WebDAV client if configured
+let webdavClient: WebDAVClient | null = null;
+if (USE_WEBDAV) {
+  try {
+    webdavClient = createClient(env.WEBDAV_URL, {
+      username: env.WEBDAV_USERNAME,
+      password: env.WEBDAV_PASSWORD,
+    });
+    console.log("WebDAV client initialized:", env.WEBDAV_URL);
+  } catch (error) {
+    console.error("Failed to initialize WebDAV client:", error);
+    webdavClient = null;
+  }
+}
 
 /**
  * Get the base path/key for a claim's files
@@ -55,15 +74,34 @@ export function getUnassignedThreadPath(threadId: string): string {
 }
 
 /**
- * Ensure a directory exists, creating it if necessary (filesystem only)
+ * Ensure a directory exists, creating it if necessary
  */
 async function ensureDir(dirPath: string): Promise<void> {
+  if (USE_WEBDAV && webdavClient) {
+    // For WebDAV, ensure directory exists
+    try {
+      const webdavPath = `${env.WEBDAV_BASE_PATH}${dirPath.startsWith('/') ? dirPath : '/' + dirPath}`;
+      await webdavClient.createDirectory(webdavPath, { recursive: true });
+    } catch (error) {
+      // Directory might already exist, that's okay
+      console.warn("WebDAV directory creation warning:", error);
+    }
+    return;
+  }
   if (USE_BLOB) return; // Not needed for Blob
   try {
     await fs.access(dirPath);
   } catch {
     await fs.mkdir(dirPath, { recursive: true });
   }
+}
+
+/**
+ * Get WebDAV path for a file
+ */
+function getWebDAVPath(relativePath: string): string {
+  const cleanPath = relativePath.startsWith('/') ? relativePath : '/' + relativePath;
+  return `${env.WEBDAV_BASE_PATH}${cleanPath}`;
 }
 
 /**
@@ -84,7 +122,8 @@ export async function saveAttachmentForClaim(params: {
   if (params.claim) {
     claim = params.claim;
   } else if (params.claimId) {
-    claim = await prisma.claim.findUnique({
+    const prismaClient = await getPrisma();
+    claim = await prismaClient.claim.findUnique({
       where: { id: params.claimId },
     });
     if (!claim) {
@@ -99,7 +138,42 @@ export async function saveAttachmentForClaim(params: {
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_");
 
-  if (USE_BLOB) {
+  if (USE_WEBDAV && webdavClient) {
+    // Use WebDAV
+    const baseKey = getClaimBaseKey(claim);
+    const subfolder = params.subfolder || "03_attachments";
+    const relativePath = `${baseKey}/${subfolder}/${sanitizedFileName}`;
+    const webdavPath = getWebDAVPath(relativePath);
+
+    // Ensure directory exists
+    const dirPath = `${baseKey}/${subfolder}`;
+    await ensureDir(dirPath);
+
+    // Check if file exists and make unique if needed
+    let finalPath = webdavPath;
+    let counter = 1;
+    try {
+      while (await webdavClient.exists(finalPath)) {
+        const ext = path.extname(sanitizedFileName);
+        const name = path.basename(sanitizedFileName, ext);
+        const newRelativePath = `${baseKey}/${subfolder}/${name}_${counter}${ext}`;
+        finalPath = getWebDAVPath(newRelativePath);
+        counter++;
+      }
+    } catch (error) {
+      console.warn("Could not check for existing WebDAV file:", error);
+    }
+
+    // Upload file to WebDAV
+    await webdavClient.putFileContents(finalPath, params.fileBuffer, {
+      overwrite: false,
+      contentLength: params.fileBuffer.length,
+    });
+
+    // Return relative path (we'll use this to identify the file)
+    const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
+    return `webdav:${finalRelativePath}`;
+  } else if (USE_BLOB) {
     // Use Vercel Blob
     const baseKey = getClaimBaseKey(claim);
     const subfolder = params.subfolder || "03_attachments";
@@ -171,7 +245,40 @@ export async function saveAttachmentForUnassignedThread(params: {
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_");
 
-  if (USE_BLOB) {
+  if (USE_WEBDAV && webdavClient) {
+    // Use WebDAV
+    const baseKey = getUnassignedThreadKey(params.threadId);
+    const relativePath = `${baseKey}/${sanitizedFileName}`;
+    const webdavPath = getWebDAVPath(relativePath);
+
+    // Ensure directory exists
+    await ensureDir(baseKey);
+
+    // Check if file exists and make unique if needed
+    let finalPath = webdavPath;
+    let counter = 1;
+    try {
+      while (await webdavClient.exists(finalPath)) {
+        const ext = path.extname(sanitizedFileName);
+        const name = path.basename(sanitizedFileName, ext);
+        const newRelativePath = `${baseKey}/${name}_${counter}${ext}`;
+        finalPath = getWebDAVPath(newRelativePath);
+        counter++;
+      }
+    } catch (error) {
+      console.warn("Could not check for existing WebDAV file:", error);
+    }
+
+    // Upload file to WebDAV
+    await webdavClient.putFileContents(finalPath, params.fileBuffer, {
+      overwrite: false,
+      contentLength: params.fileBuffer.length,
+    });
+
+    // Return relative path
+    const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
+    return `webdav:${finalRelativePath}`;
+  } else if (USE_BLOB) {
     // Use Vercel Blob
     const baseKey = getUnassignedThreadKey(params.threadId);
     const blobKey = `${baseKey}/${sanitizedFileName}`;
@@ -225,9 +332,13 @@ export async function saveAttachmentForUnassignedThread(params: {
 
 /**
  * Get the absolute file path for an attachment (filesystem only)
- * For Blob, this returns the URL as-is
+ * For Blob/WebDAV, this returns the identifier as-is
  */
 export function getAttachmentFilePath(relativePathOrUrl: string): string {
+  if (relativePathOrUrl.startsWith('webdav:')) {
+    // It's a WebDAV path, return as-is
+    return relativePathOrUrl;
+  }
   if (USE_BLOB || relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
     // It's a Blob URL, return as-is
     return relativePathOrUrl;
@@ -236,9 +347,16 @@ export function getAttachmentFilePath(relativePathOrUrl: string): string {
 }
 
 /**
- * Check if a file exists (filesystem only)
+ * Check if a file exists
  */
 async function fileExists(filePath: string): Promise<boolean> {
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      return await webdavClient.exists(filePath);
+    } catch {
+      return false;
+    }
+  }
   if (USE_BLOB) return false; // Not applicable for Blob
   try {
     await fs.access(filePath);
@@ -249,11 +367,19 @@ async function fileExists(filePath: string): Promise<boolean> {
 }
 
 /**
- * Read a file by its relative path or Blob URL
- * Returns Buffer for both filesystem and Blob
+ * Read a file by its relative path, Blob URL, or WebDAV path
+ * Returns Buffer for all storage types
  */
 export async function readAttachmentFile(relativePathOrUrl: string): Promise<Buffer> {
-  if (USE_BLOB || relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
+  if (relativePathOrUrl.startsWith('webdav:')) {
+    // It's a WebDAV path
+    if (!webdavClient) {
+      throw new Error("WebDAV client not initialized");
+    }
+    const webdavPath = getWebDAVPath(relativePathOrUrl.replace('webdav:', ''));
+    const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
+    return Buffer.from(buffer as ArrayBuffer);
+  } else if (USE_BLOB || relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
     // It's a Blob URL
     const response = await fetch(relativePathOrUrl);
     if (!response.ok) {
@@ -269,10 +395,22 @@ export async function readAttachmentFile(relativePathOrUrl: string): Promise<Buf
 }
 
 /**
- * Delete a file by its relative path or Blob URL
+ * Delete a file by its relative path, Blob URL, or WebDAV path
  */
 export async function deleteAttachmentFile(relativePathOrUrl: string): Promise<void> {
-  if (USE_BLOB || relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
+  if (relativePathOrUrl.startsWith('webdav:')) {
+    // It's a WebDAV path
+    if (!webdavClient) {
+      throw new Error("WebDAV client not initialized");
+    }
+    try {
+      const webdavPath = getWebDAVPath(relativePathOrUrl.replace('webdav:', ''));
+      await webdavClient.deleteFile(webdavPath);
+    } catch (error) {
+      // If file doesn't exist, that's okay
+      console.warn("Could not delete WebDAV file:", error);
+    }
+  } else if (USE_BLOB || relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
     // It's a Blob URL - extract key from URL
     try {
       const url = new URL(relativePathOrUrl);

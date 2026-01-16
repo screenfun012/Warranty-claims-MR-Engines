@@ -3,7 +3,7 @@
  * Incrementally syncs new emails and creates threads, messages, and attachments
  */
 
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { fetchNewMessagesSince, type FetchedMessage } from "./imapClient";
 import { env } from "@/lib/config/env";
 import { isEmailConfigured } from "@/lib/config/envLoader";
@@ -34,15 +34,34 @@ export async function syncNewEmails(): Promise<SyncResult> {
     return { newMessages: 0, newThreads: 0, newClaims: 0 };
   }
 
-  // Get or create sync state
-  let syncState = await prisma.mailSyncState.findUnique({
-    where: { id: "default" },
-  });
+  // Get Prisma client (works for both SQLite and Turso)
+  let prisma;
+  try {
+    prisma = await getPrisma();
+  } catch (error) {
+    console.error("Failed to get Prisma client:", error);
+    throw new Error(`Failed to initialize database connection: ${error instanceof Error ? error.message : "Unknown error"}`);
+  }
 
-  if (!syncState) {
-    syncState = await prisma.mailSyncState.create({
-      data: { id: "default" },
+  // Get or create sync state
+  let syncState;
+  try {
+    syncState = await prisma.mailSyncState.findUnique({
+      where: { id: "default" },
     });
+
+    if (!syncState) {
+      syncState = await prisma.mailSyncState.create({
+        data: { id: "default" },
+      });
+    }
+  } catch (error) {
+    console.error("Error accessing MailSyncState:", error);
+    // If table doesn't exist, try to create it
+    if (error instanceof Error && error.message.includes("does not exist")) {
+      throw new Error("MailSyncState table does not exist. Please run database migrations.");
+    }
+    throw error;
   }
 
   const lastUid = syncState.lastUid;
@@ -116,7 +135,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
         },
       });
 
-      let thread = await findOrCreateThread(fetchedMsg);
+      let thread = await findOrCreateThread(fetchedMsg, prisma);
       const isNewThread = !threadBefore;
       
       if (isNewThread) {
@@ -197,7 +216,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
       }
 
       // Detect forwarded emails and update thread
-      await detectForwardedEmail(thread, fetchedMsg);
+      await detectForwardedEmail(thread, fetchedMsg, prisma);
     } catch (error) {
       console.error(`Error processing message UID ${fetchedMsg.uid}:`, error);
       // Continue with next message
@@ -246,7 +265,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
 /**
  * Find or create an email thread based on message headers
  */
-async function findOrCreateThread(fetchedMsg: FetchedMessage) {
+async function findOrCreateThread(fetchedMsg: FetchedMessage, prisma: Awaited<ReturnType<typeof getPrisma>>) {
   // Try to find existing thread by messageId or inReplyTo
   let thread = null;
 
@@ -297,7 +316,8 @@ async function findOrCreateThread(fetchedMsg: FetchedMessage) {
  */
 async function detectForwardedEmail(
   thread: { id: string },
-  fetchedMsg: FetchedMessage
+  fetchedMsg: FetchedMessage,
+  prisma: Awaited<ReturnType<typeof getPrisma>>
 ) {
   const subject = fetchedMsg.headers.subject.toLowerCase();
   const bodyText = (fetchedMsg.bodyText || "").toLowerCase();

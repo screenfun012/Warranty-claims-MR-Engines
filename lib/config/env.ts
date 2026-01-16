@@ -53,6 +53,12 @@ export const env = {
   FILE_ROOT_PATH: getEnv("FILE_ROOT_PATH", "./storage"),
   // Vercel Blob (optional - if set, uses Blob instead of filesystem)
   BLOB_READ_WRITE_TOKEN: getEnv("BLOB_READ_WRITE_TOKEN", ""),
+  // WebDAV (optional - if set, uses WebDAV instead of filesystem/blob)
+  // Priority: WebDAV > Blob > Filesystem
+  WEBDAV_URL: getEnv("WEBDAV_URL", ""),
+  WEBDAV_USERNAME: getEnv("WEBDAV_USERNAME", ""),
+  WEBDAV_PASSWORD: getEnv("WEBDAV_PASSWORD", ""),
+  WEBDAV_BASE_PATH: getEnv("WEBDAV_BASE_PATH", "/mr-engines-warranty"),
 
   // Translation
   TRANSLATION_PROVIDER: getEnv("TRANSLATION_PROVIDER", "none"),

@@ -13,6 +13,14 @@ const nextConfig: NextConfig = {
   },
   // Enable better source maps for debugging (for webpack fallback)
   webpack: (config, { dev, isServer }) => {
+    // Ignore README.md and other markdown files in node_modules
+    config.module = config.module || {};
+    config.module.rules = config.module.rules || [];
+    config.module.rules.push({
+      test: /\.md$/,
+      type: 'asset/source',
+    });
+    
     if (dev) {
       config.devtool = 'eval-source-map';
       
@@ -30,21 +38,6 @@ const nextConfig: NextConfig = {
           '**/prisma/dev.db',
         ],
       };
-    }
-    
-    // Ignore README.md files in node_modules (fix for @libsql packages)
-    config.module.rules.push({
-      test: /\.md$/,
-      type: 'asset/source',
-      include: /node_modules/,
-    });
-    
-    // Externalize libsql on server to avoid bundling issues
-    if (isServer) {
-      config.externals = config.externals || [];
-      if (Array.isArray(config.externals)) {
-        config.externals.push('@libsql/client', '@libsql/isomorphic-fetch');
-      }
     }
     
     if (!dev && !isServer) {
