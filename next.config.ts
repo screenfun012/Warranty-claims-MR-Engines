@@ -21,6 +21,43 @@ const nextConfig: NextConfig = {
       type: 'asset/source',
     });
     
+    // Ignore .d.ts files (TypeScript definitions) - they shouldn't be bundled
+    config.module.rules.push({
+      test: /\.d\.ts$/,
+      use: {
+        loader: 'null-loader',
+      },
+    });
+    
+    // Ignore libsql internal files that cause build issues
+    config.resolve = config.resolve || {};
+    config.resolve.alias = config.resolve.alias || {};
+    
+    // Add fallback to ignore problematic files
+    config.resolve.fallback = config.resolve.fallback || {};
+    
+    if (isServer) {
+      // For server-side, externalize libsql packages
+      config.externals = config.externals || [];
+      if (Array.isArray(config.externals)) {
+        config.externals.push({
+          '@libsql/core': 'commonjs @libsql/core',
+          '@libsql/client': 'commonjs @libsql/client',
+        });
+      } else if (typeof config.externals === 'function') {
+        const originalExternals = config.externals;
+        config.externals = [
+          originalExternals,
+          ({ request }: { request?: string }) => {
+            if (request?.includes('@libsql/core') || request?.includes('@libsql/client')) {
+              return true;
+            }
+            return false;
+          },
+        ];
+      }
+    }
+    
     if (dev) {
       config.devtool = 'eval-source-map';
       

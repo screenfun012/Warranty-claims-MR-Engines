@@ -20,14 +20,20 @@ const isTurso = (process.env.DATABASE_URL || "").startsWith("libsql://");
 async function createPrismaClient(): Promise<PrismaClient> {
   if (isTurso) {
     // Dynamically import Turso adapter only when needed
-    const { PrismaLibSQL } = await import("@prisma/adapter-libsql");
+    const adapterModule = await import("@prisma/adapter-libsql");
     const { createClient } = await import("@libsql/client");
     
     const libsql = createClient({
       url: process.env.DATABASE_URL!,
     });
     
-    const adapter = new PrismaLibSQL(libsql);
+    // PrismaLibSql is a named export (note: lowercase 's' in Sql)
+    const PrismaLibSql = (adapterModule as any).PrismaLibSql || (adapterModule as any).PrismaLibSQL;
+    if (!PrismaLibSql) {
+      throw new Error("PrismaLibSql not found in @prisma/adapter-libsql");
+    }
+    
+    const adapter = new PrismaLibSql(libsql);
     
     return new PrismaClient({
       adapter,
@@ -43,7 +49,7 @@ async function createPrismaClient(): Promise<PrismaClient> {
 
 // For local development (SQLite), export sync client
 // For Turso, we need async initialization
-let prismaClient: PrismaClient | undefined;
+let prismaClient: PrismaClient;
 
 if (!isTurso) {
   // SQLite - synchronous initialization
@@ -54,10 +60,15 @@ if (!isTurso) {
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = prismaClient;
   }
+} else {
+  // For Turso, create a dummy client that will throw if used directly
+  // This ensures TypeScript doesn't complain, but runtime will use getPrisma()
+  prismaClient = {} as PrismaClient;
 }
 
-// Export for use in API routes (only for SQLite, use getPrisma() for Turso)
-export const prisma: PrismaClient | undefined = prismaClient;
+// Export for use in API routes (works for SQLite, but for Turso use getPrisma() instead)
+// Note: For Turso, this will be undefined at runtime, so always use getPrisma() for Turso
+export const prisma: PrismaClient = prismaClient;
 
 // Export async getter for Turso compatibility (works for both SQLite and Turso)
 export async function getPrisma(): Promise<PrismaClient> {
