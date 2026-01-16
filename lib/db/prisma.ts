@@ -21,11 +21,6 @@ async function createPrismaClient(): Promise<PrismaClient> {
   if (isTurso) {
     // Dynamically import Turso adapter only when needed
     const adapterModule = await import("@prisma/adapter-libsql");
-    const { createClient } = await import("@libsql/client");
-    
-    const libsql = createClient({
-      url: process.env.DATABASE_URL!,
-    });
     
     // PrismaLibSql is a named export (note: lowercase 's' in Sql)
     const PrismaLibSql = (adapterModule as any).PrismaLibSql || (adapterModule as any).PrismaLibSQL;
@@ -33,7 +28,17 @@ async function createPrismaClient(): Promise<PrismaClient> {
       throw new Error("PrismaLibSql not found in @prisma/adapter-libsql");
     }
     
-    const adapter = new PrismaLibSql(libsql);
+    // Parse DATABASE_URL to extract URL and authToken
+    const dbUrl = process.env.DATABASE_URL!;
+    const urlObj = new URL(dbUrl);
+    const authToken = urlObj.searchParams.get("authToken") || undefined;
+    const baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+    
+    // PrismaLibSql constructor accepts config object directly (Prisma v6.6.0+)
+    const adapter = new PrismaLibSql({
+      url: baseUrl,
+      authToken: authToken,
+    });
     
     return new PrismaClient({
       adapter,
