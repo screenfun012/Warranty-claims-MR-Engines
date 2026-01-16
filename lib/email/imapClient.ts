@@ -72,20 +72,23 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Completely disable TLS validation for proxy connections with SSL termination
-    // HAProxy presents self-signed certificate, we must accept it
+    // Completely disable TLS validation for proxy connections
+    // With SSL passthrough, client connects directly to Synology through proxy
+    // Synology presents self-signed certificate, we must accept it
     tlsOptions: tls ? {
-      rejectUnauthorized: false, // Don't validate certificate (accept self-signed)
+      rejectUnauthorized: false, // Don't validate certificate (accept self-signed from Synology)
       minVersion: 'TLSv1', // Allow older TLS versions
       maxVersion: 'TLSv1.3', // Allow newer TLS versions
       // Completely skip hostname verification
       checkServerIdentity: () => {
-        // Return null to skip hostname verification (some libraries expect null instead of undefined)
+        // Return null to skip hostname verification completely
         return null as any;
       },
       // Additional options to handle self-signed certificates
       requestCert: false, // Don't request client certificate
       agent: false, // Don't use default agent
+      // Explicitly allow self-signed certificates
+      ca: [], // Empty CA list means accept any certificate
     } : undefined,
   });
 }
