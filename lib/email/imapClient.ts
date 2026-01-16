@@ -59,8 +59,8 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections with SSL termination, we need to accept self-signed certificates
-  // HAProxy terminates SSL and presents its own certificate to the client
+  // For proxy connections with SSL termination, HAProxy terminates SSL and presents its own certificate
+  // We need to completely disable TLS validation to accept self-signed certificate from HAProxy
   return new ImapFlow({
     host,
     port,
@@ -72,26 +72,12 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Completely disable TLS validation for proxy connections
-    // With SSL passthrough, client connects directly to Synology through proxy
-    // Synology presents self-signed certificate, we must accept it
-    tlsOptions: tls ? {
-      rejectUnauthorized: false, // Don't validate certificate (accept self-signed from Synology)
-      minVersion: 'TLSv1', // Allow older TLS versions
-      maxVersion: 'TLSv1.3', // Allow newer TLS versions
-      // Set servername to match the host (important for SNI)
+    // Completely disable TLS validation for proxy connections with SSL termination
+    // HAProxy presents self-signed certificate, we must accept it
+    tls: tls ? {
+      rejectUnauthorized: false, // Don't validate certificate (accept self-signed from HAProxy)
       servername: host, // Use host as servername for SNI
-      // Completely skip hostname verification
-      checkServerIdentity: () => {
-        // Return null to skip hostname verification completely
-        return null as any;
-      },
-      // Additional options to handle self-signed certificates
-      requestCert: false, // Don't request client certificate
-      agent: false, // Don't use default agent
-      // Explicitly allow self-signed certificates
-      ca: [], // Empty CA list means accept any certificate
-    } : undefined,
+    } : false,
   });
 }
 
