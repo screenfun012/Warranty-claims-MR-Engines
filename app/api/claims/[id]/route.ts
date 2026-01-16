@@ -147,6 +147,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
   try {
+    const prisma = await getPrisma();
     // OPERATOR+ can update claims
     await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
     
