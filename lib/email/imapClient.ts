@@ -70,10 +70,11 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Disable strict TLS for self-signed certificates (if needed)
-    // tlsOptions: {
-    //   rejectUnauthorized: false, // Only use if you have self-signed cert
-    // },
+    // Disable strict TLS for proxy connections (Tailscale proxy)
+    // Proxy server forwards TLS but certificate validation may fail
+    tlsOptions: {
+      rejectUnauthorized: false, // Allow self-signed certificates through proxy
+    },
   });
 }
 

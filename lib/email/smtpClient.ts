@@ -46,6 +46,10 @@ function getSmtpTransporter() {
       user,
       pass: pass || "",
     },
+    // Disable strict TLS for proxy connections (Tailscale proxy)
+    tls: {
+      rejectUnauthorized: false, // Allow self-signed certificates through proxy
+    },
   });
 }
 
