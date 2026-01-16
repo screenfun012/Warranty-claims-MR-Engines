@@ -54,6 +54,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string; sectionId: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id, sectionId } = await params;
 
     // Verify that the section belongs to this claim
