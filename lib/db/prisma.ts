@@ -71,32 +71,35 @@ async function createPrismaClient(): Promise<PrismaClient> {
     
     const host = hostMatch[1];
     
+    // @libsql/client expects https:// for remote Turso databases, not libsql://
+    // Convert libsql:// to https://
+    const httpsUrl = `https://${host}`;
+    
     // Log for debugging (only first few chars of token for security)
-    console.log(`[Prisma] Parsed DATABASE_URL - Host: ${host}, HasToken: ${!!authToken}, TokenPreview: ${authToken ? authToken.substring(0, 10) + '...' : 'none'}`);
+    console.log(`[Prisma] Parsed DATABASE_URL - Host: ${host}, OriginalURL: ${url}, HTTPSURL: ${httpsUrl}, HasToken: ${!!authToken}, TokenPreview: ${authToken ? authToken.substring(0, 10) + '...' : 'none'}`);
     
     if (!authToken) {
       console.warn("[Prisma] WARNING: No authToken found in DATABASE_URL. This may cause authentication errors.");
     }
     
     // Final validation
-    if (!url || url === "undefined" || !url.startsWith("libsql://")) {
-      throw new Error(`Invalid URL after parsing: "${url}". Original DATABASE_URL: ${dbUrl.substring(0, 80)}`);
-    }
-    
-    if (!authToken) {
-      console.warn("[Prisma] WARNING: No authToken found in DATABASE_URL. This may cause authentication errors.");
+    if (!httpsUrl || httpsUrl === "undefined" || !httpsUrl.startsWith("https://")) {
+      throw new Error(`Invalid HTTPS URL after conversion: "${httpsUrl}". Original URL: ${url}`);
     }
     
     // Create libsql client
+    // @libsql/client expects https:// for remote Turso, not libsql://
     const { createClient } = await import("@libsql/client");
     
     try {
+      console.log(`[Prisma] Creating libsql client with URL: ${httpsUrl.substring(0, 50)}..., HasToken: ${!!authToken}`);
+      
       const libsqlClient = createClient({
-        url: url,
+        url: httpsUrl,
         authToken: authToken,
       });
       
-      console.log(`[Prisma] Successfully created libsql client for: ${url.substring(0, 50)}...`);
+      console.log(`[Prisma] Successfully created libsql client for: ${httpsUrl.substring(0, 50)}...`);
       
       // PrismaLibSql is a factory - need to call connect() to get the adapter
       // Pass the libsql client to the factory
@@ -113,7 +116,15 @@ async function createPrismaClient(): Promise<PrismaClient> {
       });
     } catch (clientError) {
       const clientErrorMsg = clientError instanceof Error ? clientError.message : String(clientError);
-      throw new Error(`Failed to create libsql client: ${clientErrorMsg}. URL: ${url.substring(0, 50)}..., HasToken: ${!!authToken}`);
+      const clientErrorStack = clientError instanceof Error ? clientError.stack : undefined;
+      console.error(`[Prisma] Error creating libsql client:`, {
+        error: clientErrorMsg,
+        stack: clientErrorStack,
+        url: httpsUrl.substring(0, 50),
+        hasToken: !!authToken,
+        originalUrl: url,
+      });
+      throw new Error(`Failed to create libsql client: ${clientErrorMsg}. URL: ${httpsUrl.substring(0, 50)}..., HasToken: ${!!authToken}, OriginalURL: ${url}`);
     }
     
   }
