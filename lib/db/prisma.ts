@@ -48,11 +48,14 @@ async function createPrismaClient(): Promise<PrismaClient> {
       authToken = tokenMatch ? tokenMatch[1] : undefined;
     }
     
-    // PrismaLibSql constructor accepts config object directly (Prisma v6.6.0+)
-    const adapter = new PrismaLibSql({
+    // PrismaLibSql is a factory - need to call connect() to get the adapter
+    const adapterFactory = new PrismaLibSql({
       url: url,
       authToken: authToken,
     });
+    
+    // Connect to get the actual adapter
+    const adapter = await adapterFactory.connect();
     
     return new PrismaClient({
       adapter,
