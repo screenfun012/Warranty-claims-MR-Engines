@@ -48,11 +48,16 @@ async function createPrismaClient(): Promise<PrismaClient> {
       authToken = tokenMatch ? tokenMatch[1] : undefined;
     }
     
-    // PrismaLibSql is a factory - need to call connect() to get the adapter
-    const adapterFactory = new PrismaLibSql({
+    // Create libsql client first
+    const { createClient } = await import("@libsql/client");
+    const libsqlClient = createClient({
       url: url,
       authToken: authToken,
     });
+    
+    // PrismaLibSql is a factory - need to call connect() to get the adapter
+    // Pass the libsql client to the factory
+    const adapterFactory = new PrismaLibSql(libsqlClient);
     
     // Connect to get the actual adapter
     const adapter = await adapterFactory.connect();
