@@ -152,11 +152,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const prisma = await getPrisma();
     // OPERATOR+ can create claims
     await requirePermission(PERMISSIONS.CLAIMS_CREATE);
-    
+
     const body = await request.json();
-    console.log("[create-claim] Creating new claim with data:", { 
+    console.log("[create-claim] Creating new claim with data:", {
       emailThreadId: body.emailThreadId,
       status: body.status,
       customerId: body.customerId,
