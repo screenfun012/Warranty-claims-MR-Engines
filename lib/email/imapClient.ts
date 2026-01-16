@@ -270,6 +270,11 @@ export async function fetchNewMessagesSince(
     return messages;
   } catch (error) {
     console.error("IMAP fetch error:", error);
+    console.error("IMAP fetch error details:", {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      name: error instanceof Error ? error.name : undefined,
+    });
     if (error instanceof Error) {
       // Provide more helpful error messages
       const errorMsg = error.message.toLowerCase();
@@ -287,7 +292,9 @@ export async function fetchNewMessagesSince(
         throw new Error(`IMAP connection failed. Please check: 1) Host is correct (e.g., mail.mrgroup.rs), 2) Port is correct (993 for TLS), 3) TLS/SSL is enabled, 4) Network connection.`);
       }
       if (errorMsg.includes("certificate") || errorMsg.includes("ssl") || errorMsg.includes("tls")) {
-        throw new Error(`TLS/SSL error. Try disabling TLS or check certificate settings.`);
+        // Log full error for debugging
+        console.error("TLS/SSL error details:", error.message);
+        throw new Error(`TLS/SSL error: ${error.message}. Try disabling TLS or check certificate settings.`);
       }
     }
     throw error;
