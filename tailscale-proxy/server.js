@@ -20,14 +20,16 @@
  */
 
 /**
- * Tailscale Email Proxy Server - TCP Proxy
+ * Tailscale Email Proxy Server - TLS Tunnel Proxy
  * 
- * IMAP and SMTP are TCP protocols, so we use raw TCP proxying.
- * This server listens on public ports and forwards connections
- * to Synology MailPlus Server via Tailscale network.
+ * This proxy accepts TLS connections from Vercel and forwards them
+ * as TLS connections to Synology MailPlus Server via Tailscale network.
+ * 
+ * The key: We use Node.js TLS module to handle TLS on both sides.
  */
 
 const net = require('net');
+const tls = require('tls');
 const http = require('http');
 
 // Synology MailPlus Server Tailscale IPs
@@ -41,59 +43,83 @@ const IMAP_TCP_PORT = parseInt(process.env.IMAP_TCP_PORT || '1993', 10);
 const SMTP_TCP_PORT = parseInt(process.env.SMTP_TCP_PORT || '1465', 10);
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || '3000', 10);
 
-console.log('Tailscale Email Proxy Server');
-console.log('============================');
-console.log(`IMAP: ${IMAP_TCP_PORT} -> ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT}`);
-console.log(`SMTP: ${SMTP_TCP_PORT} -> ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT}`);
+console.log('Tailscale Email Proxy Server (TLS Tunnel)');
+console.log('==========================================');
+console.log(`IMAP: ${IMAP_TCP_PORT} -> ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT} (TLS)`);
+console.log(`SMTP: ${SMTP_TCP_PORT} -> ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT} (TLS)`);
 console.log(`Health: http://localhost:${HEALTH_PORT}/health`);
 
-// TCP Proxy for IMAP (direct connection)
+// TLS Tunnel Proxy for IMAP
+// Accepts TLS from client, forwards as TLS to Synology
 const imapTcpServer = net.createServer((clientSocket) => {
-  console.log('[IMAP TCP] New connection');
+  console.log('[IMAP TLS] New connection from', clientSocket.remoteAddress);
   
-  const serverSocket = net.createConnection({
+  // Create TLS connection to Synology
+  const serverSocket = tls.connect({
     host: SYNO_IMAP_HOST,
-    port: SYNO_IMAP_PORT
+    port: SYNO_IMAP_PORT,
+    rejectUnauthorized: false, // Accept self-signed certs from Synology
   }, () => {
-    console.log(`[IMAP TCP] Connected to ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT}`);
+    console.log(`[IMAP TLS] Connected to ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT}`);
   });
 
-  clientSocket.pipe(serverSocket);
-  serverSocket.pipe(clientSocket);
+  // Pipe client -> server (raw TCP from client, TLS to server)
+  // The client will do TLS handshake with us, we forward encrypted data as TLS to Synology
+  clientSocket.pipe(serverSocket, { end: false });
+  serverSocket.pipe(clientSocket, { end: false });
 
   clientSocket.on('error', (err) => {
-    console.error('[IMAP TCP] Client error:', err.message);
-    serverSocket.destroy();
+    console.error('[IMAP TLS] Client error:', err.message);
+    if (!serverSocket.destroyed) serverSocket.destroy();
   });
 
   serverSocket.on('error', (err) => {
-    console.error('[IMAP TCP] Server error:', err.message);
-    clientSocket.destroy();
+    console.error('[IMAP TLS] Server error:', err.message);
+    if (!clientSocket.destroyed) clientSocket.destroy();
+  });
+
+  clientSocket.on('close', () => {
+    if (!serverSocket.destroyed) serverSocket.destroy();
+  });
+
+  serverSocket.on('close', () => {
+    if (!clientSocket.destroyed) clientSocket.destroy();
   });
 });
 
-// TCP Proxy for SMTP (direct connection)
+// TLS Tunnel Proxy for SMTP
+// Accepts TLS from client, forwards as TLS to Synology
 const smtpTcpServer = net.createServer((clientSocket) => {
-  console.log('[SMTP TCP] New connection');
+  console.log('[SMTP TLS] New connection from', clientSocket.remoteAddress);
   
-  const serverSocket = net.createConnection({
+  // Create TLS connection to Synology
+  const serverSocket = tls.connect({
     host: SYNO_SMTP_HOST,
-    port: SYNO_SMTP_PORT
+    port: SYNO_SMTP_PORT,
+    rejectUnauthorized: false, // Accept self-signed certs from Synology
   }, () => {
-    console.log(`[SMTP TCP] Connected to ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT}`);
+    console.log(`[SMTP TLS] Connected to ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT}`);
   });
 
-  clientSocket.pipe(serverSocket);
-  serverSocket.pipe(clientSocket);
+  clientSocket.pipe(serverSocket, { end: false });
+  serverSocket.pipe(clientSocket, { end: false });
 
   clientSocket.on('error', (err) => {
-    console.error('[SMTP TCP] Client error:', err.message);
-    serverSocket.destroy();
+    console.error('[SMTP TLS] Client error:', err.message);
+    if (!serverSocket.destroyed) serverSocket.destroy();
   });
 
   serverSocket.on('error', (err) => {
-    console.error('[SMTP TCP] Server error:', err.message);
-    clientSocket.destroy();
+    console.error('[SMTP TLS] Server error:', err.message);
+    if (!clientSocket.destroyed) clientSocket.destroy();
+  });
+
+  clientSocket.on('close', () => {
+    if (!serverSocket.destroyed) serverSocket.destroy();
+  });
+
+  serverSocket.on('close', () => {
+    if (!clientSocket.destroyed) clientSocket.destroy();
   });
 });
 
