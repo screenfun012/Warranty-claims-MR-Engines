@@ -50,9 +50,9 @@ console.log(`SMTP: ${SMTP_TCP_PORT} -> ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT} (TLS)
 console.log(`Health: http://localhost:${HEALTH_PORT}/health`);
 
 // TLS Tunnel Proxy for IMAP
-// Accepts TLS from client, forwards as TLS to Synology
+// Accepts raw TCP from client (which will do TLS handshake), forwards as TLS to Synology
 const imapTcpServer = net.createServer((clientSocket) => {
-  console.log('[IMAP TLS] New connection from', clientSocket.remoteAddress);
+  console.log('[IMAP Proxy] New connection from', clientSocket.remoteAddress);
   
   // Create TLS connection to Synology
   const serverSocket = tls.connect({
@@ -60,21 +60,21 @@ const imapTcpServer = net.createServer((clientSocket) => {
     port: SYNO_IMAP_PORT,
     rejectUnauthorized: false, // Accept self-signed certs from Synology
   }, () => {
-    console.log(`[IMAP TLS] Connected to ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT}`);
+    console.log(`[IMAP Proxy] Connected to ${SYNO_IMAP_HOST}:${SYNO_IMAP_PORT}`);
   });
 
-  // Pipe client -> server (raw TCP from client, TLS to server)
-  // The client will do TLS handshake with us, we forward encrypted data as TLS to Synology
+  // Pipe bidirectional: client (raw TCP, will do TLS) <-> server (TLS to Synology)
+  // The client will send TLS handshake bytes, we forward them as-is to Synology via TLS
   clientSocket.pipe(serverSocket, { end: false });
   serverSocket.pipe(clientSocket, { end: false });
 
   clientSocket.on('error', (err) => {
-    console.error('[IMAP TLS] Client error:', err.message);
+    console.error('[IMAP Proxy] Client error:', err.message);
     if (!serverSocket.destroyed) serverSocket.destroy();
   });
 
   serverSocket.on('error', (err) => {
-    console.error('[IMAP TLS] Server error:', err.message);
+    console.error('[IMAP Proxy] Server error:', err.message);
     if (!clientSocket.destroyed) clientSocket.destroy();
   });
 
@@ -88,9 +88,9 @@ const imapTcpServer = net.createServer((clientSocket) => {
 });
 
 // TLS Tunnel Proxy for SMTP
-// Accepts TLS from client, forwards as TLS to Synology
+// Accepts raw TCP from client (which will do TLS handshake), forwards as TLS to Synology
 const smtpTcpServer = net.createServer((clientSocket) => {
-  console.log('[SMTP TLS] New connection from', clientSocket.remoteAddress);
+  console.log('[SMTP Proxy] New connection from', clientSocket.remoteAddress);
   
   // Create TLS connection to Synology
   const serverSocket = tls.connect({
@@ -98,19 +98,19 @@ const smtpTcpServer = net.createServer((clientSocket) => {
     port: SYNO_SMTP_PORT,
     rejectUnauthorized: false, // Accept self-signed certs from Synology
   }, () => {
-    console.log(`[SMTP TLS] Connected to ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT}`);
+    console.log(`[SMTP Proxy] Connected to ${SYNO_SMTP_HOST}:${SYNO_SMTP_PORT}`);
   });
 
   clientSocket.pipe(serverSocket, { end: false });
   serverSocket.pipe(clientSocket, { end: false });
 
   clientSocket.on('error', (err) => {
-    console.error('[SMTP TLS] Client error:', err.message);
+    console.error('[SMTP Proxy] Client error:', err.message);
     if (!serverSocket.destroyed) serverSocket.destroy();
   });
 
   serverSocket.on('error', (err) => {
-    console.error('[SMTP TLS] Server error:', err.message);
+    console.error('[SMTP Proxy] Server error:', err.message);
     if (!clientSocket.destroyed) clientSocket.destroy();
   });
 
