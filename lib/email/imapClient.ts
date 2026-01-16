@@ -79,6 +79,8 @@ export function getImapClient(): ImapFlow {
       rejectUnauthorized: false, // Don't validate certificate (accept self-signed from Synology)
       minVersion: 'TLSv1', // Allow older TLS versions
       maxVersion: 'TLSv1.3', // Allow newer TLS versions
+      // Set servername to match the host (important for SNI)
+      servername: host, // Use host as servername for SNI
       // Completely skip hostname verification
       checkServerIdentity: () => {
         // Return null to skip hostname verification completely
