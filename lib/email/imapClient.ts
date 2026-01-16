@@ -59,13 +59,17 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections, use direct TLS with relaxed certificate validation
-  // TCP proxy forwards raw TLS, but certificate validation may fail
-  // We need to disable strict certificate validation for proxy connections
+  // For proxy connections through TCP proxy, we need special handling
+  // TCP proxy forwards raw bytes, but TLS handshake may not work correctly
+  // Try to use STARTTLS if TLS is enabled but we're using a non-standard port (proxy)
+  const isProxyPort = port === 1993 || port === 1465;
+  const useStartTLS = isProxyPort && tls;
+  const useDirectTLS = tls && !isProxyPort;
+
   return new ImapFlow({
     host,
     port,
-    secure: tls, // true for port 993 (direct TLS)
+    secure: useDirectTLS, // true only for direct TLS (port 993), false for STARTTLS
     auth: {
       user,
       pass: pass,
@@ -73,14 +77,21 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Disable strict TLS certificate validation for proxy connections
-    // Proxy server forwards TLS but certificate validation fails
-    tlsOptions: tls ? {
-      rejectUnauthorized: false, // Allow self-signed certificates through proxy
-      minVersion: 'TLSv1.2',
-      // Don't verify hostname for proxy connections
-      servername: undefined,
-    } : undefined,
+    // For STARTTLS (proxy connections)
+    ...(useStartTLS ? {
+      requireTLS: true, // Require STARTTLS upgrade
+      tlsOptions: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+      },
+    } : {}),
+    // For direct TLS (non-proxy connections)
+    ...(useDirectTLS ? {
+      tlsOptions: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+      },
+    } : {}),
   });
 }
 
