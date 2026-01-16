@@ -59,12 +59,23 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections, we need to handle TLS certificate validation
-  // TCP proxy forwards raw TLS, but certificate validation may fail
-  const tlsConfig = tls ? {
+  // For proxy connections, try STARTTLS instead of direct TLS
+  // STARTTLS works better through TCP proxies than direct TLS
+  // If port is 143 or we're using proxy, use STARTTLS
+  const useStartTLS = port === 143 || !tls;
+  const useDirectTLS = tls && port !== 143;
+
+  const tlsConfig = useDirectTLS ? {
     secure: true,
     tlsOptions: {
       rejectUnauthorized: false, // Allow self-signed certificates through proxy
+      minVersion: 'TLSv1.2',
+    },
+  } : useStartTLS ? {
+    secure: false,
+    requireTLS: true, // Require STARTTLS upgrade
+    tlsOptions: {
+      rejectUnauthorized: false,
       minVersion: 'TLSv1.2',
     },
   } : {
