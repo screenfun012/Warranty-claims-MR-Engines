@@ -4,175 +4,110 @@
  * 
  * Local development: Uses SQLite (file:./dev.db)
  * Production (Vercel): Uses Turso (libsql://)
+ * 
+ * Official Turso pattern: new PrismaLibSQL({ url, authToken })
+ * URL and authToken should be separate environment variables:
+ * - TURSO_DATABASE_URL (or DATABASE_URL as fallback)
+ * - TURSO_AUTH_TOKEN (or DATABASE_AUTH_TOKEN as fallback)
  */
 
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  prismaPromise: Promise<PrismaClient> | undefined;
 };
 
 // Check if we're using Turso
-const isTurso = (process.env.DATABASE_URL || "").startsWith("libsql://");
+// Support both TURSO_DATABASE_URL (recommended) and DATABASE_URL (fallback)
+const isTurso = 
+  process.env.USE_TURSO === "true" || 
+  !!process.env.TURSO_DATABASE_URL ||
+  (process.env.DATABASE_URL || "").startsWith("libsql://");
 
-// Create Prisma client - async for Turso, sync for SQLite
-async function createPrismaClient(): Promise<PrismaClient> {
-  if (isTurso) {
-    // Dynamically import Turso adapter only when needed
-    const adapterModule = await import("@prisma/adapter-libsql");
-    
-    // PrismaLibSql is a named export (note: lowercase 's' in Sql)
-    const PrismaLibSql = (adapterModule as any).PrismaLibSql || (adapterModule as any).PrismaLibSQL;
-    if (!PrismaLibSql) {
-      throw new Error("PrismaLibSql not found in @prisma/adapter-libsql");
-    }
-    
-    // Parse DATABASE_URL to extract URL and authToken
-    // Turso URL format: libsql://db-name-username.turso.io?authToken=token
-    const dbUrl = process.env.DATABASE_URL;
-    
-    if (!dbUrl) {
-      throw new Error("DATABASE_URL environment variable is not set. Please set it in Vercel Environment Variables.");
-    }
-    
-    if (!dbUrl.startsWith("libsql://")) {
-      throw new Error(`DATABASE_URL must start with "libsql://", got: ${dbUrl.substring(0, 50)}`);
-    }
-    
-    // Parse URL to extract base URL and authToken
-    // libsql:// is not a standard protocol, so we'll parse manually
-    let url: string = "";
-    let authToken: string | undefined;
-    
-    // Extract authToken from query string
-    const tokenMatch = dbUrl.match(/[?&]authToken=([^&]+)/);
-    authToken = tokenMatch ? tokenMatch[1] : undefined;
-    
-    // Extract base URL (everything before ? or &)
-    const urlMatch = dbUrl.match(/^(libsql:\/\/[^?&]+)/);
-    if (urlMatch) {
-      url = urlMatch[1];
-    } else {
-      // Fallback: split on ? and take first part
-      url = dbUrl.split('?')[0].split('&')[0];
-    }
-    
-    // Validate URL
-    if (!url || url === "undefined" || !url.startsWith("libsql://")) {
-      throw new Error(`Invalid DATABASE_URL format. Expected: libsql://host.turso.io?authToken=token. Got URL part: "${url}"`);
-    }
-    
-    // Validate we have a host
-    const hostMatch = url.match(/^libsql:\/\/([^\/]+)/);
-    if (!hostMatch || !hostMatch[1]) {
-      throw new Error(`Invalid DATABASE_URL: missing host. URL: ${url}`);
-    }
-    
-    const host = hostMatch[1];
-    
-    // Log for debugging (only first few chars of token for security)
-    console.log(`[Prisma] Parsed DATABASE_URL - Host: ${host}, URL: ${url}, HasToken: ${!!authToken}, TokenPreview: ${authToken ? authToken.substring(0, 10) + '...' : 'none'}`);
-    
-    if (!authToken) {
-      console.warn("[Prisma] WARNING: No authToken found in DATABASE_URL. This may cause authentication errors.");
-    }
-    
-    // Final validation
-    if (!url || url === "undefined" || !url.startsWith("libsql://")) {
-      throw new Error(`Invalid URL after parsing: "${url}". Original DATABASE_URL: ${dbUrl.substring(0, 80)}`);
-    }
-    
-    // Create libsql client
-    // @libsql/client@0.8.1 expects libsql:// URL directly
-    const { createClient } = await import("@libsql/client");
-    
-    try {
-      console.log(`[Prisma] Creating libsql client with URL: ${url.substring(0, 50)}..., HasToken: ${!!authToken}`);
-      
-      // For @libsql/client@0.8.1, pass libsql:// URL directly
-      const libsqlClient = createClient({
-        url: url,
-        authToken: authToken,
-      });
-      
-      console.log(`[Prisma] Successfully created libsql client for: ${url.substring(0, 50)}...`);
-      
-      // PrismaLibSql is a factory - need to call connect() to get the adapter
-      // Pass the libsql client to the factory
-      const adapterFactory = new PrismaLibSql(libsqlClient);
-      
-      // Connect to get the actual adapter
-      const adapter = await adapterFactory.connect();
-      
-      console.log(`[Prisma] Successfully connected adapter`);
-      
-      return new PrismaClient({
-        adapter,
-        log: ["error"],
-      });
-    } catch (clientError) {
-      const clientErrorMsg = clientError instanceof Error ? clientError.message : String(clientError);
-      const clientErrorStack = clientError instanceof Error ? clientError.stack : undefined;
-      console.error(`[Prisma] Error creating libsql client:`, {
-        error: clientErrorMsg,
-        stack: clientErrorStack,
-        url: url.substring(0, 50),
-        hasToken: !!authToken,
-        host: host,
-      });
-      throw new Error(`Failed to create libsql client: ${clientErrorMsg}. URL: ${url.substring(0, 50)}..., HasToken: ${!!authToken}, Host: ${host}`);
-    }
-    
+// Helper to require environment variable
+function requireEnv(name: string, value?: string): string {
+  const v = value?.trim();
+  if (!v) {
+    throw new Error(`[Prisma] Missing required environment variable: ${name}`);
   }
-  
+  return v;
+}
+
+// Initialize Prisma client
+function initializePrisma(): PrismaClient {
+  if (isTurso) {
+    // Get URL - prefer TURSO_DATABASE_URL, fallback to DATABASE_URL
+    const url = requireEnv(
+      "TURSO_DATABASE_URL (or DATABASE_URL)",
+      process.env.TURSO_DATABASE_URL ?? process.env.DATABASE_URL
+    );
+
+    // Extract URL if it contains authToken in query string (backward compatibility)
+    let cleanUrl = url;
+    if (url.includes("?authToken=") || url.includes("&authToken=")) {
+      // Remove authToken from URL if present
+      cleanUrl = url.split("?")[0].split("&")[0];
+    }
+
+    // Get authToken - prefer TURSO_AUTH_TOKEN, fallback to DATABASE_AUTH_TOKEN or extract from URL
+    let authToken: string | undefined = 
+      process.env.TURSO_AUTH_TOKEN?.trim() || 
+      process.env.DATABASE_AUTH_TOKEN?.trim();
+
+    // If not found in env vars, try to extract from DATABASE_URL (backward compatibility)
+    if (!authToken && url.includes("authToken=")) {
+      const tokenMatch = url.match(/[?&]authToken=([^&]+)/);
+      authToken = tokenMatch ? tokenMatch[1] : undefined;
+    }
+
+    // Require authToken
+    authToken = requireEnv("TURSO_AUTH_TOKEN (or DATABASE_AUTH_TOKEN)", authToken);
+
+    // Validate URL format
+    if (!cleanUrl.startsWith("libsql://")) {
+      throw new Error(`[Prisma] TURSO_DATABASE_URL must start with "libsql://", got: ${cleanUrl.substring(0, 50)}`);
+    }
+
+    console.log(`[Prisma] Initializing Turso connection - Host: ${cleanUrl.substring(0, 50)}..., HasToken: ${!!authToken}`);
+
+    // Dynamically import PrismaLibSQL adapter
+    // Use the official pattern: new PrismaLibSQL({ url, authToken })
+    // No need for createClient() or connect() - PrismaLibSQL handles it internally
+    // Note: Using synchronous require for top-level initialization
+    const adapterModule = require("@prisma/adapter-libsql");
+    const PrismaLibSQL = adapterModule.PrismaLibSQL || adapterModule.PrismaLibSql;
+    
+    if (!PrismaLibSQL) {
+      throw new Error("[Prisma] PrismaLibSQL not found in @prisma/adapter-libsql");
+    }
+    
+    const adapter = new PrismaLibSQL({
+      url: cleanUrl,
+      authToken: authToken,
+    });
+
+    return new PrismaClient({
+      adapter,
+      log: ["error"],
+    });
+  }
+
   // Local SQLite
   return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });
 }
 
-// For local development (SQLite), export sync client
-// For Turso, we need async initialization
-let prismaClient: PrismaClient;
+// Export singleton Prisma client
+export const prisma =
+  globalForPrisma.prisma ??
+  initializePrisma();
 
-if (!isTurso) {
-  // SQLite - synchronous initialization
-  prismaClient = globalForPrisma.prisma ?? new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
-  });
-  
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = prismaClient;
-  }
-} else {
-  // For Turso, create a dummy client that will throw if used directly
-  // This ensures TypeScript doesn't complain, but runtime will use getPrisma()
-  prismaClient = {} as PrismaClient;
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
 }
 
-// Export for use in API routes (works for SQLite, but for Turso use getPrisma() instead)
-// Note: For Turso, this will be undefined at runtime, so always use getPrisma() for Turso
-export const prisma: PrismaClient = prismaClient;
-
-// Export async getter for Turso compatibility (works for both SQLite and Turso)
+// Export async getter for backward compatibility (works for both SQLite and Turso)
 export async function getPrisma(): Promise<PrismaClient> {
-  // If using SQLite and we have a client, return it
-  if (!isTurso && prismaClient) {
-    return prismaClient;
-  }
-  
-  // For Turso or if SQLite client not initialized yet
-  if (globalForPrisma.prisma) {
-    return globalForPrisma.prisma;
-  }
-  
-  if (!globalForPrisma.prismaPromise) {
-    globalForPrisma.prismaPromise = createPrismaClient();
-  }
-  
-  const client = await globalForPrisma.prismaPromise;
-  globalForPrisma.prisma = client;
-  return client;
+  return prisma;
 }
-
