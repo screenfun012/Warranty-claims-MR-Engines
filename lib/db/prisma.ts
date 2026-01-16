@@ -33,68 +33,104 @@ async function createPrismaClient(): Promise<PrismaClient> {
     const dbUrl = process.env.DATABASE_URL;
     
     if (!dbUrl) {
-      throw new Error("DATABASE_URL environment variable is not set");
+      throw new Error("DATABASE_URL environment variable is not set. Please set it in Vercel Environment Variables.");
     }
     
     if (!dbUrl.startsWith("libsql://")) {
-      throw new Error(`DATABASE_URL must start with "libsql://", got: ${dbUrl.substring(0, 20)}...`);
+      throw new Error(`DATABASE_URL must start with "libsql://", got: ${dbUrl.substring(0, 50)}`);
     }
     
-    let url: string;
+    // Parse URL to extract base URL and authToken
+    let url: string = "";
     let authToken: string | undefined;
     
     try {
       const urlObj = new URL(dbUrl);
+      
+      // Extract authToken from query params
       authToken = urlObj.searchParams.get("authToken") || undefined;
-      // Reconstruct URL without query params
-      url = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
       
-      // Validate that we have a valid URL
-      if (!url || url === "libsql://" || url === "libsql:///") {
-        throw new Error(`Invalid URL after parsing: ${url}`);
-      }
-    } catch (error) {
-      // Fallback: if URL parsing fails, use the URL as-is
-      // This handles cases where URL might already be in correct format
-      url = dbUrl;
-      // Try to extract authToken manually if present
-      const tokenMatch = dbUrl.match(/[?&]authToken=([^&]+)/);
-      authToken = tokenMatch ? tokenMatch[1] : undefined;
+      // Build base URL: protocol + host + pathname (without query params)
+      const host = urlObj.host;
+      const pathname = urlObj.pathname || "";
       
-      // Remove authToken from URL if we extracted it
-      if (authToken) {
-        url = dbUrl.replace(/[?&]authToken=[^&]*/, "");
+      if (!host) {
+        throw new Error(`Invalid DATABASE_URL: missing host. Full URL: ${dbUrl.substring(0, 100)}`);
       }
+      
+      url = `libsql://${host}${pathname}`;
       
       // Validate URL
       if (!url || url === "libsql://" || url === "libsql:///") {
-        throw new Error(`Invalid DATABASE_URL format. Expected: libsql://host.turso.io?authToken=token, got: ${dbUrl.substring(0, 50)}...`);
+        throw new Error(`Invalid URL after parsing. Host: ${host}, Pathname: ${pathname}`);
       }
+      
+      // Log for debugging (only first few chars of token for security)
+      console.log(`[Prisma] Parsed DATABASE_URL - Host: ${host}, HasToken: ${!!authToken}, TokenPreview: ${authToken ? authToken.substring(0, 10) + '...' : 'none'}`);
+      
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[Prisma] Error parsing DATABASE_URL: ${errorMsg}`);
+      console.error(`[Prisma] DATABASE_URL value (first 100 chars): ${dbUrl.substring(0, 100)}`);
+      
+      // Fallback: try to extract manually
+      const tokenMatch = dbUrl.match(/[?&]authToken=([^&]+)/);
+      authToken = tokenMatch ? tokenMatch[1] : undefined;
+      
+      // Try to extract base URL manually
+      const urlMatch = dbUrl.match(/^(libsql:\/\/[^?&]+)/);
+      if (urlMatch) {
+        url = urlMatch[1];
+      } else {
+        // Last resort: use full URL without query params
+        url = dbUrl.split('?')[0];
+      }
+      
+      if (!url || url === "undefined" || !url.startsWith("libsql://")) {
+        throw new Error(`Failed to parse DATABASE_URL: ${errorMsg}. DATABASE_URL format should be: libsql://host.turso.io?authToken=token. Got: ${dbUrl.substring(0, 80)}`);
+      }
+      
+      console.log(`[Prisma] Using fallback parsing - URL: ${url.substring(0, 50)}..., HasToken: ${!!authToken}`);
     }
     
-    // Validate that we have a valid URL before creating client
-    if (!url || url === "undefined") {
-      throw new Error(`Failed to parse DATABASE_URL. URL is undefined. Original: ${dbUrl.substring(0, 50)}...`);
+    // Final validation
+    if (!url || url === "undefined" || !url.startsWith("libsql://")) {
+      throw new Error(`Invalid URL after parsing: "${url}". Original DATABASE_URL: ${dbUrl.substring(0, 80)}`);
     }
     
-    // Create libsql client first
+    if (!authToken) {
+      console.warn("[Prisma] WARNING: No authToken found in DATABASE_URL. This may cause authentication errors.");
+    }
+    
+    // Create libsql client
     const { createClient } = await import("@libsql/client");
-    const libsqlClient = createClient({
-      url: url,
-      authToken: authToken,
-    });
     
-    // PrismaLibSql is a factory - need to call connect() to get the adapter
-    // Pass the libsql client to the factory
-    const adapterFactory = new PrismaLibSql(libsqlClient);
+    try {
+      const libsqlClient = createClient({
+        url: url,
+        authToken: authToken,
+      });
+      
+      console.log(`[Prisma] Successfully created libsql client for: ${url.substring(0, 50)}...`);
+      
+      // PrismaLibSql is a factory - need to call connect() to get the adapter
+      // Pass the libsql client to the factory
+      const adapterFactory = new PrismaLibSql(libsqlClient);
+      
+      // Connect to get the actual adapter
+      const adapter = await adapterFactory.connect();
+      
+      console.log(`[Prisma] Successfully connected adapter`);
+      
+      return new PrismaClient({
+        adapter,
+        log: ["error"],
+      });
+    } catch (clientError) {
+      const clientErrorMsg = clientError instanceof Error ? clientError.message : String(clientError);
+      throw new Error(`Failed to create libsql client: ${clientErrorMsg}. URL: ${url.substring(0, 50)}..., HasToken: ${!!authToken}`);
+    }
     
-    // Connect to get the actual adapter
-    const adapter = await adapterFactory.connect();
-    
-    return new PrismaClient({
-      adapter,
-      log: ["error"],
-    });
   }
   
   // Local SQLite
