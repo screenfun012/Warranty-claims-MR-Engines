@@ -59,8 +59,8 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections, TCP proxy forwards raw TLS bytes
-  // We need to disable all TLS validation to allow connection through proxy
+  // For proxy connections with SSL termination, we need to accept self-signed certificates
+  // HAProxy terminates SSL and presents its own certificate to the client
   return new ImapFlow({
     host,
     port,
@@ -72,14 +72,20 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Completely disable TLS validation for proxy connections
-    // TCP proxy forwards TLS but certificate validation always fails
+    // Completely disable TLS validation for proxy connections with SSL termination
+    // HAProxy presents self-signed certificate, we must accept it
     tlsOptions: tls ? {
-      rejectUnauthorized: false, // Don't validate certificate
+      rejectUnauthorized: false, // Don't validate certificate (accept self-signed)
       minVersion: 'TLSv1', // Allow older TLS versions
       maxVersion: 'TLSv1.3', // Allow newer TLS versions
-      // Don't verify hostname
-      checkServerIdentity: () => undefined, // Skip hostname verification
+      // Completely skip hostname verification
+      checkServerIdentity: () => {
+        // Always return undefined to skip hostname verification
+        return undefined;
+      },
+      // Additional options to handle self-signed certificates
+      requestCert: false, // Don't request client certificate
+      agent: false, // Don't use default agent
     } : undefined,
   });
 }
