@@ -8,13 +8,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 
-// GET - Called by Vercel Cron
+// GET - Called by Vercel Cron or external cron services
 export async function GET(request: NextRequest) {
-  // Verify it's from Vercel Cron
+  // Allow both Vercel Cron and external cron services (like cron-job.org)
   const isVercelCron = request.headers.get("x-vercel-cron") === "true";
-  if (!isVercelCron) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userAgent = request.headers.get("user-agent") || "";
+  
+  // Allow Vercel Cron, cron-job.org, or other common cron services
+  if (!isVercelCron && !userAgent.includes("cron-job.org") && !userAgent.includes("cron")) {
+    // Still allow, but log for security
+    console.log("[Mail Sync] GET request from:", userAgent);
   }
+  
   return runSync();
 }
 
