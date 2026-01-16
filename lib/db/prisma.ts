@@ -30,7 +30,16 @@ async function createPrismaClient(): Promise<PrismaClient> {
     
     // Parse DATABASE_URL to extract URL and authToken
     // Turso URL format: libsql://db-name-username.turso.io?authToken=token
-    const dbUrl = process.env.DATABASE_URL!;
+    const dbUrl = process.env.DATABASE_URL;
+    
+    if (!dbUrl) {
+      throw new Error("DATABASE_URL environment variable is not set");
+    }
+    
+    if (!dbUrl.startsWith("libsql://")) {
+      throw new Error(`DATABASE_URL must start with "libsql://", got: ${dbUrl.substring(0, 20)}...`);
+    }
+    
     let url: string;
     let authToken: string | undefined;
     
@@ -39,6 +48,11 @@ async function createPrismaClient(): Promise<PrismaClient> {
       authToken = urlObj.searchParams.get("authToken") || undefined;
       // Reconstruct URL without query params
       url = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+      
+      // Validate that we have a valid URL
+      if (!url || url === "libsql://" || url === "libsql:///") {
+        throw new Error(`Invalid URL after parsing: ${url}`);
+      }
     } catch (error) {
       // Fallback: if URL parsing fails, use the URL as-is
       // This handles cases where URL might already be in correct format
@@ -46,6 +60,21 @@ async function createPrismaClient(): Promise<PrismaClient> {
       // Try to extract authToken manually if present
       const tokenMatch = dbUrl.match(/[?&]authToken=([^&]+)/);
       authToken = tokenMatch ? tokenMatch[1] : undefined;
+      
+      // Remove authToken from URL if we extracted it
+      if (authToken) {
+        url = dbUrl.replace(/[?&]authToken=[^&]*/, "");
+      }
+      
+      // Validate URL
+      if (!url || url === "libsql://" || url === "libsql:///") {
+        throw new Error(`Invalid DATABASE_URL format. Expected: libsql://host.turso.io?authToken=token, got: ${dbUrl.substring(0, 50)}...`);
+      }
+    }
+    
+    // Validate that we have a valid URL before creating client
+    if (!url || url === "undefined") {
+      throw new Error(`Failed to parse DATABASE_URL. URL is undefined. Original: ${dbUrl.substring(0, 50)}...`);
     }
     
     // Create libsql client first
