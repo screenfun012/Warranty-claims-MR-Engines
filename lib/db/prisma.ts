@@ -29,14 +29,28 @@ async function createPrismaClient(): Promise<PrismaClient> {
     }
     
     // Parse DATABASE_URL to extract URL and authToken
+    // Turso URL format: libsql://db-name-username.turso.io?authToken=token
     const dbUrl = process.env.DATABASE_URL!;
-    const urlObj = new URL(dbUrl);
-    const authToken = urlObj.searchParams.get("authToken") || undefined;
-    const baseUrl = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+    let url: string;
+    let authToken: string | undefined;
+    
+    try {
+      const urlObj = new URL(dbUrl);
+      authToken = urlObj.searchParams.get("authToken") || undefined;
+      // Reconstruct URL without query params
+      url = `${urlObj.protocol}//${urlObj.host}${urlObj.pathname}`;
+    } catch (error) {
+      // Fallback: if URL parsing fails, use the URL as-is
+      // This handles cases where URL might already be in correct format
+      url = dbUrl;
+      // Try to extract authToken manually if present
+      const tokenMatch = dbUrl.match(/[?&]authToken=([^&]+)/);
+      authToken = tokenMatch ? tokenMatch[1] : undefined;
+    }
     
     // PrismaLibSql constructor accepts config object directly (Prisma v6.6.0+)
     const adapter = new PrismaLibSql({
-      url: baseUrl,
+      url: url,
       authToken: authToken,
     });
     
