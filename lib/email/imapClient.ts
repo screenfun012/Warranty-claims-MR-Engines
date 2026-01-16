@@ -77,6 +77,8 @@ export function getImapClient(): ImapFlow {
     tls: tls ? {
       rejectUnauthorized: false, // Don't validate certificate (accept self-signed from HAProxy)
       servername: host, // Use host as servername for SNI
+      // Additional options to ensure self-signed certificates are accepted
+      checkServerIdentity: () => undefined, // Skip hostname verification
     } : false,
   });
 }
