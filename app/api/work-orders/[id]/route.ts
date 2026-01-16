@@ -4,13 +4,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await params;
 
     const workOrder = await prisma.workOrder.findUnique({

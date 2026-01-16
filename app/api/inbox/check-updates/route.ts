@@ -5,10 +5,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 
 export async function GET(request: Request) {
   try {
+    const prisma = await getPrisma();
     const { searchParams } = new URL(request.url);
     const lastCheck = searchParams.get("lastCheck"); // ISO timestamp
 

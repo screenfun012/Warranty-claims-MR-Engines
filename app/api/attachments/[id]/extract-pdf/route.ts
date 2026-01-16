@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { readAttachmentFile } from "@/lib/files/fileStorage";
 import { extractTextFromPdf } from "@/lib/files/pdfTextExtractor";
 import { extractTextFromDocx } from "@/lib/files/docxTextExtractor";
@@ -14,6 +14,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await params;
 
     const attachment = await prisma.attachment.findUnique({

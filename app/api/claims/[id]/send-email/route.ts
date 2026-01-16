@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { sendEmailAndSave } from "@/lib/email/smtpClient";
 import { readAttachmentFile } from "@/lib/files/fileStorage";
 import { getClaimStatusEmailTemplate, getClaimProcessingEmailTemplate } from "@/lib/email/emailTemplates";
@@ -15,6 +15,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     // OPERATOR+ can send emails
     await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
     

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 
 /**
  * Mark an email thread as viewed/opened
@@ -10,6 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await params;
 
     await prisma.emailThread.update({

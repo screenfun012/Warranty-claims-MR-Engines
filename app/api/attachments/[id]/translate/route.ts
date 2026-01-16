@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { getTranslator } from "@/lib/translation/translator";
 
 export async function POST(
@@ -12,6 +12,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id } = await params;
     const body = await request.json();
     const { targetLang, sourceLang } = body;

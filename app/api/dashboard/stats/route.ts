@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 // Cache stats for 5 seconds to reduce database load but keep it responsive
@@ -32,6 +32,8 @@ export async function GET() {
     });
   }
   try {
+    const prisma = await getPrisma();
+    
     // Get total claims count
     let totalClaims = 0;
     try {

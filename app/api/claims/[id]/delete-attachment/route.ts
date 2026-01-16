@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { deleteAttachmentFile } from "@/lib/files/fileStorage";
 
 export async function DELETE(
@@ -7,6 +7,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     const { id: claimId } = await params;
     const { searchParams } = new URL(request.url);
     const attachmentId = searchParams.get("attachmentId");

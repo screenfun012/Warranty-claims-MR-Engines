@@ -5,7 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(
@@ -13,6 +13,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     // Only SUPER_ADMIN can unlock claims
     await requirePermission(PERMISSIONS.CLAIMS_UNLOCK);
     

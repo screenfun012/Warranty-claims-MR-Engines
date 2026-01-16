@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { saveAttachmentForClaim } from "@/lib/files/fileStorage";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
@@ -8,6 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const prisma = await getPrisma();
     // OPERATOR+ can upload attachments
     await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
     

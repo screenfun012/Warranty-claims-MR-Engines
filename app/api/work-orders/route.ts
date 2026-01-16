@@ -4,11 +4,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 
 export async function GET(request: NextRequest) {
   try {
+    const prisma = await getPrisma();
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get("search");
 

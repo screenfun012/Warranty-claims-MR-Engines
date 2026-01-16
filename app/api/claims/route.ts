@@ -5,12 +5,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function GET(request: NextRequest) {
   try {
+    const prisma = await getPrisma();
     // VIEWER+ can read claims
     await requirePermission(PERMISSIONS.CLAIMS_READ);
     const searchParams = request.nextUrl.searchParams;

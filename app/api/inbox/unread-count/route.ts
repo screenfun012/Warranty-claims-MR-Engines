@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 
 export async function GET() {
   try {
+    const prisma = await getPrisma();
+    
     // Count unread email threads (threads that haven't been viewed/opened and are not linked to a claim)
     // Use count() for better performance and SQLite compatibility
     const unreadCount = await prisma.emailThread.count({

@@ -4,10 +4,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 
 export async function POST(request: NextRequest) {
   try {
+    const prisma = await getPrisma();
     const body = await request.json();
     const { name, claimId } = body;
 

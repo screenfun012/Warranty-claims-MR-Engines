@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function GET() {
@@ -12,6 +12,7 @@ export async function GET() {
     // VIEWER+ can read inbox
     await requirePermission(PERMISSIONS.INBOX_READ);
     
+    const prisma = await getPrisma();
     const threads = await prisma.emailThread.findMany({
       include: {
         claim: {
