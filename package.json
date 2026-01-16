@@ -12,7 +12,7 @@
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.14.0",
     "@libsql/client": "0.8.1",
-    "@prisma/adapter-libsql": "^7.2.0",
+    "@prisma/adapter-libsql": "5.20.0",
     "@prisma/client": "^5.20.0",
     "@radix-ui/react-aspect-ratio": "^1.1.8",
     "@radix-ui/react-dialog": "^1.1.15",

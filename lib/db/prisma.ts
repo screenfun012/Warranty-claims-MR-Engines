@@ -15,6 +15,7 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaPromise: Promise<PrismaClient> | undefined;
 };
 
 // Check if we're using Turso
@@ -33,8 +34,8 @@ function requireEnv(name: string, value?: string): string {
   return v;
 }
 
-// Initialize Prisma client
-function initializePrisma(): PrismaClient {
+// Initialize Prisma client - async for Turso (needs connect()), sync for SQLite
+async function initializePrismaAsync(): Promise<PrismaClient> {
   if (isTurso) {
     // Get URL - prefer TURSO_DATABASE_URL, fallback to DATABASE_URL
     const url = requireEnv(
@@ -71,20 +72,23 @@ function initializePrisma(): PrismaClient {
     console.log(`[Prisma] Initializing Turso connection - Host: ${cleanUrl.substring(0, 50)}..., HasToken: ${!!authToken}`);
 
     // Dynamically import PrismaLibSQL adapter
-    // Use the official pattern: new PrismaLibSQL({ url, authToken })
-    // No need for createClient() or connect() - PrismaLibSQL handles it internally
-    // Note: Using synchronous require for top-level initialization
-    const adapterModule = require("@prisma/adapter-libsql");
-    const PrismaLibSQL = adapterModule.PrismaLibSQL || adapterModule.PrismaLibSql;
+    // For @prisma/adapter-libsql@5.20.0, use PrismaLibSQL (with capital SQL)
+    const adapterModule = await import("@prisma/adapter-libsql");
+    const PrismaLibSQL = adapterModule.PrismaLibSQL;
     
     if (!PrismaLibSQL) {
-      throw new Error("[Prisma] PrismaLibSQL not found in @prisma/adapter-libsql");
+      throw new Error("[Prisma] PrismaLibSQL not found in @prisma/adapter-libsql. Available exports: " + Object.keys(adapterModule).join(", "));
     }
     
-    const adapter = new PrismaLibSQL({
+    // For Prisma 5.20.0, create libsql client first, then wrap in adapter
+    const { createClient } = await import("@libsql/client");
+    const libsqlClient = createClient({
       url: cleanUrl,
       authToken: authToken,
     });
+    
+    // Wrap libsql client in PrismaLibSQL adapter (Prisma 5.20 pattern)
+    const adapter = new PrismaLibSQL(libsqlClient);
 
     return new PrismaClient({
       adapter,
@@ -98,16 +102,50 @@ function initializePrisma(): PrismaClient {
   });
 }
 
-// Export singleton Prisma client
-export const prisma =
-  globalForPrisma.prisma ??
-  initializePrisma();
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
+// Initialize Prisma client - sync wrapper
+function initializePrisma(): PrismaClient {
+  if (!isTurso) {
+    // Local SQLite - synchronous
+    return new PrismaClient({
+      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    });
+  }
+  
+  // For Turso, we need async initialization
+  // This will be handled by getPrisma() function
+  // Return a dummy client that will throw if used directly
+  return {} as PrismaClient;
 }
 
-// Export async getter for backward compatibility (works for both SQLite and Turso)
+// Export singleton Prisma client (works for SQLite, for Turso use getPrisma())
+export const prisma = initializePrisma();
+
+// Export async getter for Turso compatibility (works for both SQLite and Turso)
 export async function getPrisma(): Promise<PrismaClient> {
-  return prisma;
+  if (!isTurso) {
+    // SQLite - return sync client
+    if (globalForPrisma.prisma) {
+      return globalForPrisma.prisma;
+    }
+    const client = new PrismaClient({
+      log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+    });
+    if (process.env.NODE_ENV !== "production") {
+      globalForPrisma.prisma = client;
+    }
+    return client;
+  }
+  
+  // Turso - async initialization
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
+  
+  if (!globalForPrisma.prismaPromise) {
+    globalForPrisma.prismaPromise = initializePrismaAsync();
+  }
+  
+  const client = await globalForPrisma.prismaPromise;
+  globalForPrisma.prisma = client;
+  return client;
 }
