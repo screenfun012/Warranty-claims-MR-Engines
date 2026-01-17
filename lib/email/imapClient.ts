@@ -268,7 +268,16 @@ export async function fetchNewMessagesSince(
         const source = fullMessage.source;
         const bodyStructure = fullMessage.bodyStructure;
         
+        if (!source) {
+          console.error(`[fetchNewMessagesSince] ERROR: fullMessage.source is undefined for sequence ${messageSeq}`);
+          return null;
+        }
+        
         console.log(`[fetchNewMessagesSince] Parsing message body for sequence ${messageSeq}...`);
+        console.log(`[fetchNewMessagesSince] source type:`, typeof source);
+        console.log(`[fetchNewMessagesSince] source is Buffer:`, Buffer.isBuffer(source));
+        console.log(`[fetchNewMessagesSince] source length:`, source ? (Buffer.isBuffer(source) ? source.length : String(source).length) : 0);
+        
         const bodyParts = await parseMessageBody(source, bodyStructure);
         console.log(`[fetchNewMessagesSince] Parsed body: text=${!!bodyParts.text}, html=${!!bodyParts.html}, attachments=${bodyParts.attachments.length}`);
         
@@ -520,7 +529,22 @@ async function parseMessageBody(
       });
       
       // Pipe source buffer to parser
-      const sourceStream = Readable.from(source);
+      // Ensure source is a Buffer
+      let sourceBuffer: Buffer;
+      if (Buffer.isBuffer(source)) {
+        sourceBuffer = source;
+      } else if (typeof source === 'string') {
+        sourceBuffer = Buffer.from(source);
+      } else if (source instanceof Uint8Array) {
+        sourceBuffer = Buffer.from(source);
+      } else {
+        console.error("[parseMessageBody] ERROR: source is not a Buffer, string, or Uint8Array:", typeof source);
+        reject(new Error(`Invalid source type: ${typeof source}`));
+        return;
+      }
+      
+      console.log(`[parseMessageBody] Creating stream from source buffer (${sourceBuffer.length} bytes)`);
+      const sourceStream = Readable.from(sourceBuffer);
       sourceStream.pipe(parser);
     });
   } catch (error) {
