@@ -255,7 +255,27 @@ export async function fetchNewMessagesSince(
 
         // Extract body and attachments
         const source = fullMessage.source;
-        const bodyParts = await parseMessageBody(source, fullMessage.bodyStructure);
+        const bodyStructure = fullMessage.bodyStructure;
+        
+        // CRITICAL: Log bodyStructure to see what IMAP actually sees
+        console.log(`[IMAP] Message UID ${messageUid} bodyStructure type: ${bodyStructure?.type || 'unknown'}`);
+        if (bodyStructure && typeof bodyStructure === 'object') {
+          // Count parts that look like attachments from bodyStructure
+          const attachmentParts = countAttachmentPartsInBodyStructure(bodyStructure);
+          console.log(`[IMAP] BodyStructure indicates approximately ${attachmentParts} potential attachment parts`);
+        }
+        
+        const bodyParts = await parseMessageBody(source, bodyStructure);
+
+        console.log(`[IMAP] Message UID ${messageUid} parsed: mailparser found ${bodyParts.attachments.length} attachments`);
+        
+        // WARNING if mismatch detected
+        if (bodyStructure && typeof bodyStructure === 'object') {
+          const attachmentParts = countAttachmentPartsInBodyStructure(bodyStructure);
+          if (attachmentParts > bodyParts.attachments.length) {
+            console.error(`[IMAP] ⚠️ WARNING: BodyStructure suggests ~${attachmentParts} attachments, but mailparser found only ${bodyParts.attachments.length}!`);
+          }
+        }
 
         console.log(`Successfully parsed message UID ${messageUid}: ${headers.subject}`);
         
@@ -316,6 +336,42 @@ export async function fetchNewMessagesSince(
 }
 
 /**
+ * Helper function to count attachment-like parts in bodyStructure
+ * This helps us detect if mailparser is missing attachments
+ */
+function countAttachmentPartsInBodyStructure(structure: any, count = 0): number {
+  if (!structure || typeof structure !== 'object') return count;
+  
+  // If it's a multipart structure, check all parts
+  if (structure.parts && Array.isArray(structure.parts)) {
+    for (const part of structure.parts) {
+      count = countAttachmentPartsInBodyStructure(part, count);
+    }
+  }
+  
+  // Check if this part looks like an attachment
+  // Attachment indicators: disposition=attachment, filename parameter, or specific content types
+  const disposition = structure.disposition;
+  const params = structure.parameters || [];
+  const contentType = structure.type || '';
+  
+  // Check for filename in disposition params
+  const dispositionParams = disposition?.parameters || [];
+  const hasFilename = dispositionParams.some((p: any) => p.key?.toLowerCase() === 'filename') ||
+                      params.some((p: any) => p.key?.toLowerCase() === 'name') ||
+                      params.some((p: any) => p.key?.toLowerCase() === 'filename');
+  
+  // Count if it has attachment disposition or looks like attachment
+  if (disposition?.type?.toLowerCase() === 'attachment' || 
+      hasFilename ||
+      (contentType && !contentType.startsWith('text/') && !contentType.startsWith('multipart/'))) {
+    count++;
+  }
+  
+  return count;
+}
+
+/**
  * Parse message body and extract text, HTML, and attachments
  * Uses mailparser for proper MIME parsing
  */
@@ -331,10 +387,13 @@ async function parseMessageBody(
   
   try {
     // Parse with options to include all attachments (inline and regular)
+    // CRITICAL: Use options to ensure ALL attachments are parsed, including inline ones
     const parsed = await simpleParser(source, {
       // Include all attachments, including inline ones
       keepCidLinks: true, // Keep Content-ID links for inline attachments
-      // Don't skip any attachments
+      skipImageLinks: false, // Don't skip inline images - we want them as attachments
+      skipCidLinks: false, // Don't skip CID links - we want inline attachments
+      // Don't skip any attachments - parse everything
     });
     
     const attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
