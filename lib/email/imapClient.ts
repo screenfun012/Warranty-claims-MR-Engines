@@ -278,15 +278,22 @@ export async function fetchNewMessagesSince(
         // Extract body and attachments
         const source = fullMessage.source;
         const bodyStructure = fullMessage.bodyStructure;
-        const bodyParts = await parseMessageBody(source, bodyStructure);
         
-        return {
+        console.log(`[fetchNewMessagesSince] Parsing message body for sequence ${messageSeq}...`);
+        const bodyParts = await parseMessageBody(source, bodyStructure);
+        console.log(`[fetchNewMessagesSince] Parsed body: text=${!!bodyParts.text}, html=${!!bodyParts.html}, attachments=${bodyParts.attachments.length}`);
+        
+        const result = {
           uid: actualUid, // Use actual UID from message, or sequence number as fallback
           headers,
           bodyText: bodyParts.text,
           bodyHtml: bodyParts.html,
           attachments: bodyParts.attachments,
         };
+        
+        console.log(`[fetchNewMessagesSince] Successfully processed message sequence ${messageSeq}, UID ${actualUid}, from: ${headers.from}`);
+        
+        return result;
       } catch (error) {
         // Log detailed error information
         const errorMessage = error instanceof Error ? error.message : String(error);
