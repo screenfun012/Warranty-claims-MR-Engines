@@ -165,10 +165,17 @@ export async function saveAttachmentForClaim(params: {
     }
 
     // Upload file to WebDAV
-    await webdavClient.putFileContents(finalPath, params.fileBuffer, {
-      overwrite: false,
-      contentLength: params.fileBuffer.length,
-    });
+    try {
+      console.log(`[saveAttachmentForClaim] Uploading ${params.fileBuffer.length} bytes to WebDAV: ${finalPath}`);
+      await webdavClient.putFileContents(finalPath, params.fileBuffer, {
+        overwrite: false,
+        contentLength: params.fileBuffer.length,
+      });
+      console.log(`[saveAttachmentForClaim] Successfully uploaded file to WebDAV: ${finalPath}`);
+    } catch (error) {
+      console.error(`[saveAttachmentForClaim] Error uploading to WebDAV ${finalPath}:`, error);
+      throw new Error(`Failed to upload file to WebDAV: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     // Return relative path (we'll use this to identify the file)
     const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
@@ -270,10 +277,17 @@ export async function saveAttachmentForUnassignedThread(params: {
     }
 
     // Upload file to WebDAV
-    await webdavClient.putFileContents(finalPath, params.fileBuffer, {
-      overwrite: false,
-      contentLength: params.fileBuffer.length,
-    });
+    try {
+      console.log(`[saveAttachmentForUnassignedThread] Uploading ${params.fileBuffer.length} bytes to WebDAV: ${finalPath}`);
+      await webdavClient.putFileContents(finalPath, params.fileBuffer, {
+        overwrite: false,
+        contentLength: params.fileBuffer.length,
+      });
+      console.log(`[saveAttachmentForUnassignedThread] Successfully uploaded file to WebDAV: ${finalPath}`);
+    } catch (error) {
+      console.error(`[saveAttachmentForUnassignedThread] Error uploading to WebDAV ${finalPath}:`, error);
+      throw new Error(`Failed to upload file to WebDAV: ${error instanceof Error ? error.message : String(error)}`);
+    }
 
     // Return relative path
     const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
@@ -374,11 +388,28 @@ export async function readAttachmentFile(relativePathOrUrl: string): Promise<Buf
   if (relativePathOrUrl.startsWith('webdav:')) {
     // It's a WebDAV path
     if (!webdavClient) {
-      throw new Error("WebDAV client not initialized");
+      console.error("[readAttachmentFile] WebDAV client not initialized. Check WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD env vars.");
+      throw new Error("WebDAV client not initialized. Please check WebDAV configuration.");
     }
-    const webdavPath = getWebDAVPath(relativePathOrUrl.replace('webdav:', ''));
-    const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
-    return Buffer.from(buffer as ArrayBuffer);
+    const relativePath = relativePathOrUrl.replace('webdav:', '');
+    const webdavPath = getWebDAVPath(relativePath);
+    console.log(`[readAttachmentFile] Reading WebDAV file: ${webdavPath} (relative: ${relativePath})`);
+    
+    try {
+      // Check if file exists first
+      const exists = await webdavClient.exists(webdavPath);
+      if (!exists) {
+        console.error(`[readAttachmentFile] File does not exist on WebDAV: ${webdavPath}`);
+        throw new Error(`File not found on WebDAV: ${webdavPath}`);
+      }
+      
+      const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
+      console.log(`[readAttachmentFile] Successfully read ${Buffer.from(buffer as ArrayBuffer).length} bytes from WebDAV`);
+      return Buffer.from(buffer as ArrayBuffer);
+    } catch (error) {
+      console.error(`[readAttachmentFile] Error reading WebDAV file ${webdavPath}:`, error);
+      throw new Error(`Failed to read file from WebDAV: ${error instanceof Error ? error.message : String(error)}`);
+    }
   } else if (USE_BLOB || relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
     // It's a Blob URL
     const response = await fetch(relativePathOrUrl);

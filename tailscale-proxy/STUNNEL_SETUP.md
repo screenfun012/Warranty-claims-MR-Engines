@@ -23,6 +23,10 @@ Create `/etc/stunnel/stunnel.conf`:
 ```ini
 # Stunnel configuration for IMAP and SMTP TLS tunneling
 
+# Global settings
+pid = /var/run/stunnel4/stunnel4.pid
+foreground = no
+
 # IMAP tunnel: 1993 -> Synology IMAP (993)
 [imap]
 accept = 1993

@@ -37,7 +37,9 @@ export async function GET(
 
     // For WebDAV or filesystem, read and serve the file
     try {
+      console.log(`[files/${attachmentId}] Reading file: ${attachment.filePath} (isWebDAV: ${isWebDAV}, isBlobUrl: ${isBlobUrl})`);
       const fileBuffer = await readAttachmentFile(attachment.filePath);
+      console.log(`[files/${attachmentId}] Successfully read ${fileBuffer.length} bytes`);
       return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": attachment.mimeType,
@@ -46,15 +48,22 @@ export async function GET(
         },
       });
     } catch (error) {
-      console.error("Error reading file:", error);
+      console.error(`[files/${attachmentId}] Error reading file ${attachment.filePath}:`, error);
       // For filesystem, check if file exists
       if (!isWebDAV && !isBlobUrl) {
         const filePath = getAttachmentFilePath(attachment.filePath);
         if (!existsSync(filePath)) {
+          console.error(`[files/${attachmentId}] File not found on disk: ${filePath}`);
           return NextResponse.json({ error: "File not found on disk" }, { status: 404 });
         }
       }
-      return NextResponse.json({ error: "File not found" }, { status: 404 });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[files/${attachmentId}] Failed to read file: ${errorMessage}`);
+      return NextResponse.json({ 
+        error: "File not found", 
+        details: errorMessage,
+        filePath: attachment.filePath 
+      }, { status: 404 });
     }
   } catch (error) {
     console.error("Error serving file:", error);
