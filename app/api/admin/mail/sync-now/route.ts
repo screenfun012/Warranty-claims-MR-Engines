@@ -7,6 +7,10 @@ import { NextResponse } from "next/server";
 import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 
+// Vercel serverless function config - increase timeout for large emails with many attachments
+export const maxDuration = 60; // 60 seconds (Pro plan limit)
+export const runtime = 'nodejs';
+
 export async function POST() {
   try {
     // Check if email is configured

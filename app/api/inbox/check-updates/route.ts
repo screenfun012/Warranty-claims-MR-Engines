@@ -11,6 +11,10 @@ import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { env } from "@/lib/config/env";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 
+// Vercel serverless function config - increase timeout for large emails with many attachments
+export const maxDuration = 60; // 60 seconds (Pro plan limit)
+export const runtime = 'nodejs';
+
 // Track last sync time to avoid too frequent syncs
 let lastSyncTime: number = 0;
 const MIN_SYNC_INTERVAL = 30 * 1000; // Minimum 30 seconds between syncs

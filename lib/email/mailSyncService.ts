@@ -163,18 +163,40 @@ export async function syncNewEmails(): Promise<SyncResult> {
       newMessagesCount++;
 
       // Process attachments
-      console.log(`[Sync] Processing ${fetchedMsg.attachments.length} attachments for message UID ${fetchedMsg.uid}...`);
+      const attachmentCount = fetchedMsg.attachments.length;
+      console.log(`[Sync] Processing ${attachmentCount} attachments for message UID ${fetchedMsg.uid}...`);
       
-      if (fetchedMsg.attachments.length === 0) {
+      // Force flush console logs immediately (Vercel may buffer logs)
+      if (typeof process !== 'undefined' && process.stdout && typeof process.stdout.flush === 'function') {
+        try {
+          process.stdout.flush();
+        } catch (e) {
+          // Ignore flush errors
+        }
+      }
+      
+      if (attachmentCount === 0) {
         console.warn(`[Sync] Warning: Message UID ${fetchedMsg.uid} has no attachments, but email might have attachments in body`);
       }
       
       let savedAttachments = 0;
       let failedAttachments = 0;
       
-      for (const attachment of fetchedMsg.attachments) {
+      for (let i = 0; i < attachmentCount; i++) {
+        const attachment = fetchedMsg.attachments[i];
         try {
-          console.log(`[Sync] Saving attachment ${savedAttachments + failedAttachments + 1}/${fetchedMsg.attachments.length}: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
+          const attachmentIndex = i + 1;
+          console.log(`[Sync] Saving attachment ${attachmentIndex}/${attachmentCount}: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
+          
+          // Force flush console logs after each attachment (for Vercel)
+          if (typeof process !== 'undefined' && process.stdout && typeof process.stdout.flush === 'function') {
+            try {
+              process.stdout.flush();
+            } catch (e) {
+              // Ignore flush errors
+            }
+          }
+          
           let filePath: string;
 
           if (thread.claimId) {
