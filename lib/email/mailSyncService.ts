@@ -162,31 +162,30 @@ export async function syncNewEmails(): Promise<SyncResult> {
 
       newMessagesCount++;
 
-      // Process attachments
+      // Process attachments - OPTIMIZED: parallel processing and batch operations
       const attachmentCount = fetchedMsg.attachments.length;
       console.log(`[Sync] Processing ${attachmentCount} attachments for message UID ${fetchedMsg.uid}...`);
       
       if (attachmentCount === 0) {
         console.warn(`[Sync] Warning: Message UID ${fetchedMsg.uid} has no attachments, but email might have attachments in body`);
-      }
-      
-      let savedAttachments = 0;
-      let failedAttachments = 0;
-      
-      for (let i = 0; i < attachmentCount; i++) {
-        const attachment = fetchedMsg.attachments[i];
-        try {
-          const attachmentIndex = i + 1;
-          console.log(`[Sync] Saving attachment ${attachmentIndex}/${attachmentCount}: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
-          
-          let filePath: string;
+      } else {
+        // OPTIMIZATION 1: Load claim once if needed (not for each attachment)
+        let claim: Awaited<ReturnType<typeof getPrisma>>['claim']['findUnique'] extends (...args: any[]) => Promise<infer T> ? T : never | null = null;
+        if (thread.claimId) {
+          claim = await prisma.claim.findUnique({
+            where: { id: thread.claimId },
+          });
+        }
 
-          if (thread.claimId) {
-            // Save to claim folder
-            const claim = await prisma.claim.findUnique({
-              where: { id: thread.claimId },
-            });
+        // OPTIMIZATION 2: Process all attachments in parallel
+        const attachmentPromises = fetchedMsg.attachments.map(async (attachment, index) => {
+          try {
+            console.log(`[Sync] Saving attachment ${index + 1}/${attachmentCount}: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
+            
+            let filePath: string;
+
             if (claim) {
+              // Save to claim folder
               filePath = await saveAttachmentForClaim({
                 claim,
                 fileBuffer: attachment.buffer,
@@ -195,7 +194,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
                 subfolder: "03_attachments",
               });
             } else {
-              // Fallback to unassigned
+              // Save to unassigned thread folder
               filePath = await saveAttachmentForUnassignedThread({
                 threadId: thread.id,
                 fileBuffer: attachment.buffer,
@@ -203,38 +202,81 @@ export async function syncNewEmails(): Promise<SyncResult> {
                 mimeType: attachment.mimeType,
               });
             }
-          } else {
-            // Save to unassigned thread folder
-            filePath = await saveAttachmentForUnassignedThread({
-              threadId: thread.id,
-              fileBuffer: attachment.buffer,
-              originalFileName: attachment.filename,
-              mimeType: attachment.mimeType,
-            });
-          }
 
-          await prisma.attachment.create({
-            data: {
-              emailMessageId: emailMessage.id,
-              fileName: attachment.filename,
-              mimeType: attachment.mimeType,
+            return {
+              success: true,
+              attachment,
               filePath,
-              isRelevant: true,
-              source: "CLIENT",
-            },
-          });
-          
-          savedAttachments++;
-          console.log(`[Sync] ✓ Successfully saved attachment: ${attachment.filename}`);
-        } catch (error) {
-          failedAttachments++;
-          console.error(`[Sync] ✗ Error saving attachment ${attachment.filename}:`, error);
-          console.error(`[Sync] Error details:`, error instanceof Error ? error.message : String(error));
-          // Continue with next attachment
+            };
+          } catch (error) {
+            console.error(`[Sync] ✗ Error saving attachment ${attachment.filename}:`, error);
+            console.error(`[Sync] Error details:`, error instanceof Error ? error.message : String(error));
+            return {
+              success: false,
+              attachment,
+              error: error instanceof Error ? error.message : String(error),
+            };
+          }
+        });
+
+        // Wait for all attachments to be saved in parallel
+        const results = await Promise.allSettled(attachmentPromises);
+        
+        // Collect successful and failed attachments
+        const successful: Array<{ attachment: typeof fetchedMsg.attachments[0]; filePath: string }> = [];
+        const failed: Array<{ attachment: typeof fetchedMsg.attachments[0]; error: string }> = [];
+        
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value.success) {
+            successful.push(result.value as { attachment: typeof fetchedMsg.attachments[0]; filePath: string });
+          } else {
+            const errorMsg = result.status === 'rejected' ? result.reason?.message || 'Unknown error' : (result.value as any).error || 'Unknown error';
+            const attachment = result.status === 'rejected' ? null : (result.value as any).attachment;
+            if (attachment) {
+              failed.push({ attachment, error: errorMsg });
+            }
+          }
         }
+
+        // OPTIMIZATION 3: Batch create attachment records instead of individual creates
+        if (successful.length > 0) {
+          try {
+            await prisma.attachment.createMany({
+              data: successful.map(({ attachment, filePath }) => ({
+                emailMessageId: emailMessage.id,
+                fileName: attachment.filename,
+                mimeType: attachment.mimeType,
+                filePath,
+                isRelevant: true,
+                source: "CLIENT",
+              })),
+            });
+            console.log(`[Sync] ✓ Successfully saved ${successful.length} attachments in parallel`);
+          } catch (error) {
+            console.error(`[Sync] Error creating attachment records in batch:`, error);
+            // Fallback: try individual creates
+            for (const { attachment, filePath } of successful) {
+              try {
+                await prisma.attachment.create({
+                  data: {
+                    emailMessageId: emailMessage.id,
+                    fileName: attachment.filename,
+                    mimeType: attachment.mimeType,
+                    filePath,
+                    isRelevant: true,
+                    source: "CLIENT",
+                  },
+                });
+              } catch (createError) {
+                console.error(`[Sync] Error creating attachment record for ${attachment.filename}:`, createError);
+                failed.push({ attachment, error: createError instanceof Error ? createError.message : String(createError) });
+              }
+            }
+          }
+        }
+
+        console.log(`[Sync] Attachment summary for message UID ${fetchedMsg.uid}: ${successful.length} saved, ${failed.length} failed out of ${attachmentCount} total`);
       }
-      
-      console.log(`[Sync] Attachment summary for message UID ${fetchedMsg.uid}: ${savedAttachments} saved, ${failedAttachments} failed out of ${fetchedMsg.attachments.length} total`);
 
       // Detect forwarded emails and update thread
       await detectForwardedEmail(thread, fetchedMsg, prisma);
