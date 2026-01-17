@@ -177,6 +177,13 @@ export async function fetchNewMessagesSince(
           return null;
         }
         
+        // Debug envelope structure
+        console.log(`[fetchNewMessagesSince] envelope type:`, typeof envelope);
+        console.log(`[fetchNewMessagesSince] envelope keys:`, envelope ? Object.keys(envelope) : 'N/A');
+        console.log(`[fetchNewMessagesSince] envelope.from exists:`, !!envelope.from);
+        console.log(`[fetchNewMessagesSince] envelope.from type:`, typeof envelope.from);
+        console.log(`[fetchNewMessagesSince] envelope.from value:`, envelope.from);
+        
         // Get UID from fullMessage for tracking (it's in uid property when fetched)
         const actualUid = String(fullMessage.uid || messageSeq);
         
@@ -193,10 +200,41 @@ export async function fetchNewMessagesSince(
             .replace(/&#x2F;/g, '/');
         };
         
+        // Check if envelope.from exists and is array
+        let fromValue = "";
+        if (envelope.from) {
+          if (Array.isArray(envelope.from)) {
+            fromValue = decodeHtmlEntities(envelope.from[0]?.address || envelope.from[0]?.name || "");
+          } else {
+            fromValue = decodeHtmlEntities(envelope.from.address || envelope.from.name || String(envelope.from));
+          }
+        }
+        
+        let toValue = "";
+        if (envelope.to) {
+          if (Array.isArray(envelope.to)) {
+            toValue = decodeHtmlEntities(envelope.to[0]?.address || envelope.to[0]?.name || "");
+          } else {
+            toValue = decodeHtmlEntities(envelope.to.address || envelope.to.name || String(envelope.to));
+          }
+        }
+        
+        let ccValue = "";
+        if (envelope.cc) {
+          if (Array.isArray(envelope.cc)) {
+            ccValue = envelope.cc.map((c) => {
+              if (typeof c === 'string') return decodeHtmlEntities(c);
+              return decodeHtmlEntities(c?.address || c?.name || String(c));
+            }).join(", ");
+          } else {
+            ccValue = decodeHtmlEntities(envelope.cc.address || envelope.cc.name || String(envelope.cc));
+          }
+        }
+        
         const headers = {
-          from: decodeHtmlEntities(envelope.from?.[0]?.address || envelope.from?.[0]?.name || ""),
-          to: decodeHtmlEntities(envelope.to?.[0]?.address || envelope.to?.[0]?.name || ""),
-          cc: envelope.cc?.map((c) => decodeHtmlEntities(c.address || c.name)).join(", "),
+          from: fromValue,
+          to: toValue,
+          cc: ccValue || undefined,
           subject: decodeHtmlEntities(envelope.subject || ""),
           messageId: envelope.messageId || undefined,
           inReplyTo: envelope.inReplyTo?.[0] || undefined,
