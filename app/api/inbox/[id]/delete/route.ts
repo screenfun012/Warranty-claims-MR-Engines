@@ -37,6 +37,31 @@ export async function DELETE(
       );
     }
 
+    // CRITICAL: Track deleted messageIds BEFORE deletion to prevent sync from recreating them
+    // This ensures that once a mail is deleted, it won't come back during sync
+    for (const message of thread.messages) {
+      if (message.messageId) {
+        try {
+          await prisma.deletedEmailMessage.upsert({
+            where: { messageId: message.messageId },
+            update: { 
+              threadId: id,
+              deletedAt: new Date(),
+            },
+            create: {
+              messageId: message.messageId,
+              threadId: id,
+              deletedAt: new Date(),
+            },
+          });
+          console.log(`[Delete] Tracked deleted messageId: ${message.messageId}`);
+        } catch (error) {
+          console.error(`[Delete] Error tracking deleted messageId ${message.messageId}:`, error);
+          // Continue even if tracking fails - don't block deletion
+        }
+      }
+    }
+
     // Delete all attachment files from disk
     const { deleteAttachmentFile } = await import("@/lib/files/fileStorage");
     

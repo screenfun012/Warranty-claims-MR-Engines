@@ -236,3 +236,14 @@ model MailSyncState {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+// Track deleted email messages to prevent them from being recreated during sync
+model DeletedEmailMessage {
+  id        String   @id @default(cuid())
+  messageId String   @unique // Email messageId - unique identifier
+  threadId  String?  // Original thread ID (for reference)
+  deletedAt DateTime @default(now())
+  deletedBy String?  // User who deleted it (optional)
+  
+  @@index([messageId])
+}

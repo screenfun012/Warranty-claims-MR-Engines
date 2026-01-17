@@ -108,6 +108,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
       // Check if message already exists (by messageId) BEFORE creating thread
       let isNewMessage = true;
       if (fetchedMsg.headers.messageId) {
+        // First check if message is in the database
         const existingMessage = await prisma.emailMessage.findFirst({
           where: {
             messageId: fetchedMsg.headers.messageId,
@@ -117,6 +118,19 @@ export async function syncNewEmails(): Promise<SyncResult> {
         if (existingMessage) {
           // Skip duplicate message, but still track UID
           console.log(`Skipping duplicate message: ${fetchedMsg.headers.messageId}`);
+          continue;
+        }
+        
+        // CRITICAL: Check if message was previously deleted (to prevent recreating deleted emails)
+        const deletedMessage = await prisma.deletedEmailMessage.findUnique({
+          where: {
+            messageId: fetchedMsg.headers.messageId,
+          },
+        });
+
+        if (deletedMessage) {
+          // Skip message that was previously deleted - don't recreate it!
+          console.log(`Skipping previously deleted message: ${fetchedMsg.headers.messageId} (deleted at ${deletedMessage.deletedAt})`);
           continue;
         }
       }
