@@ -435,15 +435,18 @@ async function parseMessageBody(
   const { Readable } = await import("stream");
   
   // Create a helper function to create readable stream
-  // Readable.from might not be available in all environments
+  // Readable.from might not be available in all environments (like Vercel serverless)
   const createReadableStream = (buffer: Buffer) => {
     // Try Readable.from first (if available)
     if (Readable && Readable.from && typeof Readable.from === 'function') {
-      return Readable.from(buffer);
+      try {
+        return Readable.from(buffer);
+      } catch (error) {
+        console.warn("[parseMessageBody] Readable.from failed, using fallback:", error);
+      }
     }
-    // Fallback: Create a custom Readable stream
-    const { Readable: ReadableClass } = Readable;
-    return new ReadableClass({
+    // Fallback: Create a custom Readable stream using Readable constructor
+    return new Readable({
       read() {
         this.push(buffer);
         this.push(null); // End stream
