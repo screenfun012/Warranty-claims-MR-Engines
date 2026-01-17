@@ -25,7 +25,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const lastCheck = searchParams.get("lastCheck"); // ISO timestamp
 
-    // Trigger sync if email is configured and enough time has passed
+    // ALWAYS trigger sync when check-updates is called (fast, lightweight)
+    // Frontend polls every 5 seconds, so this provides near real-time email detection
     const now = Date.now();
     const shouldSync = 
       env.MAIL_SYNC_ENABLED && 
@@ -33,17 +34,17 @@ export async function GET(request: Request) {
       (now - lastSyncTime) >= MIN_SYNC_INTERVAL;
 
     if (shouldSync) {
-      // Trigger sync in background (don't wait for it)
-      syncNewEmails()
-        .then((result) => {
-          if (result.newMessages > 0) {
-            console.log(`[CheckUpdates] Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
-          }
-          lastSyncTime = Date.now();
-        })
-        .catch((error) => {
-          console.error("[CheckUpdates] Error syncing emails:", error);
-        });
+      // Trigger sync immediately (frontend will wait for response)
+      // This makes every check-updates call a real sync check
+      try {
+        const result = await syncNewEmails();
+        lastSyncTime = Date.now();
+        if (result.newMessages > 0) {
+          console.log(`[CheckUpdates] Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+        }
+      } catch (error) {
+        console.error("[CheckUpdates] Error syncing emails:", error);
+      }
     }
 
     // Get the most recent thread update time
