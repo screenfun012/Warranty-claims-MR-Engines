@@ -47,7 +47,8 @@ export async function GET() {
 
       // List contents of base path
       const contents = await webdavClient.getDirectoryContents(basePath);
-      console.log(`[WebDAV Test] Directory contents: ${contents.length} items`);
+      const contentsArray = Array.isArray(contents) ? contents : (contents.data || []);
+      console.log(`[WebDAV Test] Directory contents: ${contentsArray.length} items`);
 
       // Test write by creating a test file
       const testPath = `${basePath}/.test-connection`;
@@ -75,7 +76,7 @@ export async function GET() {
           url: env.WEBDAV_URL,
           basePath: basePath,
           basePathExists: exists,
-          directoryContents: Array.isArray(contents) ? contents.length : 0,
+          directoryContents: contentsArray.length,
           testWriteRead: "successful",
         },
       });
