@@ -153,10 +153,14 @@ export async function fetchNewMessagesSince(
       const messageUid = String(uid);
         
       try {
+        // fetchOne uses sequence numbers by default (which search returns by default)
+        // So we should be fine, but let's be explicit
         const fullMessage = await client.fetchOne(messageUid, {
           source: true,
           envelope: true,
           bodyStructure: true,
+        }, {
+          uid: false // Explicitly use sequence numbers (not UIDs)
         });
 
         if (!fullMessage) {
