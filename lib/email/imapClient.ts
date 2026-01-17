@@ -109,29 +109,74 @@ export async function fetchNewMessagesSince(
 
     const messages: FetchedMessage[] = [];
     
-    // SIMPLIFIED: Always fetch the most recent messages (ignore lastUid - we check duplicates by messageId)
-    // This is more reliable and works even if UIDs have gaps or are inconsistent
+    // Check mailbox status
     const status = await client.status("INBOX", { messages: true });
     
     if (status.messages === 0) {
+      console.log("[fetchNewMessagesSince] Mailbox is empty");
       return [];
     }
     
-    // Fetch the most recent N messages (limit)
-    const allMessages = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
-    const messageList = Array.isArray(allMessages) ? allMessages : [];
+    let messageUids: number[] = [];
     
-    // Extract UIDs and sort descending (newest first)
-    const messageUids = messageList
-      .map((msg) => {
-        if (typeof msg === 'number') return msg;
-        return msg?.uid || msg?.seq || msg;
-      })
-      .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
-      .map((uid) => parseInt(String(uid), 10))
-      .filter((uid) => !isNaN(uid))
-      .sort((a, b) => b - a) // Descending - newest first
-      .slice(0, limit); // Take only the most recent N
+    // Use UID range search if we have lastUid - this is more efficient and accurate
+    if (lastUid) {
+      const lastUidNum = parseInt(lastUid, 10);
+      if (!isNaN(lastUidNum)) {
+        // Fetch messages with UID greater than lastUid (new messages since last sync)
+        console.log(`[fetchNewMessagesSince] Searching for messages with UID > ${lastUidNum}...`);
+        try {
+          // Use proper imapflow syntax: { uid: 'range' }, { uid: true } to return UIDs
+          const searchResult = await client.search(
+            { uid: `${lastUidNum + 1}:*` }, // All messages with UID greater than lastUid
+            { uid: true } // Return UIDs, not sequence numbers
+          );
+          
+          messageUids = (Array.isArray(searchResult) ? searchResult : [])
+            .map((msg) => {
+              if (typeof msg === 'number') return msg;
+              return msg?.uid || msg?.seq || msg;
+            })
+            .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
+            .map((uid) => parseInt(String(uid), 10))
+            .filter((uid) => !isNaN(uid) && uid > lastUidNum)
+            .sort((a, b) => a - b); // Ascending - oldest first (process in order)
+          
+          console.log(`[fetchNewMessagesSince] Found ${messageUids.length} messages with UID > ${lastUidNum}`);
+        } catch (error) {
+          console.error(`[fetchNewMessagesSince] Error searching with UID range:`, error);
+          // Fallback to fetching recent messages
+          console.log(`[fetchNewMessagesSince] Falling back to fetching recent messages...`);
+        }
+      }
+    }
+    
+    // If no lastUid or UID range search failed/returned nothing, fetch recent messages
+    // Also limit the number of messages to process
+    if (messageUids.length === 0) {
+      console.log(`[fetchNewMessagesSince] No lastUid or no results, fetching most recent ${limit} messages...`);
+      const searchResult = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
+      const messageList = Array.isArray(searchResult) ? searchResult : [];
+      
+      messageUids = messageList
+        .map((msg) => {
+          if (typeof msg === 'number') return msg;
+          return msg?.uid || msg?.seq || msg;
+        })
+        .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
+        .map((uid) => parseInt(String(uid), 10))
+        .filter((uid) => !isNaN(uid))
+        .sort((a, b) => b - a) // Descending - newest first
+        .slice(0, limit); // Take only the most recent N
+      
+      console.log(`[fetchNewMessagesSince] Fetched ${messageUids.length} recent messages`);
+    } else {
+      // Limit the number of messages to process (take oldest first, up to limit)
+      if (messageUids.length > limit) {
+        console.log(`[fetchNewMessagesSince] Limiting to ${limit} messages (found ${messageUids.length} total)`);
+        messageUids = messageUids.slice(0, limit);
+      }
+    }
     
     if (messageUids.length === 0) {
       return [];
@@ -421,94 +466,6 @@ async function parseMessageBody(
       const sourceStream = Readable.from(source);
       sourceStream.pipe(parser);
     });
-    
-    const attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
-    
-    console.log(`[parseMessageBody] Total attachments found by mailparser: ${parsed.attachments?.length || 0}`);
-    
-    // Log details about all attachments found
-    if (parsed.attachments && parsed.attachments.length > 0) {
-      parsed.attachments.forEach((att, idx) => {
-        console.log(`[parseMessageBody] Attachment ${idx + 1}: filename="${att.filename}", contentType="${att.contentType}", contentId="${att.contentId}", cid="${att.cid}", size=${att.size || 'unknown'}`);
-      });
-    }
-    
-    if (parsed.attachments) {
-      for (const attachment of parsed.attachments) {
-        try {
-          // Generate filename if missing (for inline attachments without filename)
-          let filename = attachment.filename;
-          if (!filename) {
-            // Try to use Content-ID or CID as filename
-            if (attachment.contentId || attachment.cid) {
-              filename = attachment.contentId || attachment.cid || `unnamed-${Date.now()}`;
-              // Add extension based on content type if possible
-              const mimeType = attachment.contentType || "application/octet-stream";
-              if (mimeType.startsWith("image/")) {
-                const ext = mimeType.split("/")[1];
-                if (ext && !filename.includes(".")) {
-                  filename = `${filename}.${ext}`;
-                }
-              }
-            } else {
-              filename = `unnamed-${Date.now()}`;
-            }
-          }
-          
-          const mimeType = attachment.contentType || "application/octet-stream";
-          const content = attachment.content;
-          
-          // Check if content exists and is Buffer
-          if (!content) {
-            console.warn(`[parseMessageBody] Attachment ${filename} (contentId: ${attachment.contentId}, cid: ${attachment.cid}) has no content, skipping`);
-            continue;
-          }
-          
-          const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content as ArrayBuffer);
-          
-          if (buffer.length === 0) {
-            console.warn(`[parseMessageBody] Attachment ${filename} (contentId: ${attachment.contentId}, cid: ${attachment.cid}) is empty (0 bytes), skipping`);
-            continue;
-          }
-          
-          // Log if it's an inline attachment
-          const isInline = !!attachment.contentId || !!attachment.cid;
-          console.log(`[parseMessageBody] Processing attachment: ${filename} (${buffer.length} bytes, ${mimeType})${isInline ? ' [INLINE]' : ''}${attachment.contentId ? ` contentId="${attachment.contentId}"` : ''}${attachment.cid ? ` cid="${attachment.cid}"` : ''}`);
-          
-          attachments.push({
-            filename,
-            mimeType,
-            buffer,
-          });
-        } catch (error) {
-          console.error(`[parseMessageBody] Error processing attachment ${attachment.filename || attachment.contentId || 'unknown'}:`, error);
-          // Continue with next attachment
-        }
-      }
-    }
-    
-    console.log(`[parseMessageBody] Successfully parsed ${attachments.length} attachments`);
-
-    // Clean the text and HTML to remove unwanted content
-    let cleanedText = parsed.text;
-    if (cleanedText) {
-      cleanedText = cleanEmailBodyText(cleanedText);
-    }
-    
-    // For HTML, we'll clean it when extracting text, but keep original for reference
-    let cleanedHtml = parsed.html;
-    if (cleanedHtml) {
-      // Remove HTML comments and styles from HTML
-      cleanedHtml = cleanedHtml
-        .replace(/<!--[\s\S]*?-->/g, "")
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
-    }
-
-    return {
-      text: cleanedText || undefined,
-      html: cleanedHtml || undefined,
-      attachments,
-    };
   } catch (error) {
     console.error("Error parsing message body:", error);
     // Fallback: return empty result

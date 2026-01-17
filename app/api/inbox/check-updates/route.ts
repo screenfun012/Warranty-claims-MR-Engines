@@ -15,9 +15,9 @@ import { isEmailConfigured } from "@/lib/config/envLoader";
 export const maxDuration = 60; // 60 seconds (Pro plan limit)
 export const runtime = 'nodejs';
 
-// Track last sync time to avoid too frequent syncs
+// Track last sync time to avoid too frequent syncs (but allow fast polling)
 let lastSyncTime: number = 0;
-const MIN_SYNC_INTERVAL = 5 * 1000; // Minimum 5 seconds between syncs (fast email detection)
+const MIN_SYNC_INTERVAL = 2 * 1000; // Minimum 2 seconds between syncs (very fast email detection - like a mail client)
 
 export async function GET(request: Request) {
   try {
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
 
     // ALWAYS trigger sync when check-updates is called (fast, lightweight)
     // Frontend polls every 5 seconds, so this provides near real-time email detection
+    // This is how mail clients work - they check frequently and sync immediately
     const now = Date.now();
     const shouldSync = 
       env.MAIL_SYNC_ENABLED && 
@@ -35,16 +36,22 @@ export async function GET(request: Request) {
 
     if (shouldSync) {
       // Trigger sync immediately (frontend will wait for response)
-      // This makes every check-updates call a real sync check
+      // This makes every check-updates call a real sync check - fast and precise like a mail client
       try {
         const result = await syncNewEmails();
         lastSyncTime = Date.now();
         if (result.newMessages > 0) {
-          console.log(`[CheckUpdates] Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+          console.log(`[CheckUpdates] ✓ Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+        } else {
+          console.log(`[CheckUpdates] No new messages (checked in ${Date.now() - now}ms)`);
         }
       } catch (error) {
         console.error("[CheckUpdates] Error syncing emails:", error);
       }
+    } else {
+      // Too soon since last sync, skip (but still return current state)
+      const timeSinceLastSync = now - lastSyncTime;
+      console.log(`[CheckUpdates] Skipping sync (only ${timeSinceLastSync}ms since last sync, min ${MIN_SYNC_INTERVAL}ms)`);
     }
 
     // Get the most recent thread update time
