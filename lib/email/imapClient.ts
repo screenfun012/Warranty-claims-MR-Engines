@@ -167,10 +167,18 @@ export async function fetchNewMessagesSince(
           return null;
         }
         
-        console.log(`[fetchNewMessagesSince] Successfully fetched message sequence ${messageUid}`);
-
+        console.log(`[fetchNewMessagesSince] Successfully fetched message UID ${messageUid}`);
+        console.log(`[fetchNewMessagesSince] fullMessage keys:`, Object.keys(fullMessage || {}));
+        console.log(`[fetchNewMessagesSince] fullMessage.envelope:`, fullMessage?.envelope ? 'exists' : 'undefined');
+        
         // Parse headers
         const envelope = fullMessage.envelope;
+        
+        if (!envelope) {
+          console.error(`[fetchNewMessagesSince] ERROR: fullMessage.envelope is undefined for UID ${messageUid}`);
+          console.error(`[fetchNewMessagesSince] fullMessage structure:`, JSON.stringify(fullMessage, null, 2).substring(0, 500));
+          return null;
+        }
         
         // Helper function to decode HTML entities
         const decodeHtmlEntities = (str: string): string => {
