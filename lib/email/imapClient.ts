@@ -225,24 +225,44 @@ export async function fetchNewMessagesSince(
         }
         
         let toValue = "";
-        if (envelope.to) {
-          if (Array.isArray(envelope.to)) {
-            toValue = decodeHtmlEntities(envelope.to[0]?.address || envelope.to[0]?.name || "");
-          } else {
-            toValue = decodeHtmlEntities(envelope.to.address || envelope.to.name || String(envelope.to));
+        try {
+          if (envelope.to) {
+            const toArray = Array.isArray(envelope.to) ? envelope.to : 
+                           (envelope.to.length !== undefined ? Array.from(envelope.to) : 
+                           [envelope.to]);
+            
+            if (toArray.length > 0) {
+              const firstTo = toArray[0];
+              if (typeof firstTo === 'object' && firstTo !== null) {
+                toValue = decodeHtmlEntities(firstTo.address || firstTo.name || "");
+              } else {
+                toValue = decodeHtmlEntities(String(firstTo));
+              }
+            }
           }
+        } catch (toError) {
+          console.error(`[fetchNewMessagesSince] Error parsing envelope.to for sequence ${messageSeq}:`, toError);
+          toValue = "";
         }
         
         let ccValue = "";
-        if (envelope.cc) {
-          if (Array.isArray(envelope.cc)) {
-            ccValue = envelope.cc.map((c) => {
+        try {
+          if (envelope.cc) {
+            const ccArray = Array.isArray(envelope.cc) ? envelope.cc : 
+                           (envelope.cc.length !== undefined ? Array.from(envelope.cc) : 
+                           [envelope.cc]);
+            
+            ccValue = ccArray.map((c) => {
               if (typeof c === 'string') return decodeHtmlEntities(c);
-              return decodeHtmlEntities(c?.address || c?.name || String(c));
+              if (typeof c === 'object' && c !== null) {
+                return decodeHtmlEntities(c?.address || c?.name || String(c));
+              }
+              return decodeHtmlEntities(String(c));
             }).join(", ");
-          } else {
-            ccValue = decodeHtmlEntities(envelope.cc.address || envelope.cc.name || String(envelope.cc));
           }
+        } catch (ccError) {
+          console.error(`[fetchNewMessagesSince] Error parsing envelope.cc for sequence ${messageSeq}:`, ccError);
+          ccValue = "";
         }
         
         const headers = {
@@ -251,7 +271,7 @@ export async function fetchNewMessagesSince(
           cc: ccValue || undefined,
           subject: decodeHtmlEntities(envelope.subject || ""),
           messageId: envelope.messageId || undefined,
-          inReplyTo: envelope.inReplyTo?.[0] || undefined,
+          inReplyTo: Array.isArray(envelope.inReplyTo) ? envelope.inReplyTo[0] : envelope.inReplyTo || undefined,
           date: envelope.date || new Date(),
         };
 
