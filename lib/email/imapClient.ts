@@ -118,10 +118,9 @@ export async function fetchNewMessagesSince(
     }
     
     // Fetch the most recent N messages (limit)
-    // IMPORTANT: client.search() returns SEQUENCE NUMBERS by default, not UIDs!
-    // fetchOne() can accept either, but we need to use the right one
-    console.log(`[fetchNewMessagesSince] Calling client.search({}, { limit: ${limit * 2} })...`);
-    const allMessages = await client.search({}, { limit: limit * 2 }); // This returns sequence numbers
+    // CRITICAL: Use { uid: true } to get UIDs, then use { uid: true } in fetchOne
+    console.log(`[fetchNewMessagesSince] Calling client.search({}, { limit: ${limit * 2}, uid: true })...`);
+    const allMessages = await client.search({}, { limit: limit * 2, uid: true }); // Get UIDs, not sequence numbers
     console.log(`[fetchNewMessagesSince] Search returned:`, typeof allMessages, Array.isArray(allMessages) ? `array with ${allMessages.length} items` : 'not an array');
     const messageList = Array.isArray(allMessages) ? allMessages : [];
     console.log(`[fetchNewMessagesSince] messageList length: ${messageList.length}`);
@@ -153,12 +152,14 @@ export async function fetchNewMessagesSince(
       const messageUid = String(uid);
         
       try {
-        // fetchOne uses sequence numbers by default (which search returns by default)
-        console.log(`[fetchNewMessagesSince] Fetching message with sequence number: ${messageUid}`);
+        // Use UIDs (not sequence numbers) - search was called with { uid: true }
+        console.log(`[fetchNewMessagesSince] Fetching message with UID: ${messageUid}`);
         const fullMessage = await client.fetchOne(messageUid, {
           source: true,
           envelope: true,
           bodyStructure: true,
+        }, {
+          uid: true // Use UIDs, not sequence numbers
         });
 
         if (!fullMessage) {
