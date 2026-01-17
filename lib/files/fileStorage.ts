@@ -14,6 +14,7 @@ import { sanitizeClaimCodeForPath } from "@/lib/domain/claimCode";
 import { put, del, list } from "@vercel/blob";
 import { createClient } from "webdav";
 import type { WebDAVClient } from "webdav";
+import https from "https";
 
 // Check which storage to use (priority: WebDAV > Blob > Filesystem)
 const USE_WEBDAV = !!(env.WEBDAV_URL && env.WEBDAV_USERNAME && env.WEBDAV_PASSWORD);
@@ -35,9 +36,17 @@ let webdavClient: WebDAVClient | null = null;
 if (USE_WEBDAV) {
   try {
     console.log("[FileStorage] Initializing WebDAV client...");
+    
+    // Create HTTPS agent that accepts self-signed certificates
+    // This is needed when connecting through Nginx proxy with self-signed cert
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false, // Accept self-signed certificate from proxy
+    });
+    
     webdavClient = createClient(env.WEBDAV_URL, {
       username: env.WEBDAV_USERNAME,
       password: env.WEBDAV_PASSWORD,
+      httpsAgent: httpsAgent, // Use custom HTTPS agent
     });
     console.log("[FileStorage] ✓ WebDAV client initialized successfully:", env.WEBDAV_URL);
     console.log("[FileStorage] WebDAV base path:", env.WEBDAV_BASE_PATH);

@@ -6,6 +6,7 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/config/env";
 import { createClient } from "webdav";
+import https from "https";
 
 export async function GET() {
   try {
@@ -24,10 +25,17 @@ export async function GET() {
     console.log(`[WebDAV Test] Testing connection to: ${env.WEBDAV_URL}`);
     console.log(`[WebDAV Test] Base path: ${env.WEBDAV_BASE_PATH}`);
 
+    // Create HTTPS agent that accepts self-signed certificates
+    // This is needed when connecting through Nginx proxy with self-signed cert
+    const httpsAgent = new https.Agent({
+      rejectUnauthorized: false, // Accept self-signed certificate from proxy
+    });
+
     // Create WebDAV client
     const webdavClient = createClient(env.WEBDAV_URL, {
       username: env.WEBDAV_USERNAME,
       password: env.WEBDAV_PASSWORD,
+      httpsAgent: httpsAgent, // Use custom HTTPS agent
     });
 
     // Test connection by listing directory
