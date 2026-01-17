@@ -434,6 +434,12 @@ async function parseMessageBody(
   const { MailParser } = await import("mailparser");
   const { Readable } = await import("stream");
   
+  // Check if Readable is available
+  if (!Readable || !Readable.from) {
+    console.error("[parseMessageBody] ERROR: Readable.from is not available");
+    throw new Error("Readable.from is not available");
+  }
+  
   try {
     // Use streaming MailParser instead of simpleParser for better reliability on Vercel
     // This handles large emails and all attachments properly in serverless environments
