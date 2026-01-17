@@ -277,16 +277,38 @@ export async function fetchNewMessagesSince(
         console.log(`[fetchNewMessagesSince] source type:`, typeof source);
         console.log(`[fetchNewMessagesSince] source is Buffer:`, Buffer.isBuffer(source));
         console.log(`[fetchNewMessagesSince] source length:`, source ? (Buffer.isBuffer(source) ? source.length : String(source).length) : 0);
+        console.log(`[fetchNewMessagesSince] headers.from: ${headers.from}`);
         
-        const bodyParts = await parseMessageBody(source, bodyStructure);
-        console.log(`[fetchNewMessagesSince] Parsed body: text=${!!bodyParts.text}, html=${!!bodyParts.html}, attachments=${bodyParts.attachments.length}`);
+        let bodyParts;
+        try {
+          bodyParts = await parseMessageBody(source, bodyStructure);
+          console.log(`[fetchNewMessagesSince] Parsed body: text=${!!bodyParts?.text}, html=${!!bodyParts?.html}, attachments=${bodyParts?.attachments?.length || 0}`);
+        } catch (parseError) {
+          console.error(`[fetchNewMessagesSince] ERROR in parseMessageBody for sequence ${messageSeq}:`, parseError);
+          console.error(`[fetchNewMessagesSince] Parse error details:`, parseError instanceof Error ? parseError.message : String(parseError));
+          // Return message with empty body/attachments if parsing fails
+          bodyParts = {
+            text: undefined,
+            html: undefined,
+            attachments: [],
+          };
+        }
+        
+        if (!bodyParts) {
+          console.error(`[fetchNewMessagesSince] ERROR: parseMessageBody returned null/undefined for sequence ${messageSeq}`);
+          bodyParts = {
+            text: undefined,
+            html: undefined,
+            attachments: [],
+          };
+        }
         
         const result = {
           uid: actualUid, // Use actual UID from message, or sequence number as fallback
           headers,
-          bodyText: bodyParts.text,
-          bodyHtml: bodyParts.html,
-          attachments: bodyParts.attachments,
+          bodyText: bodyParts?.text,
+          bodyHtml: bodyParts?.html,
+          attachments: bodyParts?.attachments || [],
         };
         
         console.log(`[fetchNewMessagesSince] Successfully processed message sequence ${messageSeq}, UID ${actualUid}, from: ${headers.from}`);
