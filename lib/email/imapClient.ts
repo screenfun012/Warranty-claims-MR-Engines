@@ -334,15 +334,43 @@ async function parseMessageBody(
     
     const attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
     
+    console.log(`[parseMessageBody] Total attachments found by mailparser: ${parsed.attachments?.length || 0}`);
+    
     if (parsed.attachments) {
       for (const attachment of parsed.attachments) {
-        attachments.push({
-          filename: attachment.filename || "unnamed",
-          mimeType: attachment.contentType || "application/octet-stream",
-          buffer: attachment.content as Buffer,
-        });
+        try {
+          const filename = attachment.filename || `unnamed-${Date.now()}`;
+          const mimeType = attachment.contentType || "application/octet-stream";
+          const content = attachment.content;
+          
+          // Check if content exists and is Buffer
+          if (!content) {
+            console.warn(`[parseMessageBody] Attachment ${filename} has no content, skipping`);
+            continue;
+          }
+          
+          const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content as ArrayBuffer);
+          
+          if (buffer.length === 0) {
+            console.warn(`[parseMessageBody] Attachment ${filename} is empty (0 bytes), skipping`);
+            continue;
+          }
+          
+          console.log(`[parseMessageBody] Processing attachment: ${filename} (${buffer.length} bytes, ${mimeType})`);
+          
+          attachments.push({
+            filename,
+            mimeType,
+            buffer,
+          });
+        } catch (error) {
+          console.error(`[parseMessageBody] Error processing attachment ${attachment.filename}:`, error);
+          // Continue with next attachment
+        }
       }
     }
+    
+    console.log(`[parseMessageBody] Successfully parsed ${attachments.length} attachments`);
 
     // Clean the text and HTML to remove unwanted content
     let cleanedText = parsed.text;

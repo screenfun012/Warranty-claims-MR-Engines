@@ -164,9 +164,17 @@ export async function syncNewEmails(): Promise<SyncResult> {
 
       // Process attachments
       console.log(`[Sync] Processing ${fetchedMsg.attachments.length} attachments for message UID ${fetchedMsg.uid}...`);
+      
+      if (fetchedMsg.attachments.length === 0) {
+        console.warn(`[Sync] Warning: Message UID ${fetchedMsg.uid} has no attachments, but email might have attachments in body`);
+      }
+      
+      let savedAttachments = 0;
+      let failedAttachments = 0;
+      
       for (const attachment of fetchedMsg.attachments) {
         try {
-          console.log(`[Sync] Saving attachment: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
+          console.log(`[Sync] Saving attachment ${savedAttachments + failedAttachments + 1}/${fetchedMsg.attachments.length}: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
           let filePath: string;
 
           if (thread.claimId) {
@@ -211,11 +219,18 @@ export async function syncNewEmails(): Promise<SyncResult> {
               source: "CLIENT",
             },
           });
+          
+          savedAttachments++;
+          console.log(`[Sync] ✓ Successfully saved attachment: ${attachment.filename}`);
         } catch (error) {
-          console.error(`Error saving attachment ${attachment.filename}:`, error);
+          failedAttachments++;
+          console.error(`[Sync] ✗ Error saving attachment ${attachment.filename}:`, error);
+          console.error(`[Sync] Error details:`, error instanceof Error ? error.message : String(error));
           // Continue with next attachment
         }
       }
+      
+      console.log(`[Sync] Attachment summary for message UID ${fetchedMsg.uid}: ${savedAttachments} saved, ${failedAttachments} failed out of ${fetchedMsg.attachments.length} total`);
 
       // Detect forwarded emails and update thread
       await detectForwardedEmail(thread, fetchedMsg, prisma);
