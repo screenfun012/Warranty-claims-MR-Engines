@@ -59,14 +59,18 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections, we need to use 'mail.mrgroup.rs' as hostname for authentication
-  // even though we connect to proxy IP. Synology MailPlus Server requires domain name for auth.
-  // Use proxy IP as server, but 'mail.mrgroup.rs' as hostname for SNI and authentication
+  // CRITICAL: Synology MailPlus Server requires 'mail.mrgroup.rs' as hostname for authentication
+  // Even when connecting through proxy, we must use 'mail.mrgroup.rs' as the host
+  // The proxy IP (139.59.139.89) is only for TCP connection, but hostname must be 'mail.mrgroup.rs'
   const isProxyConnection = host !== 'mail.mrgroup.rs' && (host.includes('139.59.139.89') || host.includes('localhost'));
-  const actualHostname = isProxyConnection ? 'mail.mrgroup.rs' : host;
+  
+  // For proxy connections, use 'mail.mrgroup.rs' as hostname (required for auth)
+  // But connect to proxy IP for TCP connection
+  const connectionHost = isProxyConnection ? host : host; // Keep proxy IP for TCP connection
+  const authHostname = 'mail.mrgroup.rs'; // Always use mail.mrgroup.rs for authentication
 
   return new ImapFlow({
-    host: actualHostname, // Use mail.mrgroup.rs for proxy connections, actual host for direct
+    host: connectionHost, // Use proxy IP for TCP connection
     port,
     secure: tls, // true for port 993 (direct TLS)
     auth: {
@@ -76,11 +80,10 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // For proxy connections, use mail.mrgroup.rs as servername for SNI
-    // This allows Synology MailPlus Server to accept authentication
+    // Always use 'mail.mrgroup.rs' as servername for SNI (required for Synology auth)
     tls: tls ? {
       rejectUnauthorized: false, // Don't validate certificate (accept self-signed from HAProxy)
-      servername: 'mail.mrgroup.rs', // Always use mail.mrgroup.rs for SNI (required for auth)
+      servername: authHostname, // Use mail.mrgroup.rs for SNI (required for authentication)
       checkServerIdentity: () => undefined, // Skip hostname verification
     } : false,
   });
