@@ -152,15 +152,19 @@ export async function fetchNewMessagesSince(
       const messageUid = String(uid);
         
       try {
-        // Use UIDs (not sequence numbers) - search was called with { uid: true }
+        // Use fetch() instead of fetchOne() for better UID support
+        // fetch() can handle UID ranges and returns a Map
         console.log(`[fetchNewMessagesSince] Fetching message with UID: ${messageUid}`);
-        const fullMessage = await client.fetchOne(messageUid, {
+        const fetchResult = await client.fetch(messageUid, {
           source: true,
           envelope: true,
           bodyStructure: true,
         }, {
           uid: true // Use UIDs, not sequence numbers
         });
+        
+        // fetch() returns a Map<uid, messageObject>, so get first (and only) value
+        const fullMessage = fetchResult ? Array.from(fetchResult.values())[0] : null;
 
         if (!fullMessage) {
           console.log(`[fetchNewMessagesSince] fetchOne returned null for sequence ${messageUid}`);
