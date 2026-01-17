@@ -166,17 +166,14 @@ export async function fetchNewMessagesSince(
         }
         
         console.log(`[fetchNewMessagesSince] Successfully fetched message sequence ${messageSeq}`);
-        console.log(`[fetchNewMessagesSince] fullMessage type:`, typeof fullMessage);
         console.log(`[fetchNewMessagesSince] fullMessage keys:`, Object.keys(fullMessage || {}));
         console.log(`[fetchNewMessagesSince] fullMessage.envelope exists:`, !!fullMessage.envelope);
-        console.log(`[fetchNewMessagesSince] fullMessage structure (first 1000 chars):`, JSON.stringify(fullMessage, null, 2).substring(0, 1000));
         
         // Parse headers
         const envelope = fullMessage.envelope;
         
         if (!envelope) {
           console.error(`[fetchNewMessagesSince] ERROR: fullMessage.envelope is undefined for sequence ${messageSeq}`);
-          console.error(`[fetchNewMessagesSince] fullMessage structure:`, JSON.stringify(fullMessage, null, 2).substring(0, 2000));
           return null;
         }
         
