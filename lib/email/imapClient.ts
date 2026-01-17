@@ -154,6 +154,7 @@ export async function fetchNewMessagesSince(
         
       try {
         // fetchOne uses sequence numbers by default (which search returns by default)
+        console.log(`[fetchNewMessagesSince] Fetching message with sequence number: ${messageUid}`);
         const fullMessage = await client.fetchOne(messageUid, {
           source: true,
           envelope: true,
@@ -161,8 +162,11 @@ export async function fetchNewMessagesSince(
         });
 
         if (!fullMessage) {
+          console.log(`[fetchNewMessagesSince] fetchOne returned null for sequence ${messageUid}`);
           return null;
         }
+        
+        console.log(`[fetchNewMessagesSince] Successfully fetched message sequence ${messageUid}`);
 
         // Parse headers
         const envelope = fullMessage.envelope;
@@ -203,7 +207,16 @@ export async function fetchNewMessagesSince(
           attachments: bodyParts.attachments,
         };
       } catch (error) {
-        console.error(`Error processing message UID ${messageUid}:`, error);
+        // Log detailed error information
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        const errorName = error instanceof Error ? error.name : typeof error;
+        console.error(`[fetchNewMessagesSince] Error processing message sequence ${messageUid}:`, {
+          name: errorName,
+          message: errorMessage,
+          stack: errorStack,
+          error: error,
+        });
         return null;
       }
     });
