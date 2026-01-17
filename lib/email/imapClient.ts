@@ -74,10 +74,10 @@ export function getImapClient(): ImapFlow {
     timeout: 30000, // 30 seconds
     // Completely disable TLS validation for proxy connections with SSL termination
     // HAProxy presents self-signed certificate, we must accept it
+    // Use 'mail.mrgroup.rs' as servername for SNI to match Synology certificate CN
     tls: tls ? {
       rejectUnauthorized: false, // Don't validate certificate (accept self-signed from HAProxy)
-      servername: host, // Use host as servername for SNI
-      // Additional options to ensure self-signed certificates are accepted
+      servername: 'mail.mrgroup.rs', // Use mail.mrgroup.rs for SNI (matches Synology certificate)
       checkServerIdentity: () => undefined, // Skip hostname verification
     } : false,
   });
