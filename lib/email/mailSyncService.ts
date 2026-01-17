@@ -122,16 +122,29 @@ export async function syncNewEmails(): Promise<SyncResult> {
         }
         
         // CRITICAL: Check if message was previously deleted (to prevent recreating deleted emails)
-        const deletedMessage = await prisma.deletedEmailMessage.findUnique({
-          where: {
-            messageId: fetchedMsg.headers.messageId,
-          },
-        });
+        // Wrap in try-catch in case DeletedEmailMessage table doesn't exist yet (migration not applied)
+        try {
+          const deletedMessage = await prisma.deletedEmailMessage.findUnique({
+            where: {
+              messageId: fetchedMsg.headers.messageId,
+            },
+          });
 
-        if (deletedMessage) {
-          // Skip message that was previously deleted - don't recreate it!
-          console.log(`Skipping previously deleted message: ${fetchedMsg.headers.messageId} (deleted at ${deletedMessage.deletedAt})`);
-          continue;
+          if (deletedMessage) {
+            // Skip message that was previously deleted - don't recreate it!
+            console.log(`Skipping previously deleted message: ${fetchedMsg.headers.messageId} (deleted at ${deletedMessage.deletedAt})`);
+            continue;
+          }
+        } catch (deletedCheckError: any) {
+          // If DeletedEmailMessage table doesn't exist yet, just log and continue
+          // This happens if migration hasn't been applied to production yet
+          if (deletedCheckError?.code === 'P2021' || deletedCheckError?.code === 'SQLITE_UNKNOWN' || 
+              deletedCheckError?.message?.includes('no such table')) {
+            console.warn(`[Sync] DeletedEmailMessage table not found, skipping deleted message check (migration may not be applied yet)`);
+          } else {
+            // Re-throw if it's a different error
+            throw deletedCheckError;
+          }
         }
       }
 

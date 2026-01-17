@@ -431,28 +431,91 @@ async function parseMessageBody(
   html?: string;
   attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }>;
 }> {
-  const { MailParser } = await import("mailparser");
-  const { Readable } = await import("stream");
+  const { MailParser, simpleParser } = await import("mailparser");
   
-  // Create a helper function to create readable stream
-  // Readable.from might not be available in all environments (like Vercel serverless)
-  const createReadableStream = (buffer: Buffer) => {
-    // Try Readable.from first (if available)
-    if (Readable && Readable.from && typeof Readable.from === 'function') {
-      try {
-        return Readable.from(buffer);
-      } catch (error) {
-        console.warn("[parseMessageBody] Readable.from failed, using fallback:", error);
-      }
+  // Try simpleParser first (more reliable in serverless environments)
+  // It doesn't require Readable streams and works directly with buffers
+  try {
+    console.log(`[parseMessageBody] Attempting to parse with simpleParser (${source.length} bytes)`);
+    const parsed = await simpleParser(source);
+    
+    const attachments = (parsed.attachments || []).map((att: any) => ({
+      filename: att.filename || att.contentId || 'attachment',
+      mimeType: att.contentType || 'application/octet-stream',
+      buffer: att.content instanceof Buffer ? att.content : Buffer.from(att.content || ''),
+    }));
+    
+    let text = parsed.text;
+    let html = parsed.html || undefined;
+    
+    // Clean the text and HTML
+    if (text) {
+      const { cleanEmailBodyText } = require("./emailBodyCleaner");
+      text = cleanEmailBodyText(text);
     }
-    // Fallback: Create a custom Readable stream using Readable constructor
-    return new Readable({
-      read() {
-        this.push(buffer);
-        this.push(null); // End stream
+    
+    if (html) {
+      // Remove HTML comments and styles
+      html = html
+        .replace(/<!--[\s\S]*?-->/g, "")
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+    }
+    
+    console.log(`[parseMessageBody] Successfully parsed with simpleParser: text=${!!text}, html=${!!html}, attachments=${attachments.length}`);
+    
+    return {
+      text: text || undefined,
+      html: html || undefined,
+      attachments,
+    };
+  } catch (simpleParserError) {
+    console.warn(`[parseMessageBody] simpleParser failed, trying streaming parser:`, simpleParserError);
+    
+    // Fallback to streaming parser if simpleParser fails
+    // Create a helper function to create readable stream
+    // Readable.from might not be available in all environments (like Vercel serverless)
+    const createReadableStream = async (buffer: Buffer) => {
+      try {
+        // Try to import stream module
+        const stream = await import("stream");
+        const { Readable } = stream;
+        
+        // Try Readable.from first (if available)
+        if (Readable && Readable.from && typeof Readable.from === 'function') {
+          try {
+            return Readable.from(buffer);
+          } catch (error) {
+            console.warn("[parseMessageBody] Readable.from failed, using fallback:", error);
+          }
+        }
+        
+        // Fallback: Create a custom Readable stream using Readable constructor
+        if (Readable && typeof Readable === 'function') {
+          return new Readable({
+            read() {
+              this.push(buffer);
+              this.push(null); // End stream
+            }
+          });
+        }
+        
+        // Last resort: Create stream manually using stream.Readable
+        if (stream.Readable && typeof stream.Readable === 'function') {
+          return new stream.Readable({
+            read() {
+              this.push(buffer);
+              this.push(null); // End stream
+            }
+          });
+        }
+        
+        throw new Error("Readable is not available as a constructor");
+      } catch (error) {
+        console.error("[parseMessageBody] Error importing stream module:", error);
+        // If all else fails, throw the error so we can catch it above
+        throw new Error(`Failed to create Readable stream: ${error instanceof Error ? error.message : String(error)}`);
       }
-    });
-  };
+    };
   
   try {
     // Use streaming MailParser instead of simpleParser for better reliability on Vercel
@@ -587,7 +650,7 @@ async function parseMessageBody(
       
       console.log(`[parseMessageBody] Creating stream from source buffer (${sourceBuffer.length} bytes)`);
       try {
-        const sourceStream = createReadableStream(sourceBuffer);
+        const sourceStream = await createReadableStream(sourceBuffer);
         sourceStream.pipe(parser);
         
         // Add timeout to prevent hanging
