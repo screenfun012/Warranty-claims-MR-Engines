@@ -59,10 +59,14 @@ export function getImapClient(): ImapFlow {
 
   console.log(`Connecting to IMAP: ${user}@${host}:${port} (TLS: ${tls})`);
 
-  // For proxy connections with SSL termination, HAProxy terminates SSL and presents its own certificate
-  // We need to completely disable TLS validation to accept self-signed certificate from HAProxy
+  // For proxy connections, we need to use 'mail.mrgroup.rs' as hostname for authentication
+  // even though we connect to proxy IP. Synology MailPlus Server requires domain name for auth.
+  // Use proxy IP as server, but 'mail.mrgroup.rs' as hostname for SNI and authentication
+  const isProxyConnection = host !== 'mail.mrgroup.rs' && (host.includes('139.59.139.89') || host.includes('localhost'));
+  const actualHostname = isProxyConnection ? 'mail.mrgroup.rs' : host;
+
   return new ImapFlow({
-    host,
+    host: actualHostname, // Use mail.mrgroup.rs for proxy connections, actual host for direct
     port,
     secure: tls, // true for port 993 (direct TLS)
     auth: {
@@ -72,12 +76,11 @@ export function getImapClient(): ImapFlow {
     logger: true,
     // Add connection timeout for external servers
     timeout: 30000, // 30 seconds
-    // Completely disable TLS validation for proxy connections with SSL termination
-    // HAProxy presents self-signed certificate, we must accept it
-    // Use 'mail.mrgroup.rs' as servername for SNI to match Synology certificate CN
+    // For proxy connections, use mail.mrgroup.rs as servername for SNI
+    // This allows Synology MailPlus Server to accept authentication
     tls: tls ? {
       rejectUnauthorized: false, // Don't validate certificate (accept self-signed from HAProxy)
-      servername: 'mail.mrgroup.rs', // Use mail.mrgroup.rs for SNI (matches Synology certificate)
+      servername: 'mail.mrgroup.rs', // Always use mail.mrgroup.rs for SNI (required for auth)
       checkServerIdentity: () => undefined, // Skip hostname verification
     } : false,
   });
