@@ -119,64 +119,25 @@ export async function fetchNewMessagesSince(
     
     let messageUids: number[] = [];
     
-    // Use UID range search if we have lastUid - this is more efficient and accurate
-    if (lastUid) {
-      const lastUidNum = parseInt(lastUid, 10);
-      if (!isNaN(lastUidNum)) {
-        // Fetch messages with UID greater than lastUid (new messages since last sync)
-        console.log(`[fetchNewMessagesSince] Searching for messages with UID > ${lastUidNum}...`);
-        try {
-          // Use proper imapflow syntax: { uid: 'range' }, { uid: true } to return UIDs
-          const searchResult = await client.search(
-            { uid: `${lastUidNum + 1}:*` }, // All messages with UID greater than lastUid
-            { uid: true } // Return UIDs, not sequence numbers
-          );
-          
-          messageUids = (Array.isArray(searchResult) ? searchResult : [])
-            .map((msg) => {
-              if (typeof msg === 'number') return msg;
-              return msg?.uid || msg?.seq || msg;
-            })
-            .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
-            .map((uid) => parseInt(String(uid), 10))
-            .filter((uid) => !isNaN(uid) && uid > lastUidNum)
-            .sort((a, b) => a - b); // Ascending - oldest first (process in order)
-          
-          console.log(`[fetchNewMessagesSince] Found ${messageUids.length} messages with UID > ${lastUidNum}`);
-        } catch (error) {
-          console.error(`[fetchNewMessagesSince] Error searching with UID range:`, error);
-          // Fallback to fetching recent messages
-          console.log(`[fetchNewMessagesSince] Falling back to fetching recent messages...`);
-        }
-      }
-    }
+    // Always fetch recent messages first (more reliable)
+    // We check for duplicates by messageId later
+    console.log(`[fetchNewMessagesSince] Fetching most recent ${limit} messages...`);
+    const searchResult = await client.search({}, { limit: limit * 3 }); // Fetch more to ensure we get enough
+    const messageList = Array.isArray(searchResult) ? searchResult : [];
     
-    // If no lastUid or UID range search failed/returned nothing, fetch recent messages
-    // Also limit the number of messages to process
-    if (messageUids.length === 0) {
-      console.log(`[fetchNewMessagesSince] No lastUid or no results, fetching most recent ${limit} messages...`);
-      const searchResult = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
-      const messageList = Array.isArray(searchResult) ? searchResult : [];
-      
-      messageUids = messageList
-        .map((msg) => {
-          if (typeof msg === 'number') return msg;
-          return msg?.uid || msg?.seq || msg;
-        })
-        .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
-        .map((uid) => parseInt(String(uid), 10))
-        .filter((uid) => !isNaN(uid))
-        .sort((a, b) => b - a) // Descending - newest first
-        .slice(0, limit); // Take only the most recent N
-      
-      console.log(`[fetchNewMessagesSince] Fetched ${messageUids.length} recent messages`);
-    } else {
-      // Limit the number of messages to process (take oldest first, up to limit)
-      if (messageUids.length > limit) {
-        console.log(`[fetchNewMessagesSince] Limiting to ${limit} messages (found ${messageUids.length} total)`);
-        messageUids = messageUids.slice(0, limit);
-      }
-    }
+    // Extract UIDs and sort descending (newest first)
+    messageUids = messageList
+      .map((msg) => {
+        if (typeof msg === 'number') return msg;
+        return msg?.uid || msg?.seq || msg;
+      })
+      .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
+      .map((uid) => parseInt(String(uid), 10))
+      .filter((uid) => !isNaN(uid))
+      .sort((a, b) => b - a) // Descending - newest first
+      .slice(0, limit); // Take only the most recent N
+    
+    console.log(`[fetchNewMessagesSince] Found ${messageUids.length} messages to check (from most recent ${limit * 3})`);
     
     if (messageUids.length === 0) {
       return [];
