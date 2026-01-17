@@ -373,7 +373,8 @@ function countAttachmentPartsInBodyStructure(structure: any, count = 0): number 
 
 /**
  * Parse message body and extract text, HTML, and attachments
- * Uses mailparser for proper MIME parsing
+ * Uses MailParser streaming API instead of simpleParser for better reliability on Vercel
+ * Streaming parser handles large emails and attachments better in serverless environments
  */
 async function parseMessageBody(
   source: Buffer,
@@ -383,17 +384,128 @@ async function parseMessageBody(
   html?: string;
   attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }>;
 }> {
-  const { simpleParser } = await import("mailparser");
+  const { MailParser } = await import("mailparser");
+  const { Readable } = await import("stream");
   
   try {
-    // Parse with options to include all attachments (inline and regular)
-    // CRITICAL: Use options to ensure ALL attachments are parsed, including inline ones
-    const parsed = await simpleParser(source, {
-      // Include all attachments, including inline ones
-      keepCidLinks: true, // Keep Content-ID links for inline attachments
-      skipImageLinks: false, // Don't skip inline images - we want them as attachments
-      skipCidLinks: false, // Don't skip CID links - we want inline attachments
-      // Don't skip any attachments - parse everything
+    // Use streaming MailParser instead of simpleParser for better reliability on Vercel
+    // This handles large emails and all attachments properly in serverless environments
+    return new Promise((resolve, reject) => {
+      const parser = new MailParser({
+        // Include all attachments, including inline ones
+        keepCidLinks: true, // Keep Content-ID links for inline attachments
+        skipImageLinks: false, // Don't skip inline images - we want them as attachments
+        skipCidLinks: false, // Don't skip CID links - we want inline attachments
+      });
+      
+      const attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
+      let text: string | undefined;
+      let html: string | undefined;
+      
+      // Collect attachment data
+      parser.on("attachment", async (attachment) => {
+        try {
+          const filename = attachment.filename || 
+                          attachment.contentId || 
+                          attachment.cid || 
+                          `unnamed-${Date.now()}`;
+          const mimeType = attachment.contentType || "application/octet-stream";
+          
+          // Read attachment content into buffer
+          const chunks: Buffer[] = [];
+          attachment.content.on("data", (chunk: Buffer) => {
+            chunks.push(chunk);
+          });
+          
+          await new Promise<void>((resolve, reject) => {
+            attachment.content.on("end", () => {
+              const buffer = Buffer.concat(chunks);
+              
+              if (buffer.length === 0) {
+                console.warn(`[parseMessageBody] Attachment ${filename} is empty (0 bytes), skipping`);
+                attachment.release();
+                resolve();
+                return;
+              }
+              
+              // Add extension if missing (for inline attachments)
+              let finalFilename = filename;
+              if (!finalFilename.includes('.') && mimeType.startsWith('image/')) {
+                const ext = mimeType.split('/')[1];
+                finalFilename = `${finalFilename}.${ext}`;
+              }
+              
+              const isInline = !!attachment.contentId || !!attachment.cid;
+              console.log(`[parseMessageBody] Processing attachment: ${finalFilename} (${buffer.length} bytes, ${mimeType})${isInline ? ' [INLINE]' : ''}${attachment.contentId ? ` contentId="${attachment.contentId}"` : ''}${attachment.cid ? ` cid="${attachment.cid}"` : ''}`);
+              
+              attachments.push({
+                filename: finalFilename,
+                mimeType,
+                buffer,
+              });
+              
+              attachment.release(); // CRITICAL: Must release to continue parsing
+              resolve();
+            });
+            
+            attachment.content.on("error", (err) => {
+              console.error(`[parseMessageBody] Error reading attachment ${filename}:`, err);
+              attachment.release();
+              reject(err);
+            });
+          });
+        } catch (error) {
+          console.error(`[parseMessageBody] Error processing attachment:`, error);
+          attachment.release();
+        }
+      });
+      
+      // Collect text/html parts
+      parser.on("data", (data) => {
+        if (data.type === "text") {
+          if (data.textAsHtml) {
+            html = data.textAsHtml;
+          } else {
+            text = data.text;
+          }
+        }
+      });
+      
+      parser.on("headers", (headers) => {
+        // Headers are already extracted, but we can use them if needed
+      });
+      
+      parser.on("end", () => {
+        console.log(`[parseMessageBody] Successfully parsed ${attachments.length} attachments using streaming parser`);
+        
+        // Clean the text and HTML
+        if (text) {
+          const { cleanEmailBodyText } = require("./emailBodyCleaner");
+          text = cleanEmailBodyText(text);
+        }
+        
+        if (html) {
+          // Remove HTML comments and styles
+          html = html
+            .replace(/<!--[\s\S]*?-->/g, "")
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+        }
+        
+        resolve({
+          text: text || undefined,
+          html: html || undefined,
+          attachments,
+        });
+      });
+      
+      parser.on("error", (error) => {
+        console.error("[parseMessageBody] Parser error:", error);
+        reject(error);
+      });
+      
+      // Pipe source buffer to parser
+      const sourceStream = Readable.from(source);
+      sourceStream.pipe(parser);
     });
     
     const attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
