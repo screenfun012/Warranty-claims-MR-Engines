@@ -202,12 +202,26 @@ export async function fetchNewMessagesSince(
         
         // Check if envelope.from exists and is array
         let fromValue = "";
-        if (envelope.from) {
-          if (Array.isArray(envelope.from)) {
-            fromValue = decodeHtmlEntities(envelope.from[0]?.address || envelope.from[0]?.name || "");
-          } else {
-            fromValue = decodeHtmlEntities(envelope.from.address || envelope.from.name || String(envelope.from));
+        try {
+          if (envelope.from) {
+            // envelope.from is an array-like object (Array.isArray might return false)
+            // Try to access it as array first
+            const fromArray = Array.isArray(envelope.from) ? envelope.from : 
+                             (envelope.from.length !== undefined ? Array.from(envelope.from) : 
+                             [envelope.from]);
+            
+            if (fromArray.length > 0) {
+              const firstFrom = fromArray[0];
+              if (typeof firstFrom === 'object' && firstFrom !== null) {
+                fromValue = decodeHtmlEntities(firstFrom.address || firstFrom.name || "");
+              } else {
+                fromValue = decodeHtmlEntities(String(firstFrom));
+              }
+            }
           }
+        } catch (fromError) {
+          console.error(`[fetchNewMessagesSince] Error parsing envelope.from for sequence ${messageSeq}:`, fromError);
+          fromValue = "";
         }
         
         let toValue = "";
