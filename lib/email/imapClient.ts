@@ -118,11 +118,16 @@ export async function fetchNewMessagesSince(
     }
     
     // Fetch the most recent N messages (limit)
+    // IMPORTANT: client.search() returns SEQUENCE NUMBERS by default, not UIDs!
+    // fetchOne() can accept either, but we need to use the right one
     console.log(`[fetchNewMessagesSince] Calling client.search({}, { limit: ${limit * 2} })...`);
-    const allMessages = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
+    const allMessages = await client.search({}, { limit: limit * 2 }); // This returns sequence numbers
     console.log(`[fetchNewMessagesSince] Search returned:`, typeof allMessages, Array.isArray(allMessages) ? `array with ${allMessages.length} items` : 'not an array');
     const messageList = Array.isArray(allMessages) ? allMessages : [];
     console.log(`[fetchNewMessagesSince] messageList length: ${messageList.length}`);
+    if (messageList.length > 0) {
+      console.log(`[fetchNewMessagesSince] First few items from search:`, messageList.slice(0, 5));
+    }
     
     // Extract UIDs and sort descending (newest first)
     const messageUids = messageList
