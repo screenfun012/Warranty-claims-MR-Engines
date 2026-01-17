@@ -291,20 +291,15 @@ export async function syncNewEmails(): Promise<SyncResult> {
     }
   }
 
-  // Update sync state - always update lastSyncedAt, and update lastUid if we have one
-  // If we fetched messages but they were all duplicates, we still want to update lastSyncedAt
-  // to avoid re-checking the same messages
-  const updateData: any = {
-    lastSyncedAt: new Date(),
-  };
-  
-  if (highestUid) {
-    updateData.lastUid = highestUid;
-  }
-
+  // Update sync state - always update lastSyncedAt
+  // Update lastUid only if we have new messages (to track progress)
+  // But we don't rely on lastUid for fetching - we check duplicates by messageId instead
   await prisma.mailSyncState.update({
     where: { id: "default" },
-    data: updateData,
+    data: {
+      lastSyncedAt: new Date(),
+      ...(highestUid ? { lastUid: highestUid } : {}), // Only update if we have a valid UID
+    },
   });
 
   const syncDuration = Date.now() - syncStartTime;

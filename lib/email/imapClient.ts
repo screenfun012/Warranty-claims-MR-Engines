@@ -103,165 +103,45 @@ export async function fetchNewMessagesSince(
   let connected = false;
 
   try {
-    console.log("Attempting to connect to IMAP server...");
     await client.connect();
     connected = true;
-    console.log("IMAP connected successfully");
-    
-    console.log("Opening INBOX...");
     await client.mailboxOpen("INBOX");
-    console.log("INBOX opened successfully");
 
     const messages: FetchedMessage[] = [];
     
-    // First, let's check how many messages are in the mailbox
+    // SIMPLIFIED: Always fetch the most recent messages (ignore lastUid - we check duplicates by messageId)
+    // This is more reliable and works even if UIDs have gaps or are inconsistent
     const status = await client.status("INBOX", { messages: true });
-    console.log(`INBOX has ${status.messages} total messages`);
-
-    // CRITICAL: Log current state for debugging
-    console.log(`[fetchNewMessagesSince] lastUid: ${lastUid || 'none'}, limit: ${limit}`);
-    console.log(`[fetchNewMessagesSince] INBOX status: ${status.messages} total messages`);
     
-    // If we have a lastUid, fetch messages with UID greater than it
-    // Otherwise, fetch recent messages (for first sync, get the last N messages)
-    let messageList: any[] = [];
-    
-    if (lastUid) {
-      const lastUidNum = parseInt(lastUid, 10);
-      if (!isNaN(lastUidNum)) {
-        // Fetch messages with UID greater than lastUid
-        // CRITICAL: Use `lastUidNum:*` instead of `lastUidNum + 1:*` to include ALL new messages
-        // Some IMAP servers may have gaps in UIDs, so we should include lastUidNum too and filter duplicates
-        console.log(`[fetchNewMessagesSince] Searching for messages with UID >= ${lastUidNum + 1}`);
-        try {
-          // Try to fetch with UID range (more efficient)
-          const searchResult = await client.search({ uid: `${lastUidNum + 1}:*` }, { limit });
-          console.log(`[fetchNewMessagesSince] Search returned ${Array.isArray(searchResult) ? searchResult.length : 'non-array'} messages`);
-          
-          // Ensure we have an array
-          messageList = Array.isArray(searchResult) ? searchResult : [];
-          
-          // CRITICAL: Also check if there are messages at lastUidNum (in case of race condition)
-          // If we found 0 messages, try without the +1 to see if there's a message at lastUidNum
-          if (messageList.length === 0) {
-            console.log(`[fetchNewMessagesSince] No messages with UID > ${lastUidNum}, checking if message exists at UID ${lastUidNum}`);
-            try {
-              const checkResult = await client.search({ uid: `${lastUidNum}` }, { limit: 1 });
-              if (Array.isArray(checkResult) && checkResult.length > 0) {
-                console.log(`[fetchNewMessagesSince] Found message at UID ${lastUidNum}, but it should be skipped (already synced)`);
-              }
-            } catch (e) {
-              // Ignore check errors
-            }
-          }
-        } catch (error) {
-          console.error("[fetchNewMessagesSince] Error searching with UID range:", error);
-          console.error("[fetchNewMessagesSince] Error details:", error instanceof Error ? error.message : String(error));
-          
-          // Fallback: try to get all messages and filter
-          console.log("[fetchNewMessagesSince] Fallback: fetching all messages and filtering...");
-          const allMsgs = await client.search({}, { limit: limit * 2 });
-          console.log(`[fetchNewMessagesSince] Fallback fetched ${Array.isArray(allMsgs) ? allMsgs.length : 'non-array'} messages`);
-          
-          messageList = (Array.isArray(allMsgs) ? allMsgs : []).filter((msg) => {
-            try {
-              const msgUid = typeof msg === 'number' ? msg : (msg?.uid || msg?.seq || msg);
-              if (msgUid === undefined || msgUid === null) return false;
-              const msgUidNum = parseInt(String(msgUid), 10);
-              return msgUidNum > lastUidNum; // Use > not >= to avoid duplicates
-            } catch (e) {
-              console.error("[fetchNewMessagesSince] Error filtering message:", e, msg);
-              return false;
-            }
-          }).slice(0, limit);
-        }
-      } else {
-        console.log(`[fetchNewMessagesSince] Invalid lastUid format: ${lastUid}, fetching recent messages`);
-        // If lastUid is not valid, fetch recent messages
-        const recentMsgs = await client.search({}, { limit });
-        messageList = Array.isArray(recentMsgs) ? recentMsgs : [];
-      }
-    } else {
-      console.log("No lastUid found, fetching recent messages (first sync)");
-      // First sync - fetch the most recent messages
-      // Get all messages and take the last N
-      const allMessages = await client.search({}, { limit: limit * 2 });
-      // Sort by UID descending and take the first N
-      messageList = allMessages
-        .filter((msg) => {
-          // Filter out any undefined/null messages
-          if (msg === undefined || msg === null) return false;
-          try {
-            const uid = typeof msg === 'number' ? msg : (msg?.uid || msg?.seq || msg);
-            return uid !== undefined && uid !== null;
-          } catch (e) {
-            return false;
-          }
-        })
-        .sort((a, b) => {
-          try {
-            const uidA = typeof a === 'number' ? a : (a?.uid || a?.seq || a);
-            const uidB = typeof b === 'number' ? b : (b?.uid || b?.seq || b);
-            if (uidA === undefined || uidB === undefined) return 0;
-            return parseInt(String(uidB), 10) - parseInt(String(uidA), 10);
-          } catch (e) {
-            console.error("Error sorting messages:", e);
-            return 0;
-          }
-        })
-        .slice(0, limit);
-      console.log(`Fetched ${allMessages.length} total messages, taking ${messageList.length} most recent`);
+    if (status.messages === 0) {
+      return [];
     }
-
-    console.log(`[fetchNewMessagesSince] Found ${messageList.length} messages to process`);
     
-    // CRITICAL: Log message UIDs for debugging
-    if (messageList.length > 0) {
-      const uids = messageList.map((msg) => {
+    // Fetch the most recent N messages (limit)
+    const allMessages = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
+    const messageList = Array.isArray(allMessages) ? allMessages : [];
+    
+    // Extract UIDs and sort descending (newest first)
+    const messageUids = messageList
+      .map((msg) => {
         if (typeof msg === 'number') return msg;
         return msg?.uid || msg?.seq || msg;
-      }).filter((uid) => uid !== undefined && uid !== null);
-      console.log(`[fetchNewMessagesSince] Message UIDs to process: ${uids.slice(0, 10).join(', ')}${uids.length > 10 ? ` ... (${uids.length} total)` : ''}`);
-    } else {
-      console.log(`[fetchNewMessagesSince] ⚠️ WARNING: No messages found! This could mean:`);
-      console.log(`[fetchNewMessagesSince]   1. No new messages since lastUid=${lastUid}`);
-      console.log(`[fetchNewMessagesSince]   2. IMAP search returned empty (check search criteria)`);
-      console.log(`[fetchNewMessagesSince]   3. All messages were already processed`);
+      })
+      .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
+      .map((uid) => parseInt(String(uid), 10))
+      .filter((uid) => !isNaN(uid))
+      .sort((a, b) => b - a) // Descending - newest first
+      .slice(0, limit); // Take only the most recent N
+    
+    if (messageUids.length === 0) {
+      return [];
     }
     
-    for (const message of messageList) {
+    // Fetch all messages in parallel for speed
+    const fetchPromises = messageUids.map(async (uid) => {
+      const messageUid = String(uid);
+        
       try {
-        // Handle different message formats from imapflow
-        // message can be a number (UID) or an object with uid property
-        let messageUid: string;
-        if (message === undefined || message === null) {
-          console.error("Skipping undefined/null message");
-          continue;
-        }
-        
-        if (typeof message === 'number') {
-          messageUid = String(message);
-        } else if (typeof message === 'object' && message !== null) {
-          const uid = message.uid || message.seq || message;
-          if (uid === undefined || uid === null) {
-            console.error("Message object has no UID:", message);
-            continue;
-          }
-          messageUid = String(uid);
-        } else if (message !== undefined && message !== null) {
-          messageUid = String(message);
-        } else {
-          console.error("Message is undefined or null:", message);
-          continue;
-        }
-        
-        if (!messageUid || messageUid === 'undefined' || messageUid === 'null') {
-          console.error("Invalid message UID:", messageUid, message);
-          continue;
-        }
-        
-        console.log(`Processing message UID: ${messageUid}`);
-        
         const fullMessage = await client.fetchOne(messageUid, {
           source: true,
           envelope: true,
@@ -269,8 +149,7 @@ export async function fetchNewMessagesSince(
         });
 
         if (!fullMessage) {
-          console.log(`No data for message UID ${messageUid}`);
-          continue;
+          return null;
         }
 
         // Parse headers
@@ -302,39 +181,28 @@ export async function fetchNewMessagesSince(
         // Extract body and attachments
         const source = fullMessage.source;
         const bodyStructure = fullMessage.bodyStructure;
-        
-        // CRITICAL: Log bodyStructure to see what IMAP actually sees
-        console.log(`[IMAP] Message UID ${messageUid} bodyStructure type: ${bodyStructure?.type || 'unknown'}`);
-        if (bodyStructure && typeof bodyStructure === 'object') {
-          // Count parts that look like attachments from bodyStructure
-          const attachmentParts = countAttachmentPartsInBodyStructure(bodyStructure);
-          console.log(`[IMAP] BodyStructure indicates approximately ${attachmentParts} potential attachment parts`);
-        }
-        
         const bodyParts = await parseMessageBody(source, bodyStructure);
-
-        console.log(`[IMAP] Message UID ${messageUid} parsed: mailparser found ${bodyParts.attachments.length} attachments`);
         
-        // WARNING if mismatch detected
-        if (bodyStructure && typeof bodyStructure === 'object') {
-          const attachmentParts = countAttachmentPartsInBodyStructure(bodyStructure);
-          if (attachmentParts > bodyParts.attachments.length) {
-            console.error(`[IMAP] ⚠️ WARNING: BodyStructure suggests ~${attachmentParts} attachments, but mailparser found only ${bodyParts.attachments.length}!`);
-          }
-        }
-
-        console.log(`Successfully parsed message UID ${messageUid}: ${headers.subject}`);
-        
-        messages.push({
+        return {
           uid: messageUid,
           headers,
           bodyText: bodyParts.text,
           bodyHtml: bodyParts.html,
           attachments: bodyParts.attachments,
-        });
+        };
       } catch (error) {
-        console.error(`Error processing message:`, error);
-        // Continue with next message
+        console.error(`Error processing message UID ${messageUid}:`, error);
+        return null;
+      }
+    });
+    
+    // Wait for all messages to be fetched
+    const fetchedResults = await Promise.all(fetchPromises);
+    
+    // Filter out null results (errors) and add to messages array
+    for (const result of fetchedResults) {
+      if (result) {
+        messages.push(result);
       }
     }
 
