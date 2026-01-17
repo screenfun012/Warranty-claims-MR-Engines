@@ -469,8 +469,19 @@ async function parseMessageBody(
       attachments,
     };
   } catch (simpleParserError) {
-    console.warn(`[parseMessageBody] simpleParser failed, trying streaming parser:`, simpleParserError);
-    
+    console.error(`[parseMessageBody] simpleParser failed:`, simpleParserError);
+    // Return empty result if simpleParser fails
+    // This is safer than trying streaming parser which has issues in Vercel serverless
+    return {
+      text: undefined,
+      html: undefined,
+      attachments: [],
+    };
+  }
+}
+
+// Old streaming parser code (commented out - not compatible with Vercel serverless)
+/*
     // Fallback to streaming parser if simpleParser fails
     // Create a helper function to create readable stream
     // Readable.from might not be available in all environments (like Vercel serverless)
