@@ -17,7 +17,7 @@ export const runtime = 'nodejs';
 
 // Track last sync time to avoid too frequent syncs
 let lastSyncTime: number = 0;
-const MIN_SYNC_INTERVAL = 30 * 1000; // Minimum 30 seconds between syncs
+const MIN_SYNC_INTERVAL = 5 * 1000; // Minimum 5 seconds between syncs (fast email detection)
 
 export async function GET(request: Request) {
   try {

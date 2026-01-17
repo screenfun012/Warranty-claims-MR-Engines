@@ -127,9 +127,9 @@ export default function InboxPage() {
   } = useQuery({
     queryKey: ["inboxThreads"],
     queryFn: fetchThreads,
-    refetchInterval: 30000, // 30 sekundi - češće proveravanje za automatski sync
+    refetchInterval: 5000, // 5 sekundi - brza detekcija novih mailova (kao u mail aplikacijama)
     refetchIntervalInBackground: false,
-    staleTime: 20 * 1000, // 20 sekundi - data je fresh 20 sekundi
+    staleTime: 3 * 1000, // 3 sekunde - data je fresh 3 sekunde
   });
 
   // Get last updated time from threads

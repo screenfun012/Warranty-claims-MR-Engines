@@ -74,17 +74,22 @@ export async function syncNewEmails(): Promise<SyncResult> {
   });
 
   // Fetch new messages from IMAP
-  console.log(`Fetching messages from IMAP (lastUid: ${lastUid || "none"}, limit: ${limit})`);
+  console.log(`[Sync] Fetching messages from IMAP (lastUid: ${lastUid || "none"}, limit: ${limit})`);
+  const fetchStartTime = Date.now();
   const fetchedMessages = await fetchNewMessagesSince(lastUid, limit);
+  const fetchDuration = Date.now() - fetchStartTime;
   
-  console.log(`Fetched ${fetchedMessages.length} messages from IMAP`);
+  console.log(`[Sync] Fetched ${fetchedMessages.length} messages from IMAP in ${fetchDuration}ms`);
   
   if (fetchedMessages.length === 0) {
-    console.log("No messages fetched. This could mean:");
-    console.log("1. There are no new messages since last sync");
-    console.log("2. All messages were already processed");
-    console.log("3. IMAP search returned no results");
-    console.log("4. There's an issue with the search criteria");
+    console.log(`[Sync] ⚠️ No messages fetched. This could mean:`);
+    console.log(`[Sync]   1. No new messages since lastUid=${lastUid}`);
+    console.log(`[Sync]   2. All messages were already processed`);
+    console.log(`[Sync]   3. IMAP search returned no results`);
+    console.log(`[Sync]   4. There's an issue with the search criteria`);
+    console.log(`[Sync] ⚠️ If you know there are new emails, check IMAP logs above for search details`);
+  } else {
+    console.log(`[Sync] ✓ Found ${fetchedMessages.length} new messages to process`);
   }
 
   let newMessagesCount = 0;

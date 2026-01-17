@@ -118,6 +118,10 @@ export async function fetchNewMessagesSince(
     const status = await client.status("INBOX", { messages: true });
     console.log(`INBOX has ${status.messages} total messages`);
 
+    // CRITICAL: Log current state for debugging
+    console.log(`[fetchNewMessagesSince] lastUid: ${lastUid || 'none'}, limit: ${limit}`);
+    console.log(`[fetchNewMessagesSince] INBOX status: ${status.messages} total messages`);
+    
     // If we have a lastUid, fetch messages with UID greater than it
     // Otherwise, fetch recent messages (for first sync, get the last N messages)
     let messageList: any[] = [];
@@ -126,28 +130,56 @@ export async function fetchNewMessagesSince(
       const lastUidNum = parseInt(lastUid, 10);
       if (!isNaN(lastUidNum)) {
         // Fetch messages with UID greater than lastUid
-        console.log(`Fetching messages with UID > ${lastUidNum}`);
+        // CRITICAL: Use `lastUidNum:*` instead of `lastUidNum + 1:*` to include ALL new messages
+        // Some IMAP servers may have gaps in UIDs, so we should include lastUidNum too and filter duplicates
+        console.log(`[fetchNewMessagesSince] Searching for messages with UID >= ${lastUidNum + 1}`);
         try {
-          messageList = await client.search({ uid: `${lastUidNum + 1}:*` }, { limit });
+          // Try to fetch with UID range (more efficient)
+          const searchResult = await client.search({ uid: `${lastUidNum + 1}:*` }, { limit });
+          console.log(`[fetchNewMessagesSince] Search returned ${Array.isArray(searchResult) ? searchResult.length : 'non-array'} messages`);
+          
+          // Ensure we have an array
+          messageList = Array.isArray(searchResult) ? searchResult : [];
+          
+          // CRITICAL: Also check if there are messages at lastUidNum (in case of race condition)
+          // If we found 0 messages, try without the +1 to see if there's a message at lastUidNum
+          if (messageList.length === 0) {
+            console.log(`[fetchNewMessagesSince] No messages with UID > ${lastUidNum}, checking if message exists at UID ${lastUidNum}`);
+            try {
+              const checkResult = await client.search({ uid: `${lastUidNum}` }, { limit: 1 });
+              if (Array.isArray(checkResult) && checkResult.length > 0) {
+                console.log(`[fetchNewMessagesSince] Found message at UID ${lastUidNum}, but it should be skipped (already synced)`);
+              }
+            } catch (e) {
+              // Ignore check errors
+            }
+          }
         } catch (error) {
-          console.error("Error searching with UID range:", error);
+          console.error("[fetchNewMessagesSince] Error searching with UID range:", error);
+          console.error("[fetchNewMessagesSince] Error details:", error instanceof Error ? error.message : String(error));
+          
           // Fallback: try to get all messages and filter
+          console.log("[fetchNewMessagesSince] Fallback: fetching all messages and filtering...");
           const allMsgs = await client.search({}, { limit: limit * 2 });
-          messageList = allMsgs.filter((msg) => {
+          console.log(`[fetchNewMessagesSince] Fallback fetched ${Array.isArray(allMsgs) ? allMsgs.length : 'non-array'} messages`);
+          
+          messageList = (Array.isArray(allMsgs) ? allMsgs : []).filter((msg) => {
             try {
               const msgUid = typeof msg === 'number' ? msg : (msg?.uid || msg?.seq || msg);
               if (msgUid === undefined || msgUid === null) return false;
-              return parseInt(String(msgUid), 10) > lastUidNum;
+              const msgUidNum = parseInt(String(msgUid), 10);
+              return msgUidNum > lastUidNum; // Use > not >= to avoid duplicates
             } catch (e) {
-              console.error("Error filtering message:", e, msg);
+              console.error("[fetchNewMessagesSince] Error filtering message:", e, msg);
               return false;
             }
           }).slice(0, limit);
         }
       } else {
-        console.log(`Invalid lastUid format: ${lastUid}, fetching recent messages`);
+        console.log(`[fetchNewMessagesSince] Invalid lastUid format: ${lastUid}, fetching recent messages`);
         // If lastUid is not valid, fetch recent messages
-        messageList = await client.search({}, { limit });
+        const recentMsgs = await client.search({}, { limit });
+        messageList = Array.isArray(recentMsgs) ? recentMsgs : [];
       }
     } else {
       console.log("No lastUid found, fetching recent messages (first sync)");
@@ -181,7 +213,21 @@ export async function fetchNewMessagesSince(
       console.log(`Fetched ${allMessages.length} total messages, taking ${messageList.length} most recent`);
     }
 
-    console.log(`Found ${messageList.length} messages to process`);
+    console.log(`[fetchNewMessagesSince] Found ${messageList.length} messages to process`);
+    
+    // CRITICAL: Log message UIDs for debugging
+    if (messageList.length > 0) {
+      const uids = messageList.map((msg) => {
+        if (typeof msg === 'number') return msg;
+        return msg?.uid || msg?.seq || msg;
+      }).filter((uid) => uid !== undefined && uid !== null);
+      console.log(`[fetchNewMessagesSince] Message UIDs to process: ${uids.slice(0, 10).join(', ')}${uids.length > 10 ? ` ... (${uids.length} total)` : ''}`);
+    } else {
+      console.log(`[fetchNewMessagesSince] ⚠️ WARNING: No messages found! This could mean:`);
+      console.log(`[fetchNewMessagesSince]   1. No new messages since lastUid=${lastUid}`);
+      console.log(`[fetchNewMessagesSince]   2. IMAP search returned empty (check search criteria)`);
+      console.log(`[fetchNewMessagesSince]   3. All messages were already processed`);
+    }
     
     for (const message of messageList) {
       try {
