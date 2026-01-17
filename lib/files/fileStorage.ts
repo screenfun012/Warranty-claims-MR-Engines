@@ -19,18 +19,40 @@ import type { WebDAVClient } from "webdav";
 const USE_WEBDAV = !!(env.WEBDAV_URL && env.WEBDAV_USERNAME && env.WEBDAV_PASSWORD);
 const USE_BLOB = !USE_WEBDAV && !!env.BLOB_READ_WRITE_TOKEN;
 
+console.log("[FileStorage] Storage configuration:", {
+  USE_WEBDAV,
+  USE_BLOB,
+  hasWebDAVUrl: !!env.WEBDAV_URL,
+  hasWebDAVUsername: !!env.WEBDAV_USERNAME,
+  hasWebDAVPassword: !!env.WEBDAV_PASSWORD,
+  webDAVUrl: env.WEBDAV_URL ? `${env.WEBDAV_URL.substring(0, 20)}...` : "not set",
+  webDAVBasePath: env.WEBDAV_BASE_PATH,
+  hasBlobToken: !!env.BLOB_READ_WRITE_TOKEN,
+});
+
 // Initialize WebDAV client if configured
 let webdavClient: WebDAVClient | null = null;
 if (USE_WEBDAV) {
   try {
+    console.log("[FileStorage] Initializing WebDAV client...");
     webdavClient = createClient(env.WEBDAV_URL, {
       username: env.WEBDAV_USERNAME,
       password: env.WEBDAV_PASSWORD,
     });
-    console.log("WebDAV client initialized:", env.WEBDAV_URL);
+    console.log("[FileStorage] ✓ WebDAV client initialized successfully:", env.WEBDAV_URL);
+    console.log("[FileStorage] WebDAV base path:", env.WEBDAV_BASE_PATH);
   } catch (error) {
-    console.error("Failed to initialize WebDAV client:", error);
+    console.error("[FileStorage] ✗ Failed to initialize WebDAV client:", error);
     webdavClient = null;
+  }
+} else {
+  console.warn("[FileStorage] ⚠ WebDAV not configured! Missing:", {
+    WEBDAV_URL: !env.WEBDAV_URL,
+    WEBDAV_USERNAME: !env.WEBDAV_USERNAME,
+    WEBDAV_PASSWORD: !env.WEBDAV_PASSWORD,
+  });
+  if (!USE_BLOB) {
+    console.warn("[FileStorage] ⚠ No storage configured! Files will be saved to filesystem (which won't persist on Vercel).");
   }
 }
 

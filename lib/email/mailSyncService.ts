@@ -163,8 +163,10 @@ export async function syncNewEmails(): Promise<SyncResult> {
       newMessagesCount++;
 
       // Process attachments
+      console.log(`[Sync] Processing ${fetchedMsg.attachments.length} attachments for message UID ${fetchedMsg.uid}...`);
       for (const attachment of fetchedMsg.attachments) {
         try {
+          console.log(`[Sync] Saving attachment: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
           let filePath: string;
 
           if (thread.claimId) {
