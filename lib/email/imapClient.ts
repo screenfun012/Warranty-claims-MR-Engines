@@ -118,9 +118,9 @@ export async function fetchNewMessagesSince(
     }
     
     // Fetch the most recent N messages (limit)
-    // CRITICAL: Use { uid: true } to get UIDs, then use { uid: true } in fetchOne
-    console.log(`[fetchNewMessagesSince] Calling client.search({}, { limit: ${limit * 2}, uid: true })...`);
-    const allMessages = await client.search({}, { limit: limit * 2, uid: true }); // Get UIDs, not sequence numbers
+    // Use sequence numbers (default) - fetchOne works better with sequence numbers
+    console.log(`[fetchNewMessagesSince] Calling client.search({}, { limit: ${limit * 2} })...`);
+    const allMessages = await client.search({}, { limit: limit * 2 }); // Returns sequence numbers by default
     console.log(`[fetchNewMessagesSince] Search returned:`, typeof allMessages, Array.isArray(allMessages) ? `array with ${allMessages.length} items` : 'not an array');
     const messageList = Array.isArray(allMessages) ? allMessages : [];
     console.log(`[fetchNewMessagesSince] messageList length: ${messageList.length}`);
@@ -128,57 +128,56 @@ export async function fetchNewMessagesSince(
       console.log(`[fetchNewMessagesSince] First few items from search:`, messageList.slice(0, 5));
     }
     
-    // Extract UIDs and sort descending (newest first)
-    const messageUids = messageList
+    // Extract sequence numbers and sort descending (newest first)
+    const messageSeqs = messageList
       .map((msg) => {
         if (typeof msg === 'number') return msg;
         return msg?.uid || msg?.seq || msg;
       })
-      .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
-      .map((uid) => parseInt(String(uid), 10))
-      .filter((uid) => !isNaN(uid))
+      .filter((seq) => seq !== undefined && seq !== null && seq !== 'undefined' && seq !== 'null')
+      .map((seq) => parseInt(String(seq), 10))
+      .filter((seq) => !isNaN(seq))
       .sort((a, b) => b - a) // Descending - newest first
       .slice(0, limit); // Take only the most recent N
     
-    console.log(`[fetchNewMessagesSince] Extracted ${messageUids.length} message UIDs:`, messageUids.slice(0, 10));
+    console.log(`[fetchNewMessagesSince] Extracted ${messageSeqs.length} message sequence numbers:`, messageSeqs.slice(0, 10));
     
-    if (messageUids.length === 0) {
-      console.log(`[fetchNewMessagesSince] ⚠️ No message UIDs found - returning empty array`);
+    if (messageSeqs.length === 0) {
+      console.log(`[fetchNewMessagesSince] ⚠️ No message sequence numbers found - returning empty array`);
       return [];
     }
     
     // Fetch all messages in parallel for speed
-    const fetchPromises = messageUids.map(async (uid) => {
-      const messageUid = String(uid);
+    const fetchPromises = messageSeqs.map(async (seq) => {
+      const messageSeq = String(seq);
         
       try {
-        // Use fetchOne() but with proper handling
-        console.log(`[fetchNewMessagesSince] Fetching message with UID: ${messageUid}`);
-        const fullMessage = await client.fetchOne(messageUid, {
+        // Use fetchOne() with sequence numbers (default) - no uid option needed
+        console.log(`[fetchNewMessagesSince] Fetching message with sequence number: ${messageSeq}`);
+        const fullMessage = await client.fetchOne(messageSeq, {
           source: true,
           envelope: true,
           bodyStructure: true,
-        }, {
-          uid: true // Use UIDs, not sequence numbers
         });
 
         if (!fullMessage) {
-          console.log(`[fetchNewMessagesSince] fetchOne returned null for sequence ${messageUid}`);
+          console.log(`[fetchNewMessagesSince] fetchOne returned null for sequence ${messageSeq}`);
           return null;
         }
         
-        console.log(`[fetchNewMessagesSince] Successfully fetched message UID ${messageUid}`);
-        console.log(`[fetchNewMessagesSince] fullMessage keys:`, Object.keys(fullMessage || {}));
-        console.log(`[fetchNewMessagesSince] fullMessage.envelope:`, fullMessage?.envelope ? 'exists' : 'undefined');
+        console.log(`[fetchNewMessagesSince] Successfully fetched message sequence ${messageSeq}`);
         
         // Parse headers
         const envelope = fullMessage.envelope;
         
         if (!envelope) {
-          console.error(`[fetchNewMessagesSince] ERROR: fullMessage.envelope is undefined for UID ${messageUid}`);
-          console.error(`[fetchNewMessagesSince] fullMessage structure:`, JSON.stringify(fullMessage, null, 2).substring(0, 500));
+          console.error(`[fetchNewMessagesSince] ERROR: fullMessage.envelope is undefined for sequence ${messageSeq}`);
+          console.error(`[fetchNewMessagesSince] fullMessage keys:`, Object.keys(fullMessage || {}));
           return null;
         }
+        
+        // Get UID from fullMessage for tracking (it's in uid property when fetched)
+        const actualUid = String(fullMessage.uid || messageSeq);
         
         // Helper function to decode HTML entities
         const decodeHtmlEntities = (str: string): string => {
@@ -209,7 +208,7 @@ export async function fetchNewMessagesSince(
         const bodyParts = await parseMessageBody(source, bodyStructure);
         
         return {
-          uid: messageUid,
+          uid: actualUid, // Use actual UID from message, or sequence number as fallback
           headers,
           bodyText: bodyParts.text,
           bodyHtml: bodyParts.html,
@@ -220,7 +219,7 @@ export async function fetchNewMessagesSince(
         const errorMessage = error instanceof Error ? error.message : String(error);
         const errorStack = error instanceof Error ? error.stack : undefined;
         const errorName = error instanceof Error ? error.name : typeof error;
-        console.error(`[fetchNewMessagesSince] Error processing message sequence ${messageUid}:`, {
+        console.error(`[fetchNewMessagesSince] Error processing message sequence ${messageSeq}:`, {
           name: errorName,
           message: errorMessage,
           stack: errorStack,
