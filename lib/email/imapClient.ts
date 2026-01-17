@@ -203,21 +203,18 @@ export async function fetchNewMessagesSince(
         // Check if envelope.from exists and is array
         let fromValue = "";
         try {
-          if (envelope.from) {
-            // envelope.from is an array-like object (Array.isArray might return false)
-            // Try to access it as array first
-            const fromArray = Array.isArray(envelope.from) ? envelope.from : 
-                             (envelope.from.length !== undefined ? Array.from(envelope.from) : 
-                             [envelope.from]);
-            
-            if (fromArray.length > 0) {
-              const firstFrom = fromArray[0];
-              if (typeof firstFrom === 'object' && firstFrom !== null) {
-                fromValue = decodeHtmlEntities(firstFrom.address || firstFrom.name || "");
+          if (envelope && envelope.from) {
+            // envelope.from is an array - access it directly
+            const fromItem = envelope.from[0];
+            if (fromItem) {
+              if (typeof fromItem === 'object' && fromItem !== null) {
+                fromValue = decodeHtmlEntities(fromItem.address || fromItem.name || "");
               } else {
-                fromValue = decodeHtmlEntities(String(firstFrom));
+                fromValue = decodeHtmlEntities(String(fromItem));
               }
             }
+          } else {
+            console.warn(`[fetchNewMessagesSince] envelope.from is missing for sequence ${messageSeq}`);
           }
         } catch (fromError) {
           console.error(`[fetchNewMessagesSince] Error parsing envelope.from for sequence ${messageSeq}:`, fromError);
@@ -226,17 +223,13 @@ export async function fetchNewMessagesSince(
         
         let toValue = "";
         try {
-          if (envelope.to) {
-            const toArray = Array.isArray(envelope.to) ? envelope.to : 
-                           (envelope.to.length !== undefined ? Array.from(envelope.to) : 
-                           [envelope.to]);
-            
-            if (toArray.length > 0) {
-              const firstTo = toArray[0];
-              if (typeof firstTo === 'object' && firstTo !== null) {
-                toValue = decodeHtmlEntities(firstTo.address || firstTo.name || "");
+          if (envelope && envelope.to) {
+            const toItem = envelope.to[0];
+            if (toItem) {
+              if (typeof toItem === 'object' && toItem !== null) {
+                toValue = decodeHtmlEntities(toItem.address || toItem.name || "");
               } else {
-                toValue = decodeHtmlEntities(String(firstTo));
+                toValue = decodeHtmlEntities(String(toItem));
               }
             }
           }
@@ -247,12 +240,8 @@ export async function fetchNewMessagesSince(
         
         let ccValue = "";
         try {
-          if (envelope.cc) {
-            const ccArray = Array.isArray(envelope.cc) ? envelope.cc : 
-                           (envelope.cc.length !== undefined ? Array.from(envelope.cc) : 
-                           [envelope.cc]);
-            
-            ccValue = ccArray.map((c) => {
+          if (envelope && envelope.cc && envelope.cc.length > 0) {
+            ccValue = envelope.cc.map((c: any) => {
               if (typeof c === 'string') return decodeHtmlEntities(c);
               if (typeof c === 'object' && c !== null) {
                 return decodeHtmlEntities(c?.address || c?.name || String(c));
