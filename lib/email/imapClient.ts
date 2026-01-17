@@ -118,8 +118,11 @@ export async function fetchNewMessagesSince(
     }
     
     // Fetch the most recent N messages (limit)
+    console.log(`[fetchNewMessagesSince] Calling client.search({}, { limit: ${limit * 2} })...`);
     const allMessages = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
+    console.log(`[fetchNewMessagesSince] Search returned:`, typeof allMessages, Array.isArray(allMessages) ? `array with ${allMessages.length} items` : 'not an array');
     const messageList = Array.isArray(allMessages) ? allMessages : [];
+    console.log(`[fetchNewMessagesSince] messageList length: ${messageList.length}`);
     
     // Extract UIDs and sort descending (newest first)
     const messageUids = messageList
@@ -133,7 +136,10 @@ export async function fetchNewMessagesSince(
       .sort((a, b) => b - a) // Descending - newest first
       .slice(0, limit); // Take only the most recent N
     
+    console.log(`[fetchNewMessagesSince] Extracted ${messageUids.length} message UIDs:`, messageUids.slice(0, 10));
+    
     if (messageUids.length === 0) {
+      console.log(`[fetchNewMessagesSince] ⚠️ No message UIDs found - returning empty array`);
       return [];
     }
     
