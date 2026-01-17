@@ -127,9 +127,9 @@ export default function InboxPage() {
   } = useQuery({
     queryKey: ["inboxThreads"],
     queryFn: fetchThreads,
-    refetchInterval: 60000, // 60 sekundi umesto 30 (2x manje request-ova)
+    refetchInterval: 30000, // 30 sekundi - češće proveravanje za automatski sync
     refetchIntervalInBackground: false,
-    staleTime: 30 * 1000, // 30 sekundi - data je fresh 30 sekundi
+    staleTime: 20 * 1000, // 20 sekundi - data je fresh 20 sekundi
   });
 
   // Get last updated time from threads
@@ -171,14 +171,14 @@ export default function InboxPage() {
     });
   }, [threads, searchQuery]);
 
-  // Check for updates sa React Query
+  // Check for updates sa React Query - ovo trigger-uje sync u pozadini
   const { data: updateCheck } = useQuery({
     queryKey: ["inboxUpdates", lastCheckTime],
     queryFn: () => checkForUpdates(lastCheckTime),
     enabled: !!lastCheckTime && !document.hidden,
-    refetchInterval: 45000, // 45 sekundi umesto 15 (3x manje request-ova)
+    refetchInterval: 30000, // 30 sekundi - trigger-uje sync svakih 30 sekundi
     refetchIntervalInBackground: false,
-    staleTime: 20 * 1000, // 20 sekundi - data je fresh 20 sekundi
+    staleTime: 15 * 1000, // 15 sekundi - data je fresh 15 sekundi
   });
 
   // Refetch kada se detektuju update-i

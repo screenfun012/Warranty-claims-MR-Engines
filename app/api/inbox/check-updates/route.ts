@@ -1,17 +1,46 @@
 /**
  * Lightweight endpoint to check if there are new emails
+ * Also triggers email sync if enough time has passed since last sync
  * Returns only the count and last updated timestamp
  * GET /api/inbox/check-updates
  */
 
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
+import { syncNewEmails } from "@/lib/email/mailSyncService";
+import { env } from "@/lib/config/env";
+import { isEmailConfigured } from "@/lib/config/envLoader";
+
+// Track last sync time to avoid too frequent syncs
+let lastSyncTime: number = 0;
+const MIN_SYNC_INTERVAL = 30 * 1000; // Minimum 30 seconds between syncs
 
 export async function GET(request: Request) {
   try {
     const prisma = await getPrisma();
     const { searchParams } = new URL(request.url);
     const lastCheck = searchParams.get("lastCheck"); // ISO timestamp
+
+    // Trigger sync if email is configured and enough time has passed
+    const now = Date.now();
+    const shouldSync = 
+      env.MAIL_SYNC_ENABLED && 
+      isEmailConfigured() && 
+      (now - lastSyncTime) >= MIN_SYNC_INTERVAL;
+
+    if (shouldSync) {
+      // Trigger sync in background (don't wait for it)
+      syncNewEmails()
+        .then((result) => {
+          if (result.newMessages > 0) {
+            console.log(`[CheckUpdates] Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+          }
+          lastSyncTime = Date.now();
+        })
+        .catch((error) => {
+          console.error("[CheckUpdates] Error syncing emails:", error);
+        });
+    }
 
     // Get the most recent thread update time
     const mostRecentThread = await prisma.emailThread.findFirst({
