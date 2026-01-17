@@ -27,10 +27,14 @@
 - [ ] `SMTP_TLS` - true
 
 ### WebDAV - za čuvanje priloga (obavezno!)
-- [ ] `WEBDAV_URL` - WebDAV server URL (npr. https://your-synology.dyndns.org:5006)
-- [ ] `WEBDAV_USERNAME` - WebDAV korisničko ime
+- [ ] `WEBDAV_URL` - WebDAV server URL BEZ `/webdav` na kraju (npr. https://your-synology.dyndns.org:5006 ili https://192-168-100-226.mrengines.direct.quickconnect.to:5006)
+  - **VAŽNO:** Ne stavljaj `/webdav` na kraju URL-a!
+  - Za QuickConnect: `https://192-168-100-226.mrengines.direct.quickconnect.to:5006`
+  - Za direktan pristup: `https://your-synology.dyndns.org:5006`
+- [ ] `WEBDAV_USERNAME` - WebDAV korisničko ime (npr. webdav-user)
 - [ ] `WEBDAV_PASSWORD` - WebDAV lozinka
-- [ ] `WEBDAV_BASE_PATH` - Base path na Synology-u (npr. /Warranty/REKLAMACIJE)
+- [ ] `WEBDAV_BASE_PATH` - Base path na Synology-u (npr. /Warranty/REKLAMACIJE ili /volume10/Warranty/REKLAMACIJE)
+  - **NAPOMENA:** Ovo je putanja gde će se fajlovi čuvati na Synology-u
 
 ### Mail Sync (opciono)
 - [ ] `MAIL_SYNC_ENABLED` - true (default)
