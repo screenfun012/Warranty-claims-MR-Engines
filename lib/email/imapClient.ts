@@ -566,8 +566,28 @@ async function parseMessageBody(
       }
       
       console.log(`[parseMessageBody] Creating stream from source buffer (${sourceBuffer.length} bytes)`);
-      const sourceStream = Readable.from(sourceBuffer);
-      sourceStream.pipe(parser);
+      try {
+        const sourceStream = Readable.from(sourceBuffer);
+        sourceStream.pipe(parser);
+        
+        // Add timeout to prevent hanging
+        const timeout = setTimeout(() => {
+          console.error("[parseMessageBody] Parser timeout after 30 seconds");
+          reject(new Error("Parser timeout"));
+        }, 30000);
+        
+        // Clear timeout when parser completes
+        parser.once("end", () => {
+          clearTimeout(timeout);
+        });
+        
+        parser.once("error", () => {
+          clearTimeout(timeout);
+        });
+      } catch (streamError) {
+        console.error("[parseMessageBody] Error creating stream:", streamError);
+        reject(streamError);
+      }
     });
   } catch (error) {
     console.error("Error parsing message body:", error);
