@@ -64,11 +64,12 @@ export async function startIdleSync(): Promise<void> {
         console.log("[AutoSync] IDLE detected mailbox change, syncing emails...");
         try {
           // Add a small delay to ensure IMAP server has processed the new message
-          await new Promise(resolve => setTimeout(resolve, 1000)); // Reduced to 1 second for faster sync
+          await new Promise(resolve => setTimeout(resolve, 2000));
           
           const result = await syncNewEmails();
           if (result.newMessages > 0) {
-            console.log(`[AutoSync] IDLE: ✓ Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+            console.log(`[AutoSync] IDLE: Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
+            console.log("[AutoSync] IDLE: New messages synced, frontend should refresh via polling");
           } else {
             console.log("[AutoSync] IDLE: No new messages found (may be a false positive or already synced)");
           }
@@ -79,17 +80,16 @@ export async function startIdleSync(): Promise<void> {
 
       console.log("[AutoSync] IMAP IDLE mode started successfully - using real-time push notifications");
       
-      // Also start periodic polling as backup (every 30 seconds) in case IDLE misses something
-      // Faster polling for better email client-like behavior
-      console.log("[AutoSync] Starting backup polling (every 30 seconds) in addition to IDLE...");
-      const backupPollInterval = 30 * 1000; // 30 seconds - faster backup polling
+      // Also start periodic polling as backup (every 2 minutes) in case IDLE misses something
+      console.log("[AutoSync] Starting backup polling (every 2 minutes) in addition to IDLE...");
+      const backupPollInterval = 2 * 60 * 1000; // 2 minutes
       syncInterval = setInterval(async () => {
         if (isSyncActive) {
           try {
             console.log("[AutoSync] Backup polling: Checking for new emails...");
             const result = await syncNewEmails();
             if (result.newMessages > 0) {
-              console.log(`[AutoSync] Backup polling: ✓ Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
+              console.log(`[AutoSync] Backup polling: Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
             }
           } catch (error) {
             console.error("[AutoSync] Error in backup polling:", error);
@@ -104,17 +104,17 @@ export async function startIdleSync(): Promise<void> {
     }
   }
 
-  // Fallback to periodic polling (faster for mail client-like behavior)
+  // Fallback to periodic polling
   if (!useIdleMode) {
-    console.log("[AutoSync] Starting periodic polling (every 15 seconds) - fast email detection...");
-    const pollInterval = 15 * 1000; // 15 seconds for very fast response (like a mail client)
+    console.log("[AutoSync] Starting periodic polling (every 30 seconds)...");
+    const pollInterval = 30 * 1000; // 30 seconds for faster response
     syncInterval = setInterval(async () => {
       if (isSyncActive && !useIdleMode) {
         try {
           console.log("[AutoSync] Polling for new emails...");
           const result = await syncNewEmails();
           if (result.newMessages > 0) {
-            console.log(`[AutoSync] ✓ Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
+            console.log(`[AutoSync] Found ${result.newMessages} new messages, ${result.newThreads} new threads`);
           }
         } catch (error) {
           console.error("[AutoSync] Error syncing emails:", error);

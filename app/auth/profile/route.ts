@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       });
     }
     
-    const user = session.user as any;
+    const user = session.user as unknown as { sub: string; id: string; email: string; 'https://mr-engines-warranty/roles': string[] };
     const userId = user.sub || user.id;
     
     // Pročitaj role iz custom claim (ubacuje Auth0 Action) - ovo je fallback
@@ -86,10 +86,10 @@ export async function GET(request: NextRequest) {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Za SVE greške (uključujući 401), vrati 204
     // Ovo je normalno nakon logout-a ili kada korisnik nije ulogovan
-    console.error('[Profile] Error (returning 204):', error?.message || error);
+    console.error('[Profile] Error (returning 204):', error instanceof Error ? error.message : String(error));
     return new NextResponse(null, { 
       status: 204,
       headers: {
