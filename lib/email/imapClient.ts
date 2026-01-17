@@ -109,40 +109,29 @@ export async function fetchNewMessagesSince(
 
     const messages: FetchedMessage[] = [];
     
-    // Check mailbox status
+    // SIMPLIFIED: Always fetch the most recent messages (ignore lastUid - we check duplicates by messageId)
+    // This is more reliable and works even if UIDs have gaps or are inconsistent
     const status = await client.status("INBOX", { messages: true });
     
     if (status.messages === 0) {
-      console.log("[fetchNewMessagesSince] Mailbox is empty");
       return [];
     }
     
-    let messageUids: number[] = [];
+    // Fetch the most recent N messages (limit)
+    const allMessages = await client.search({}, { limit: limit * 2 }); // Fetch more to ensure we get enough
+    const messageList = Array.isArray(allMessages) ? allMessages : [];
     
-    // Always fetch recent messages first (more reliable)
-    // We check for duplicates by messageId later
-    // CRITICAL: Must use { uid: true } to get UIDs instead of sequence numbers!
-    console.log(`[fetchNewMessagesSince] Fetching most recent ${limit} messages...`);
-    const searchResult = await client.search({}, { limit: limit * 3, uid: true }); // Fetch more to ensure we get enough, return UIDs
-    const messageList = Array.isArray(searchResult) ? searchResult : [];
-    
-    // Extract UIDs - searchResult should be array of numbers (UIDs) when uid: true is set
-    messageUids = messageList
-      .map((uid) => {
-        if (typeof uid === 'number') return uid;
-        // Fallback: try to extract if it's an object
-        if (typeof uid === 'object' && uid !== null) {
-          return uid?.uid || uid?.seq || null;
-        }
-        return null;
+    // Extract UIDs and sort descending (newest first)
+    const messageUids = messageList
+      .map((msg) => {
+        if (typeof msg === 'number') return msg;
+        return msg?.uid || msg?.seq || msg;
       })
-      .filter((uid) => uid !== null && uid !== undefined && !isNaN(Number(uid)))
-      .map((uid) => Number(uid))
-      .filter((uid) => !isNaN(uid) && uid > 0)
+      .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
+      .map((uid) => parseInt(String(uid), 10))
+      .filter((uid) => !isNaN(uid))
       .sort((a, b) => b - a) // Descending - newest first
       .slice(0, limit); // Take only the most recent N
-    
-    console.log(`[fetchNewMessagesSince] Found ${messageUids.length} messages to check (from most recent ${limit * 3})`);
     
     if (messageUids.length === 0) {
       return [];
