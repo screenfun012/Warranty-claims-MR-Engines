@@ -434,11 +434,22 @@ async function parseMessageBody(
   const { MailParser } = await import("mailparser");
   const { Readable } = await import("stream");
   
-  // Check if Readable is available
-  if (!Readable || !Readable.from) {
-    console.error("[parseMessageBody] ERROR: Readable.from is not available");
-    throw new Error("Readable.from is not available");
-  }
+  // Create a helper function to create readable stream
+  // Readable.from might not be available in all environments
+  const createReadableStream = (buffer: Buffer) => {
+    // Try Readable.from first (if available)
+    if (Readable && Readable.from && typeof Readable.from === 'function') {
+      return Readable.from(buffer);
+    }
+    // Fallback: Create a custom Readable stream
+    const { Readable: ReadableClass } = Readable;
+    return new ReadableClass({
+      read() {
+        this.push(buffer);
+        this.push(null); // End stream
+      }
+    });
+  };
   
   try {
     // Use streaming MailParser instead of simpleParser for better reliability on Vercel
@@ -573,7 +584,7 @@ async function parseMessageBody(
       
       console.log(`[parseMessageBody] Creating stream from source buffer (${sourceBuffer.length} bytes)`);
       try {
-        const sourceStream = Readable.from(sourceBuffer);
+        const sourceStream = createReadableStream(sourceBuffer);
         sourceStream.pipe(parser);
         
         // Add timeout to prevent hanging
