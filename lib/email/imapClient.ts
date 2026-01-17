@@ -121,19 +121,24 @@ export async function fetchNewMessagesSince(
     
     // Always fetch recent messages first (more reliable)
     // We check for duplicates by messageId later
+    // CRITICAL: Must use { uid: true } to get UIDs instead of sequence numbers!
     console.log(`[fetchNewMessagesSince] Fetching most recent ${limit} messages...`);
-    const searchResult = await client.search({}, { limit: limit * 3 }); // Fetch more to ensure we get enough
+    const searchResult = await client.search({}, { limit: limit * 3, uid: true }); // Fetch more to ensure we get enough, return UIDs
     const messageList = Array.isArray(searchResult) ? searchResult : [];
     
-    // Extract UIDs and sort descending (newest first)
+    // Extract UIDs - searchResult should be array of numbers (UIDs) when uid: true is set
     messageUids = messageList
-      .map((msg) => {
-        if (typeof msg === 'number') return msg;
-        return msg?.uid || msg?.seq || msg;
+      .map((uid) => {
+        if (typeof uid === 'number') return uid;
+        // Fallback: try to extract if it's an object
+        if (typeof uid === 'object' && uid !== null) {
+          return uid?.uid || uid?.seq || null;
+        }
+        return null;
       })
-      .filter((uid) => uid !== undefined && uid !== null && uid !== 'undefined' && uid !== 'null')
-      .map((uid) => parseInt(String(uid), 10))
-      .filter((uid) => !isNaN(uid))
+      .filter((uid) => uid !== null && uid !== undefined && !isNaN(Number(uid)))
+      .map((uid) => Number(uid))
+      .filter((uid) => !isNaN(uid) && uid > 0)
       .sort((a, b) => b - a) // Descending - newest first
       .slice(0, limit); // Take only the most recent N
     
