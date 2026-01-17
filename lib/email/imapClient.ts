@@ -330,33 +330,65 @@ async function parseMessageBody(
   const { simpleParser } = await import("mailparser");
   
   try {
-    const parsed = await simpleParser(source);
+    // Parse with options to include all attachments (inline and regular)
+    const parsed = await simpleParser(source, {
+      // Include all attachments, including inline ones
+      keepCidLinks: true, // Keep Content-ID links for inline attachments
+      // Don't skip any attachments
+    });
     
     const attachments: Array<{ filename: string; mimeType: string; buffer: Buffer }> = [];
     
     console.log(`[parseMessageBody] Total attachments found by mailparser: ${parsed.attachments?.length || 0}`);
     
+    // Log details about all attachments found
+    if (parsed.attachments && parsed.attachments.length > 0) {
+      parsed.attachments.forEach((att, idx) => {
+        console.log(`[parseMessageBody] Attachment ${idx + 1}: filename="${att.filename}", contentType="${att.contentType}", contentId="${att.contentId}", cid="${att.cid}", size=${att.size || 'unknown'}`);
+      });
+    }
+    
     if (parsed.attachments) {
       for (const attachment of parsed.attachments) {
         try {
-          const filename = attachment.filename || `unnamed-${Date.now()}`;
+          // Generate filename if missing (for inline attachments without filename)
+          let filename = attachment.filename;
+          if (!filename) {
+            // Try to use Content-ID or CID as filename
+            if (attachment.contentId || attachment.cid) {
+              filename = attachment.contentId || attachment.cid || `unnamed-${Date.now()}`;
+              // Add extension based on content type if possible
+              const mimeType = attachment.contentType || "application/octet-stream";
+              if (mimeType.startsWith("image/")) {
+                const ext = mimeType.split("/")[1];
+                if (ext && !filename.includes(".")) {
+                  filename = `${filename}.${ext}`;
+                }
+              }
+            } else {
+              filename = `unnamed-${Date.now()}`;
+            }
+          }
+          
           const mimeType = attachment.contentType || "application/octet-stream";
           const content = attachment.content;
           
           // Check if content exists and is Buffer
           if (!content) {
-            console.warn(`[parseMessageBody] Attachment ${filename} has no content, skipping`);
+            console.warn(`[parseMessageBody] Attachment ${filename} (contentId: ${attachment.contentId}, cid: ${attachment.cid}) has no content, skipping`);
             continue;
           }
           
           const buffer = Buffer.isBuffer(content) ? content : Buffer.from(content as ArrayBuffer);
           
           if (buffer.length === 0) {
-            console.warn(`[parseMessageBody] Attachment ${filename} is empty (0 bytes), skipping`);
+            console.warn(`[parseMessageBody] Attachment ${filename} (contentId: ${attachment.contentId}, cid: ${attachment.cid}) is empty (0 bytes), skipping`);
             continue;
           }
           
-          console.log(`[parseMessageBody] Processing attachment: ${filename} (${buffer.length} bytes, ${mimeType})`);
+          // Log if it's an inline attachment
+          const isInline = !!attachment.contentId || !!attachment.cid;
+          console.log(`[parseMessageBody] Processing attachment: ${filename} (${buffer.length} bytes, ${mimeType})${isInline ? ' [INLINE]' : ''}${attachment.contentId ? ` contentId="${attachment.contentId}"` : ''}${attachment.cid ? ` cid="${attachment.cid}"` : ''}`);
           
           attachments.push({
             filename,
@@ -364,7 +396,7 @@ async function parseMessageBody(
             buffer,
           });
         } catch (error) {
-          console.error(`[parseMessageBody] Error processing attachment ${attachment.filename}:`, error);
+          console.error(`[parseMessageBody] Error processing attachment ${attachment.filename || attachment.contentId || 'unknown'}:`, error);
           // Continue with next attachment
         }
       }
