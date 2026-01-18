@@ -106,6 +106,7 @@ model Claim {
   status               String          @default("NEW") // NEW, IN_ANALYSIS, APPROVED, REJECTED, CLOSED
   claimAcceptanceStatus String?        // ACCEPTED, REJECTED, PENDING
   processingEmailSentAt DateTime?      // Kada je poslat email o obradi reklamacije
+  isLocked             Boolean         @default(false) // If true, claim is locked (read-only for non-SUPER_ADMIN users)
   customerId           String?
   customer             Customer?       @relation(fields: [customerId], references: [id])
   workOrderId          String?

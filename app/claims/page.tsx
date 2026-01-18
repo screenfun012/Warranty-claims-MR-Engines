@@ -374,12 +374,15 @@ export default function ClaimsPage() {
         method: "POST",
       });
       if (res.ok) {
-        // Update local state
-        setClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: "IN_ANALYSIS" } : c));
-        setAllClaims(prev => prev.map(c => c.id === claimId ? { ...c, status: "IN_ANALYSIS" } : c));
+        const data = await res.json();
+        // Update local state - unlock the claim (don't change status)
+        setClaims(prev => prev.map(c => c.id === claimId ? { ...c, isLocked: false } : c));
+        setAllClaims(prev => prev.map(c => c.id === claimId ? { ...c, isLocked: false } : c));
         setUnlockClaimId(null);
         // Dispatch event to update dashboard
         window.dispatchEvent(new CustomEvent('claim-updated'));
+        // Refresh to ensure UI updates
+        setTimeout(() => window.location.reload(), 500);
       } else {
         const data = await res.json();
         alert(`Greška: ${data.error || "Neuspešno otključavanje"}`);
@@ -761,7 +764,7 @@ export default function ClaimsPage() {
             ...(isSuperAdmin ? {
               actions: (
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  {claim.status === "CLOSED" ? (
+                  {(claim.status === "CLOSED" || claim.isLocked) ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -775,9 +778,33 @@ export default function ClaimsPage() {
                       <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                     </Button>
                   ) : (
-                    <div className="h-7 w-7 flex items-center justify-center" title="Reklamacija je otključana">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (confirm("Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike.")) {
+                          try {
+                            const res = await fetch(`/api/claims/${claim.id}/lock`, {
+                              method: "POST",
+                            });
+                            if (res.ok) {
+                              // Refresh claims to show updated lock status
+                              window.location.reload();
+                            } else {
+                              const data = await res.json();
+                              alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
+                            }
+                          } catch (error) {
+                            alert("Greška pri zaključavanju reklamacije");
+                          }
+                        }
+                      }}
+                      title="Zaključaj reklamaciju"
+                    >
                       <Unlock className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </div>
+                    </Button>
                   )}
                   <Button
                     variant="ghost"
@@ -836,7 +863,7 @@ export default function ClaimsPage() {
         onOpenChange={(open) => !open && setUnlockClaimId(null)}
         onConfirm={() => unlockClaimId && handleUnlockClaim(unlockClaimId)}
         title="Otključavanje reklamacije"
-        description="Da li ste sigurni da želite da otključate ovu reklamaciju? Status će biti promenjen na 'U obradi'."
+        description="Da li ste sigurni da želite da otključate ovu reklamaciju? Reklamacija će biti dostupna za uređivanje ostalim korisnicima."
         confirmText={isUnlocking ? "Otključavanje..." : "Otključaj"}
         cancelText="Otkaži"
         variant="default"

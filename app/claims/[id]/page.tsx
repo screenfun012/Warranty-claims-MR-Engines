@@ -184,6 +184,12 @@ export default function ClaimDetailPage() {
   const isSuperAdmin = hasMinRole(userRole, "SUPER_ADMIN");
   const canEdit = hasMinRole(userRole, "OPERATOR");
   const canDelete = isSuperAdmin;
+  
+  // Check if claim is locked or closed (read-only logic)
+  // Claim is read-only if: (status === CLOSED AND not SUPER_ADMIN) OR (isLocked AND not SUPER_ADMIN)
+  const isReadOnly = claim ? 
+    (!isSuperAdmin && (claim.status === "CLOSED" || claim.isLocked)) : 
+    false;
 
   // React Query for data fetching with caching
   const { data: claim, isLoading: loading, refetch } = useQuery({
@@ -353,10 +359,14 @@ export default function ClaimDetailPage() {
       </div>
 
       {/* Compact Info Banner */}
-      {claim.status === "CLOSED" && (
+      {(claim.status === "CLOSED" || claim.isLocked) && (
         <Card className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
           <p className="text-xs text-blue-700 dark:text-blue-300">
-            <strong>Završena reklamacija.</strong> Svi podaci su read-only.
+            <strong>
+              {claim.status === "CLOSED" ? "Završena reklamacija." : "Zaključana reklamacija."}
+            </strong>{" "}
+            {!isSuperAdmin && "Svi podaci su read-only."}
+            {isSuperAdmin && "Kliknite na katanac u listi reklamacija da otključate."}
           </p>
         </Card>
       )}
@@ -364,7 +374,7 @@ export default function ClaimDetailPage() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-1">
-          <ClaimMetadata claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
+          <ClaimMetadata claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || isReadOnly} />
         </div>
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -391,19 +401,19 @@ export default function ClaimDetailPage() {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
-              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
+              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || isReadOnly} />
             </TabsContent>
             <TabsContent value="emails" className="mt-4">
-              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
+              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || isReadOnly} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              <ClaimClientDocuments claim={claim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} onRefresh={() => refetch()} />
+              <ClaimClientDocuments claim={claim} isReadOnly={!canEdit || isReadOnly} onRefresh={() => refetch()} />
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
-              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} />
+              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || isReadOnly} />
             </TabsContent>
             <TabsContent value="photos" className="mt-4">
-              <ClaimPhotos claim={claim} isReadOnly={!canEdit || (claim.status === "CLOSED" && !isSuperAdmin)} onRefresh={() => refetch()} />
+              <ClaimPhotos claim={claim} isReadOnly={!canEdit || isReadOnly} onRefresh={() => refetch()} />
             </TabsContent>
           </Tabs>
         </div>
