@@ -885,20 +885,21 @@ export default function ClaimsPage() {
               // NO REFETCH - instant update via state only
               // Other users will see the change when they refresh or when their tables refresh naturally
             } else {
-                              const data = await res.json();
-                              alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
-                            }
-                          } catch (error) {
-                            alert("Greška pri zaključavanju reklamacije");
-                          }
-                        }
-                      }}
-                      title="Zaključaj reklamaciju"
-                    >
-                      <Unlock className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </Button>
-                    );
-                  })()}
+              const data = await res.json();
+              alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
+            }
+          } catch (error) {
+            alert("Greška pri zaključavanju reklamacije");
+          } finally {
+            setIsLocking(false);
+          }
+        }}
+        title="Zaključavanje reklamacije"
+        description="Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike."
+        confirmText={isLocking ? "Zaključavanje..." : "Zaključaj"}
+        cancelText="Otkaži"
+        variant="default"
+      />
                   <Button
                     variant="ghost"
                     size="sm"
