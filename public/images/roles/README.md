@@ -13,4 +13,8 @@ Place your custom role icon PNG images in this folder with the following names:
 - **Colors**: White or light colored icons work best on colored badges
 - **Background**: Transparent
 
-If the PNG images are not found, the application will automatically fall back to using lucide-react icons (Crown, UserCog, Wrench, Eye).
+If the PNG images are not found, the application will automatically fall back to using lucide-react icons:
+- **SUPER_ADMIN**: Crown (highest level privileges)
+- **ADMIN**: ShieldCheck (administration + verified/approved status)
+- **OPERATOR**: Wrench (operational work / tools)
+- **VIEWER**: Eye (view-only access)
