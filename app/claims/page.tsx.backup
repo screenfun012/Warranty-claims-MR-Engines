@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
@@ -132,7 +131,6 @@ const statusLabels: Record<string, string> = {
 export default function ClaimsPage() {
   const router = useRouter();
   const { user } = useUser();
-  const queryClient = useQueryClient();
   
   // Get user role
   interface Auth0User {
@@ -145,6 +143,10 @@ export default function ClaimsPage() {
   const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
   const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
   const isSuperAdmin = hasMinRole(userRole, "SUPER_ADMIN");
+  
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [allClaims, setAllClaims] = useState<Claim[]>([]); // Store all claims for suggestions
+  const [loading, setLoading] = useState(true);
   const [deleteClaimId, setDeleteClaimId] = useState<string | null>(null);
   const [unlockClaimId, setUnlockClaimId] = useState<string | null>(null);
   const [lockClaimId, setLockClaimId] = useState<string | null>(null);
@@ -170,73 +172,51 @@ export default function ClaimsPage() {
   const [claimCodeSuggestions, setClaimCodeSuggestions] = useState<string[]>([]);
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
 
-  // Fetch claims data function for React Query
-  const fetchClaimsData = useCallback(async (filters: { status: string[]; claimCode?: string; customerId?: string; urgentOnly?: boolean }, showAll = false) => {
-    const params = new URLSearchParams();
-    
-    // If showing all, only apply status filter for suggestions
-    if (showAll) {
-      if (filters.status.length > 0) {
-        filters.status.forEach(s => params.append("status", s));
-      }
-    } else {
-      if (filters.status.length > 0) {
-        filters.status.forEach(s => params.append("status", s));
-      }
-      if (filters.claimCode) params.append("claimCode", filters.claimCode);
-      if (filters.customerId) params.append("customerId", filters.customerId);
-    }
-
-    const res = await fetch(`/api/claims?${params.toString()}`);
-    if (!res.ok) {
-      throw new Error("Failed to fetch claims");
-    }
-    const data = await res.json();
-    return data.claims || [];
-  }, []);
-
-  // React Query for filtered claims (displayed in table)
-  const { data: claims = [], isLoading: loading, refetch: refetchClaims } = useQuery({
-    queryKey: ['claims', 'filtered', filters.status, filters.claimCode, filters.customerId],
-    queryFn: () => fetchClaimsData({ ...filters, claimCode: filters.claimCode || textFilters.claimCode, customerId: filters.customerId || textFilters.customerId }, false),
-    staleTime: 30 * 1000, // 30 seconds - data stays fresh
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
-  });
-
-  // React Query for all claims (used for suggestions)
-  const { data: allClaims = [], refetch: refetchAllClaims } = useQuery({
-    queryKey: ['claims', 'all', filters.status],
-    queryFn: () => fetchClaimsData({ ...filters }, true),
-    staleTime: 60 * 1000, // 60 seconds - suggestions don't need to be as fresh
-    gcTime: 5 * 60 * 1000,
-  });
-
-  // Helper function to update claims in React Query cache
-  const updateClaimInCache = useCallback((claimId: string, updates: Partial<Claim>) => {
-    // Update filtered claims cache
-    queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId], (old) => {
-      if (!old) return old;
-      return old.map(c => c.id === claimId ? { ...c, ...updates } : c);
-    });
-    
-    // Update all claims cache (for suggestions)
-    queryClient.setQueryData<Claim[]>(['claims', 'all', filters.status], (old) => {
-      if (!old) return old;
-      return old.map(c => c.id === claimId ? { ...c, ...updates } : c);
-    });
-    
-    // Also invalidate other possible filter combinations to ensure consistency
-    queryClient.invalidateQueries({ queryKey: ['claims'] });
-  }, [queryClient, filters]);
-
-  // Legacy fetchClaims function for backward compatibility (now just calls refetch)
   const fetchClaims = useCallback(async (showAll = false, customFilters?: { claimCode?: string; customerId?: string }) => {
-    if (showAll) {
-      await refetchAllClaims();
-    } else {
-      await refetchClaims();
+    // Don't show loading if user is typing (to prevent "panic")
+    const isTyping = textFilters.claimCode !== filters.claimCode || textFilters.customerId !== filters.customerId;
+    if (!isTyping) {
+      setLoading(true);
     }
-  }, [refetchClaims, refetchAllClaims]);
+    
+    try {
+      const params = new URLSearchParams();
+      const activeFilters = customFilters || filters;
+      
+      // If showing all, only apply status filter for suggestions
+      if (showAll) {
+        if (filters.status.length > 0) {
+          filters.status.forEach(s => params.append("status", s));
+        }
+      } else {
+        if (filters.status.length > 0) {
+          filters.status.forEach(s => params.append("status", s));
+        }
+        if (activeFilters.claimCode) params.append("claimCode", activeFilters.claimCode);
+        if (activeFilters.customerId) params.append("customerId", activeFilters.customerId);
+      }
+
+      const res = await fetch(`/api/claims?${params.toString()}`);
+      const data = await res.json();
+      const fetchedClaims = data.claims || [];
+      
+      if (showAll) {
+        setAllClaims(fetchedClaims);
+        // Also update displayed claims if no text filters are active
+        if (!filters.claimCode && !filters.customerId) {
+          setClaims(fetchedClaims);
+        }
+      } else {
+        setClaims(fetchedClaims);
+      }
+    } catch (error) {
+      console.error("Error fetching claims:", error);
+    } finally {
+      if (!isTyping) {
+        setLoading(false);
+      }
+    }
+  }, [filters, textFilters]);
 
   const handleClaimCodeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -247,14 +227,14 @@ export default function ClaimsPage() {
       setShowClaimCodeSuggestions(true);
       // Generate suggestions from allClaims with Serbian Latin support
       const normalizedValue = normalizeSerbianLatin(value);
-      const suggestions: string[] = Array.from(
+      const suggestions = Array.from(
         new Set(
           allClaims
-            .map((c: Claim) => c.claimCodeRaw)
-            .filter((code: string | null): code is string => !!code && normalizeSerbianLatin(code).includes(normalizedValue))
+            .map(c => c.claimCodeRaw)
+            .filter((code): code is string => !!code && normalizeSerbianLatin(code).includes(normalizedValue))
             .slice(0, 5)
         )
-      ) as string[];
+      );
       setClaimCodeSuggestions(suggestions);
     } else {
       setShowClaimCodeSuggestions(false);
@@ -271,14 +251,14 @@ export default function ClaimsPage() {
       setShowCustomerSuggestions(true);
       // Generate suggestions from allClaims with Serbian Latin support
       const normalizedValue = normalizeSerbianLatin(value);
-      const suggestions: string[] = Array.from(
+      const suggestions = Array.from(
         new Set(
           allClaims
-            .map((c: Claim) => c.customer?.name)
-            .filter((name: string | null | undefined): name is string => !!name && normalizeSerbianLatin(name).includes(normalizedValue))
+            .map(c => c.customer?.name)
+            .filter((name): name is string => !!name && normalizeSerbianLatin(name).includes(normalizedValue))
             .slice(0, 5)
         )
-      ) as string[];
+      );
       setCustomerSuggestions(suggestions);
     } else {
       setShowCustomerSuggestions(false);
@@ -289,16 +269,19 @@ export default function ClaimsPage() {
   // NO debounce - filters are only applied when user clicks suggestion or presses Enter
   // This keeps the list visible while typing
 
-  // Initial load is handled by React Query automatically - no need for manual fetch
+  // Initial load - fetch all claims
+  useEffect(() => {
+    fetchClaims(true); // Fetch all claims for suggestions
+  }, []);
 
   // Initial fetch only - no refresh on status change
 
-  // Real-time filtering while typing - filter locally from React Query data
-  // Note: This runs client-side for instant filtering as user types
-  const filteredClaims = useMemo(() => {
-    if (!claims || claims.length === 0) return [];
+  // Real-time filtering while typing - filter locally from allClaims
+  useEffect(() => {
+    // Filter claims locally in real-time as user types
+    if (allClaims.length === 0) return;
     
-    let filtered = [...claims];
+    let filtered = [...allClaims];
     
     // Apply claimCode filter in real-time with Serbian Latin support
     if (textFilters.claimCode.trim()) {
@@ -347,21 +330,19 @@ export default function ClaimsPage() {
       });
     }
     
-    // Return filtered claims - React Query will handle the state
-    return filtered;
-  }, [textFilters.claimCode, textFilters.customerId, filters.status.join(","), filters.urgentOnly, claims]);
+    setClaims(filtered);
+  }, [textFilters.claimCode, textFilters.customerId, filters.status.join(","), filters.urgentOnly, allClaims]);
 
   // Listen for claim updates to refresh the list
   useEffect(() => {
     const handleClaimUpdate = () => {
-      // Invalidate and refetch claims when update event is received
-      queryClient.invalidateQueries({ queryKey: ['claims'] });
+      fetchClaims();
     };
     window.addEventListener('claim-updated', handleClaimUpdate);
     return () => {
       window.removeEventListener('claim-updated', handleClaimUpdate);
     };
-  }, [queryClient]);
+  }, [fetchClaims]);
 
   // Delete claim handler (SUPER_ADMIN only)
   const handleDeleteClaim = async (claimId: string) => {
@@ -371,22 +352,12 @@ export default function ClaimsPage() {
         method: "DELETE",
       });
       if (res.ok) {
-        // Optimistically remove from cache
-        queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId], (old) => {
-          if (!old) return old;
-          return old.filter(c => c.id !== claimId);
-        });
-        queryClient.setQueryData<Claim[]>(['claims', 'all', filters.status], (old) => {
-          if (!old) return old;
-          return old.filter(c => c.id !== claimId);
-        });
-        
+        // Remove from local state
+        setClaims(prev => prev.filter(c => c.id !== claimId));
+        setAllClaims(prev => prev.filter(c => c.id !== claimId));
         setDeleteClaimId(null);
         // Dispatch event to update dashboard
         window.dispatchEvent(new CustomEvent('claim-deleted'));
-        
-        // Refetch to ensure consistency
-        queryClient.invalidateQueries({ queryKey: ['claims'] });
       } else {
         const data = await res.json();
         alert(`Greška: ${data.error || "Neuspešno brisanje"}`);
@@ -402,31 +373,25 @@ export default function ClaimsPage() {
   const handleUnlockClaim = async (claimId: string) => {
     setIsUnlocking(true);
     try {
-      // Optimistic update - instant UI feedback
-      updateClaimInCache(claimId, { isLocked: false });
-      
       const res = await fetch(`/api/claims/${claimId}/unlock`, {
         method: "POST",
       });
       if (res.ok) {
         const data = await res.json();
-        // Update cache with server response
-        if (data.claim) {
-          updateClaimInCache(claimId, data.claim);
-        }
+        // Update local state immediately - unlock the claim (don't change status)
+        // This is instant - no table refresh needed, no page reload
+        setClaims(prev => prev.map(c => c.id === claimId ? { ...c, isLocked: false } : c));
+        setAllClaims(prev => prev.map(c => c.id === claimId ? { ...c, isLocked: false } : c));
         setUnlockClaimId(null);
         // Dispatch event to update dashboard (other users will see update via their own refresh)
         window.dispatchEvent(new CustomEvent('claim-updated'));
-        // NO REFETCH - instant update via cache
+        // NO REFETCH - instant update via state only
+        // Other users will see the change when they refresh or when their tables refresh naturally
       } else {
-        // Revert optimistic update on error
         const data = await res.json();
-        queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
         alert(`Greška: ${data.error || "Neuspešno otključavanje"}`);
       }
     } catch (error) {
-      // Revert optimistic update on error
-      queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
       alert("Greška pri otključavanju reklamacije");
     } finally {
       setIsUnlocking(false);
@@ -447,9 +412,6 @@ export default function ClaimsPage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showStatusDropdown]);
-
-  // Use filtered claims for display
-  const displayClaims = filteredClaims;
 
   if (loading) {
     return (
@@ -741,7 +703,7 @@ export default function ClaimsPage() {
         {/* Results count */}
         <div className="mt-4 pt-4 border-t flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Prikazano: <span className="font-semibold text-foreground">{displayClaims.length}</span> od <span className="font-semibold text-foreground">{allClaims.length}</span> reklamacija
+            Prikazano: <span className="font-semibold text-foreground">{claims.length}</span> od <span className="font-semibold text-foreground">{allClaims.length}</span> reklamacija
           </p>
           {(filters.status.length > 0 || filters.urgentOnly || textFilters.claimCode.trim() || textFilters.customerId.trim()) && (
             <Button
@@ -767,9 +729,9 @@ export default function ClaimsPage() {
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">Lista reklamacija</h2>
-            {displayClaims.length > 0 && (
+            {claims.length > 0 && (
               <Badge variant="secondary" className="ml-2">
-                {displayClaims.length} {displayClaims.length === 1 ? "reklamacija" : "reklamacija"}
+                {claims.length} {claims.length === 1 ? "reklamacija" : "reklamacija"}
               </Badge>
             )}
           </div>
@@ -786,7 +748,7 @@ export default function ClaimsPage() {
             { key: "created", label: "Created" },
             ...(isSuperAdmin ? [{ key: "actions", label: "Akcije" }] : []),
           ]}
-          data={displayClaims.map((claim, index) => ({
+          data={claims.map((claim, index) => ({
             claimCode: (
               <span className="font-medium transition-colors group-hover:text-primary">
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
@@ -872,7 +834,7 @@ export default function ClaimsPage() {
               </Button>
             </div>
           }
-          onRowClick={(row, index) => router.push(`/claims/${displayClaims[index].id}`)}
+          onRowClick={(row, index) => router.push(`/claims/${claims[index].id}`)}
         />
       </Card>
 
@@ -908,31 +870,25 @@ export default function ClaimsPage() {
           if (!lockClaimId) return;
           setIsLocking(true);
           try {
-            // Optimistic update - instant UI feedback
-            updateClaimInCache(lockClaimId, { isLocked: true });
-            
             const res = await fetch(`/api/claims/${lockClaimId}/lock`, {
               method: "POST",
             });
             if (res.ok) {
               const data = await res.json();
-              // Update cache with server response
-              if (data.claim) {
-                updateClaimInCache(lockClaimId, data.claim);
-              }
+              // Update local state immediately - lock the claim
+              // This is instant - no table refresh needed, no page reload
+              setClaims(prev => prev.map(c => c.id === lockClaimId ? { ...c, isLocked: true } : c));
+              setAllClaims(prev => prev.map(c => c.id === lockClaimId ? { ...c, isLocked: true } : c));
               setLockClaimId(null);
               // Dispatch event to update dashboard (other users will see update via their own refresh)
               window.dispatchEvent(new CustomEvent('claim-updated'));
-              // NO REFETCH - instant update via cache
+              // NO REFETCH - instant update via state only
+              // Other users will see the change when they refresh or when their tables refresh naturally
             } else {
-              // Revert optimistic update on error
               const data = await res.json();
-              queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
               alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
             }
           } catch (error) {
-            // Revert optimistic update on error
-            queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
             alert("Greška pri zaključavanju reklamacije");
           } finally {
             setIsLocking(false);
