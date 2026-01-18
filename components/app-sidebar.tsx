@@ -89,7 +89,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading: userLoading } = useUser();
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const queryClient = useQueryClient();
 
@@ -222,10 +222,18 @@ export function AppSidebar() {
                   const isActive = Boolean(pathname === item.href || (pathname && item.href && pathname.startsWith(item.href + "/")));
                   const showBadge = item.showBadge && unreadCount > 0;
                   
+                  const handleLinkClick = () => {
+                    // Close mobile sidebar when a link is clicked
+                    if (isMobile) {
+                      setOpenMobile(false);
+                    }
+                  };
+
                   const menuButton = (
                     <SidebarMenuButton asChild isActive={isActive} className="transition-all duration-200 hover:bg-sidebar-accent/80">
                       <Link 
-                        href={item.href} 
+                        href={item.href}
+                        onClick={handleLinkClick}
                         className="flex items-center gap-3 group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit hover:text-inherit visited:text-inherit active:text-inherit"
                         style={{ 
                           textDecoration: 'none',

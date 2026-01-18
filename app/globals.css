@@ -203,10 +203,22 @@
     color: var(--foreground) !important;
   }
 
-  /* Poštuj slike u email potpisima */
-  .email-body img {
+  /* Prevent email content from overflowing on mobile */
+  .email-body {
     max-width: 100%;
-    height: auto;
+    overflow-x: auto;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .email-body * {
+    max-width: 100%;
+  }
+
+  /* Ensure images in email signatures don't overflow */
+  .email-body img {
+    max-width: 100% !important;
+    height: auto !important;
     display: inline-block;
   }
 
@@ -216,10 +228,20 @@
     text-decoration: inherit;
   }
 
-  /* Poštuj tabelu strukture (često se koriste u potpisima) */
+  /* Ensure tables in signatures wrap properly on mobile */
   .email-body table {
     border-collapse: collapse;
     width: 100%;
+    max-width: 100% !important;
+    table-layout: auto;
+    overflow-x: auto;
+    display: block;
+  }
+
+  @media (min-width: 640px) {
+    .email-body table {
+      display: table;
+    }
   }
 
   .email-body td,
@@ -227,6 +249,18 @@
     padding: inherit;
     border: inherit;
     vertical-align: inherit;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Prevent browser back gesture when sidebar is open on mobile */
+  [data-sidebar="sidebar"][data-mobile="true"] {
+    touch-action: pan-y;
+  }
+
+  /* Prevent browser swipe-to-go-back gesture when interacting with sidebar content */
+  [data-sidebar="sidebar"] * {
+    touch-action: pan-y pinch-zoom;
   }
   
   /* Custom animations for table rows */
