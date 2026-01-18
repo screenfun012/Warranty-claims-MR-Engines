@@ -84,6 +84,34 @@ const fetchUnreadCount = async (): Promise<number> => {
   return data.count || 0;
 };
 
+// Avatar Image component - uses native img tag to avoid Next.js Image optimization
+// This ensures the image loads directly without going through Next.js _next/image endpoint
+function AvatarImage({ src, alt, onError, onLoad }: { src: string; alt: string; onError: () => void; onLoad: () => void }) {
+  const imgRef = React.useRef<HTMLImageElement>(null);
+  const [imageSrc, setImageSrc] = React.useState<string>(src);
+  
+  React.useEffect(() => {
+    // Directly set src to avoid Next.js optimization
+    setImageSrc(src);
+  }, [src]);
+  
+  return (
+    <img
+      ref={imgRef}
+      src={imageSrc}
+      alt={alt}
+      className="absolute inset-0 w-full h-full object-cover rounded-full z-10"
+      style={{ display: 'block' }}
+      loading="eager"
+      decoding="async"
+      onError={onError}
+      onLoad={onLoad}
+      // Remove crossOrigin - may cause issues with Gravatar
+      referrerPolicy="no-referrer"
+    />
+  );
+}
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading: userLoading } = useUser();
@@ -330,26 +358,18 @@ export function AppSidebar() {
                       
                       {/* Show Auth0 picture as overlay if available - use regular img tag, NOT Next.js Image */}
                       {hasPicture && !avatarImageError && (
-                        <img
+                        <AvatarImage
                           src={pictureUrl}
                           alt={auth0User.name || "User"}
-                          className="absolute inset-0 w-full h-full object-cover rounded-full z-10"
-                          onError={(e) => {
-                            // If image fails, mark error and User icon will show
+                          onError={() => {
                             setAvatarImageError(true);
                             if (process.env.NODE_ENV === 'development') {
                               console.warn('[UserAvatar] Failed to load Auth0 picture:', pictureUrl);
                             }
                           }}
-                          onLoad={(e) => {
-                            // When image loads successfully, hide User icon
+                          onLoad={() => {
                             setAvatarImageLoaded(true);
                           }}
-                          style={{ display: 'block' }}
-                          // Add crossorigin for Gravatar
-                          crossOrigin="anonymous"
-                          // Add referrerPolicy to avoid issues
-                          referrerPolicy="no-referrer"
                         />
                       )}
                     </>
