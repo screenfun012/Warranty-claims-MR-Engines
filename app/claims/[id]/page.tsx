@@ -184,7 +184,18 @@ export default function ClaimDetailPage() {
   const isSuperAdmin = hasMinRole(userRole, "SUPER_ADMIN");
   const canEdit = hasMinRole(userRole, "OPERATOR");
   const canDelete = isSuperAdmin;
-  
+
+  // React Query for data fetching with caching
+  const { data: claim, isLoading: loading, refetch } = useQuery({
+    queryKey: ['claim', claimId],
+    queryFn: () => fetchClaimData(claimId),
+    enabled: !!claimId,
+    staleTime: 60 * 1000, // 1 minute - data stays fresh
+    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
+    retry: 2,
+    retryDelay: 1000,
+  });
+
   // Check if claim is locked or closed (read-only logic)
   // Default: CLOSED status = locked (read-only for non-SUPER_ADMIN)
   // SUPER_ADMIN can unlock closed claims by setting isLocked = false
@@ -197,17 +208,6 @@ export default function ClaimDetailPage() {
     false;
   
   const isReadOnly = !isSuperAdmin && isClaimLocked;
-
-  // React Query for data fetching with caching
-  const { data: claim, isLoading: loading, refetch } = useQuery({
-    queryKey: ['claim', claimId],
-    queryFn: () => fetchClaimData(claimId),
-    enabled: !!claimId,
-    staleTime: 60 * 1000, // 1 minute - data stays fresh
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
-    retry: 2,
-    retryDelay: 1000,
-  });
 
   // Reset tab when claim ID changes
   useEffect(() => {
