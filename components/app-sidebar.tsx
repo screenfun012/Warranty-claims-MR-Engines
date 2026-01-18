@@ -84,40 +84,11 @@ const fetchUnreadCount = async (): Promise<number> => {
   return data.count || 0;
 };
 
-// Avatar Image component - uses native img tag to avoid Next.js Image optimization
-// This ensures the image loads directly without going through Next.js _next/image endpoint
-function AvatarImage({ src, alt, onError, onLoad }: { src: string; alt: string; onError: () => void; onLoad: () => void }) {
-  const imgRef = React.useRef<HTMLImageElement>(null);
-  const [imageSrc, setImageSrc] = React.useState<string>(src);
-  
-  React.useEffect(() => {
-    // Directly set src to avoid Next.js optimization
-    setImageSrc(src);
-  }, [src]);
-  
-  return (
-    <img
-      ref={imgRef}
-      src={imageSrc}
-      alt={alt}
-      className="absolute inset-0 w-full h-full object-cover rounded-full z-10"
-      style={{ display: 'block' }}
-      loading="eager"
-      decoding="async"
-      onError={onError}
-      onLoad={onLoad}
-      // Remove crossOrigin - may cause issues with Gravatar
-      referrerPolicy="no-referrer"
-    />
-  );
-}
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading: userLoading } = useUser();
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [avatarImageLoaded, setAvatarImageLoaded] = useState(false);
-  const [avatarImageError, setAvatarImageError] = useState(false);
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const queryClient = useQueryClient();
@@ -160,19 +131,6 @@ export function AppSidebar() {
     };
   }
   const auth0User = user as Auth0User | undefined;
-  
-  // Reset avatar image state when picture URL changes
-  useEffect(() => {
-    setAvatarImageLoaded(false);
-    setAvatarImageError(false);
-  }, [auth0User?.picture]);
-  
-  // Debug: Log picture URL in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development' && auth0User?.picture) {
-      console.log('[UserAvatar] Auth0 picture URL:', auth0User.picture);
-    }
-  }, [auth0User?.picture]);
   
   // Get role from various possible locations
   const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
@@ -343,38 +301,8 @@ export function AppSidebar() {
             {/* User Avatar with Role Icon */}
             <div className="relative shrink-0">
               <div className="relative h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200 overflow-hidden">
-                {(() => {
-                  // Check if picture exists and is valid
-                  const pictureUrl = auth0User?.picture;
-                  const hasPicture = pictureUrl && pictureUrl.trim() !== '' && pictureUrl !== 'undefined' && !pictureUrl.startsWith('undefined');
-                  
-                  // Always show User icon as primary, img as overlay
-                  return (
-                    <>
-                      {/* Show User icon only if image hasn't loaded or failed */}
-                      {(!avatarImageLoaded || avatarImageError || !hasPicture) && (
-                        <User className="h-4 w-4 text-primary relative z-0" />
-                      )}
-                      
-                      {/* Show Auth0 picture as overlay if available - use regular img tag, NOT Next.js Image */}
-                      {hasPicture && !avatarImageError && (
-                        <AvatarImage
-                          src={pictureUrl}
-                          alt={auth0User.name || "User"}
-                          onError={() => {
-                            setAvatarImageError(true);
-                            if (process.env.NODE_ENV === 'development') {
-                              console.warn('[UserAvatar] Failed to load Auth0 picture:', pictureUrl);
-                            }
-                          }}
-                          onLoad={() => {
-                            setAvatarImageLoaded(true);
-                          }}
-                        />
-                      )}
-                    </>
-                  );
-                })()}
+                {/* Always show User icon - simple and clean */}
+                <User className="h-4 w-4 text-primary" />
               </div>
               {/* Role Icon Badge - Use lucide icons directly */}
               {userRole && (
