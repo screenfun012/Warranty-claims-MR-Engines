@@ -45,16 +45,29 @@ export async function POST(
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
 
+    // Generate email subject early (needed for thread creation)
+    // We'll refine it later based on email type
+    let emailSubject = body.subject;
+    
+    // If no subject provided, use default based on claim code
+    if (!emailSubject || !emailSubject.trim()) {
+      if (claim.claimCodeRaw) {
+        emailSubject = `Re: Claim ${claim.claimCodeRaw}`;
+      } else {
+        emailSubject = "Claim Response";
+      }
+    }
+
     // Use existing thread or create new one
     let threadId = body.emailThreadId;
     if (!threadId && claim.emailThreads.length > 0) {
       threadId = claim.emailThreads[0].id;
     } else if (!threadId) {
-      // Create new thread
+      // Create new thread - subjectOriginal is required, so use emailSubject
       const newThread = await prisma.emailThread.create({
         data: {
           claimId: id,
-          subjectOriginal: body.subject,
+          subjectOriginal: emailSubject,
         },
       });
       threadId = newThread.id;
@@ -137,8 +150,8 @@ export async function POST(
       );
     }
 
-    // Generate email template based on type
-    let emailSubject = body.subject;
+    // Generate email template based on type (refine emailSubject if needed)
+    // emailSubject is already set above, but may need to be updated for templates
     let emailText = body.text || body.body;
     let emailHtml = body.html;
 

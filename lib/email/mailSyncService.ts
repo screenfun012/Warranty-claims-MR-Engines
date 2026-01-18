@@ -390,9 +390,11 @@ async function findOrCreateThread(fetchedMsg: FetchedMessage, prisma: Awaited<Re
 
   // Create new thread if not found
   if (!thread) {
+    // subjectOriginal is required - use fallback if subject is missing
+    const subject = fetchedMsg.headers.subject || "(No Subject)";
     thread = await prisma.emailThread.create({
       data: {
-        subjectOriginal: fetchedMsg.headers.subject,
+        subjectOriginal: subject,
         originalSender: fetchedMsg.headers.from,
       },
     });
