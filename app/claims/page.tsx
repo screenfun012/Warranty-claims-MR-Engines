@@ -900,68 +900,6 @@ export default function ClaimsPage() {
         cancelText="Otkaži"
         variant="default"
       />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 w-7 p-0 hover:bg-red-100 dark:hover:bg-red-900/30"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteClaimId(claim.id);
-                    }}
-                    title="Obriši reklamaciju"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-                  </Button>
-                </div>
-              ),
-            } : {}),
-          }))}
-          emptyMessage={
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="p-4 bg-muted/50 rounded-full mb-4 animate-pulse">
-                <FileText className="h-12 w-12 text-muted-foreground" />
-              </div>
-              <p className="text-lg font-semibold mb-2">No claims found</p>
-              <p className="text-sm text-muted-foreground mb-4">
-                Try adjusting your filters or create a new claim
-              </p>
-              <Button 
-                onClick={() => router.push("/claims/new")} 
-                variant="outline"
-                className="mt-2"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Create New Claim
-              </Button>
-            </div>
-          }
-          onRowClick={(row, index) => router.push(`/claims/${claims[index].id}`)}
-        />
-      </Card>
-
-      {/* Delete confirmation dialog */}
-      <ConfirmDialog
-        open={!!deleteClaimId}
-        onOpenChange={(open) => !open && setDeleteClaimId(null)}
-        onConfirm={() => deleteClaimId && handleDeleteClaim(deleteClaimId)}
-        title="Brisanje reklamacije"
-        description="Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna."
-        confirmText={isDeleting ? "Brisanje..." : "Obriši"}
-        cancelText="Otkaži"
-        variant="destructive"
-      />
-
-      {/* Unlock confirmation dialog */}
-      <ConfirmDialog
-        open={!!unlockClaimId}
-        onOpenChange={(open) => !open && setUnlockClaimId(null)}
-        onConfirm={() => unlockClaimId && handleUnlockClaim(unlockClaimId)}
-        title="Otključavanje reklamacije"
-        description="Da li ste sigurni da želite da otključate ovu reklamaciju? Reklamacija će biti dostupna za uređivanje ostalim korisnicima."
-        confirmText={isUnlocking ? "Otključavanje..." : "Otključaj"}
-        cancelText="Otkaži"
-        variant="default"
-      />
     </div>
   );
 }
