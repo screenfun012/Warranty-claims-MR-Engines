@@ -42,11 +42,24 @@
 - [ ] `MAIL_SYNC_MAX_MESSAGES_PER_RUN` - 50 (default)
 - [ ] `MAIL_SYNC_USE_IDLE` - true (default, ali na Vercel-u ne radi)
 
-### Translation (opciono)
-- [ ] `TRANSLATION_PROVIDER` - none (default) ili deepl/openai/google
-- [ ] `TRANSLATION_API_KEY` - API key za translation provider (ako koristiš)
-- [ ] `TRANSLATION_BASE_URL` - Base URL za translation API (ako koristiš)
-- [ ] `TRANSLATION_MODEL` - Model za translation (ako koristiš)
+### Translation (opciono - potrebno za automatsko prevodenje)
+**Napomena:** Bez ovih varijabli, prevod **neće raditi**. Ako želiš da omogućiš prevod, moraš postaviti `TRANSLATION_PROVIDER` i `TRANSLATION_API_KEY`.
+
+**Opcija 1: DeepL (Preporučeno za evropske jezike)**
+- [ ] `TRANSLATION_PROVIDER` - `deepl`
+- [ ] `TRANSLATION_API_KEY` - DeepL API key (možeš dobiti besplatno na https://www.deepl.com/pro-api)
+- [ ] `TRANSLATION_BASE_URL` - `https://api-free.deepl.com/v2/translate` (za free API) ili `https://api.deepl.com/v2/translate` (za paid), ili ostavi prazno
+
+**Opcija 2: OpenAI (Preporučeno za srpski jezik)**
+- [ ] `TRANSLATION_PROVIDER` - `openai`
+- [ ] `TRANSLATION_API_KEY` - OpenAI API key (možeš dobiti na https://platform.openai.com/api-keys)
+- [ ] `TRANSLATION_BASE_URL` - `https://api.openai.com/v1/chat/completions` (ili ostavi prazno - default)
+- [ ] `TRANSLATION_MODEL` - `gpt-3.5-turbo` (ili `gpt-4` za bolji kvalitet, ili ostavi prazno - default je gpt-3.5-turbo)
+
+**Onemogući prevod:**
+- [ ] `TRANSLATION_PROVIDER` - `none` (default - prevod neće raditi)
+
+**Detaljne instrukcije:** Pogledaj `TRANSLATION_SETUP.md` za detaljne korake kako da dobiješ API key i konfigurišeš prevod.
 
 ### File Storage (opciono - samo ako ne koristiš WebDAV)
 - [ ] `FILE_ROOT_PATH` - ./storage (default, ali ne radi na Vercel-u)
