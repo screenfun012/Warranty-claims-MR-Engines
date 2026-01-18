@@ -109,6 +109,25 @@ const nextConfig: NextConfig = {
   // Optimize images
   images: {
     formats: ['image/avif', 'image/webp'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.auth0.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.gravatar.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.googleusercontent.com',
+        pathname: '**',
+      },
+    ],
+    // Allow all domains if needed (less secure but works for all Auth0 providers)
+    unoptimized: false,
   },
   // Experimental features for better performance
   experimental: {

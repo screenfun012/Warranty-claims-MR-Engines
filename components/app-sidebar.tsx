@@ -299,21 +299,37 @@ export function AppSidebar() {
           )}>
             {/* User Avatar with Role Icon */}
             <div className="relative shrink-0">
-              {auth0User?.picture ? (
-                <div className="relative h-8 w-8 rounded-full overflow-hidden ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200">
-                  <Image
-                    src={auth0User.picture}
-                    alt={auth0User.name || "User"}
-                    fill
-                    className="object-cover"
-                    sizes="32px"
-                  />
-                </div>
-              ) : (
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200">
+              <div className="relative h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200 overflow-hidden">
+                {auth0User?.picture ? (
+                  <>
+                    <Image
+                      src={auth0User.picture}
+                      alt={auth0User.name || "User"}
+                      fill
+                      className="object-cover"
+                      sizes="32px"
+                      unoptimized={auth0User.picture.includes('auth0.com') || auth0User.picture.includes('gravatar.com')}
+                      onError={(e) => {
+                        // Hide broken image and show User icon instead
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const container = target.parentElement;
+                        const userIcon = container?.querySelector('.fallback-user-icon') as HTMLElement;
+                        if (userIcon) {
+                          userIcon.style.display = 'flex';
+                        }
+                      }}
+                    />
+                    {/* Fallback User Icon - hidden by default, shown on error */}
+                    <div className="fallback-user-icon absolute inset-0 flex items-center justify-center w-full h-full bg-primary/10" style={{ display: 'none' }}>
+                      <User className="h-4 w-4 text-primary" />
+                    </div>
+                  </>
+                ) : (
+                  /* Show User icon if no picture at all */
                   <User className="h-4 w-4 text-primary" />
-                </div>
-              )}
+                )}
+              </div>
               {/* Role Icon Badge - Use PNG images if available, fallback to lucide icons */}
               {userRole && (
                 <div className={cn(
