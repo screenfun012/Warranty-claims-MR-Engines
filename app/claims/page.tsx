@@ -213,20 +213,29 @@ export default function ClaimsPage() {
 
   // Helper function to update claims in React Query cache
   const updateClaimInCache = useCallback((claimId: string, updates: Partial<Claim>) => {
-    // Update filtered claims cache
+    // Update filtered claims cache - use functional update to ensure React detects change
     queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId], (old) => {
       if (!old) return old;
-      return old.map(c => c.id === claimId ? { ...c, ...updates } : c);
+      const updated = old.map(c => c.id === claimId ? { ...c, ...updates } : c);
+      // Force re-render by creating new array reference
+      return [...updated];
     });
     
     // Update all claims cache (for suggestions)
     queryClient.setQueryData<Claim[]>(['claims', 'all', filters.status], (old) => {
       if (!old) return old;
-      return old.map(c => c.id === claimId ? { ...c, ...updates } : c);
+      const updated = old.map(c => c.id === claimId ? { ...c, ...updates } : c);
+      // Force re-render by creating new array reference
+      return [...updated];
     });
     
     // Also invalidate other possible filter combinations to ensure consistency
     queryClient.invalidateQueries({ queryKey: ['claims'] });
+    
+    // Force immediate UI update by triggering a small delay to ensure React has processed the update
+    setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ['claims', 'filtered'] });
+    }, 0);
   }, [queryClient, filters]);
 
   // Legacy fetchClaims function for backward compatibility (now just calls refetch)
@@ -805,15 +814,16 @@ export default function ClaimsPage() {
             ),
             ...(isSuperAdmin ? {
               actions: (
-                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} key={`actions-${claim.id}-${claim.isLocked}`}>
                   {(() => {
                     // Check if claim is locked (CLOSED = locked by default, OR isLocked === true)
                     const isLocked = claim.isLocked === true || (claim.status === "CLOSED" && claim.isLocked !== false);
                     return isLocked ? (
                       <Button
+                        key={`unlock-${claim.id}-${claim.isLocked}`}
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                        className="h-7 w-7 p-0 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
                           setUnlockClaimId(claim.id);
@@ -824,9 +834,10 @@ export default function ClaimsPage() {
                       </Button>
                     ) : (
                       <Button
+                        key={`lock-${claim.id}-${claim.isLocked}`}
                         variant="ghost"
                         size="sm"
-                        className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
                           setLockClaimId(claim.id);
