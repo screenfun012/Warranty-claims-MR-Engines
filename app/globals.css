@@ -209,10 +209,28 @@
     overflow-x: auto;
     word-wrap: break-word;
     overflow-wrap: break-word;
+    position: relative;
   }
 
   .email-body * {
     max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Force containers in email signatures to respect max-width */
+  .email-body > div,
+  .email-body > table,
+  .email-body > tbody,
+  .email-body > tr,
+  .email-body > td {
+    max-width: 100% !important;
+  }
+
+  /* Prevent absolute positioned elements from overflowing */
+  .email-body [style*="position: absolute"],
+  .email-body [style*="position:fixed"] {
+    max-width: 100% !important;
+    right: auto !important;
   }
 
   /* Ensure images in email signatures don't overflow */

@@ -208,13 +208,13 @@ export default function DashboardPage() {
 
       {/* Unread Emails Alert - moved to top */}
       {stats.unreadEmailsCount !== undefined && stats.unreadEmailsCount > 0 && (
-        <Card className="p-6 bg-blue-500/5 border-blue-500/20">
+        <Card className="p-4 sm:p-6 bg-blue-500/5 border-blue-500/20">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
-              <div className="min-w-0">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 sm:mt-0" />
+              <div className="min-w-0 flex-1">
                 <p className="font-semibold">Nepročitane poruke</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground break-words">
                   Imate <span className="font-bold text-blue-600 dark:text-blue-400">{stats.unreadEmailsCount}</span> nepročitanih email poruka
                 </p>
               </div>
@@ -222,7 +222,7 @@ export default function DashboardPage() {
             <Button 
               variant="default"
               onClick={() => router.push("/inbox")}
-              className="w-full sm:w-auto shrink-0"
+              className="w-full sm:w-auto shrink-0 self-start sm:self-auto"
             >
               Otvori inbox
               <ArrowRight className="h-4 w-4 ml-2" />
