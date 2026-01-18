@@ -17,8 +17,8 @@ import {
   Mail,
   Crown,
   Eye,
-  Wrench,
-  ShieldCheck,
+  UserRoundCog,
+  UserCheck,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -376,85 +376,20 @@ export function AppSidebar() {
                   );
                 })()}
               </div>
-              {/* Role Icon Badge - Use PNG images if available, fallback to lucide icons */}
+              {/* Role Icon Badge - Use lucide icons directly */}
               {userRole && (
                 <div className={cn(
-                  "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background transition-all duration-200 overflow-hidden",
+                  "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background transition-all duration-200",
                   userRole === "SUPER_ADMIN" && "bg-amber-500 dark:bg-amber-600",
                   userRole === "ADMIN" && "bg-purple-500 dark:bg-purple-600",
                   userRole === "OPERATOR" && "bg-blue-500 dark:bg-blue-600",
                   userRole === "VIEWER" && "bg-gray-500 dark:bg-gray-600"
                 )}>
-                  {/* Try to use PNG image first, fallback to lucide icon */}
-                  {userRole === "SUPER_ADMIN" && (
-                    <>
-                      <Image
-                        src="/images/roles/super-admin.png"
-                        alt="Super Admin"
-                        width={12}
-                        height={12}
-                        className="h-3 w-3 object-contain"
-                        onError={(e) => {
-                          // Fallback to lucide icon if image doesn't exist
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'block';
-                        }}
-                      />
-                      <Crown className="h-2.5 w-2.5 text-white hidden" style={{ display: 'none' }} />
-                    </>
-                  )}
-                  {userRole === "ADMIN" && (
-                    <>
-                      <Image
-                        src="/images/roles/admin.png"
-                        alt="Admin"
-                        width={12}
-                        height={12}
-                        className="h-3 w-3 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'block';
-                        }}
-                      />
-                      <ShieldCheck className="h-2.5 w-2.5 text-white hidden" style={{ display: 'none' }} />
-                    </>
-                  )}
-                  {userRole === "OPERATOR" && (
-                    <>
-                      <Image
-                        src="/images/roles/operator.png"
-                        alt="Operator"
-                        width={12}
-                        height={12}
-                        className="h-3 w-3 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'block';
-                        }}
-                      />
-                      <Wrench className="h-2.5 w-2.5 text-white hidden" style={{ display: 'none' }} />
-                    </>
-                  )}
-                  {userRole === "VIEWER" && (
-                    <>
-                      <Image
-                        src="/images/roles/viewer.png"
-                        alt="Viewer"
-                        width={12}
-                        height={12}
-                        className="h-3 w-3 object-contain"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = 'block';
-                        }}
-                      />
-                      <Eye className="h-2.5 w-2.5 text-white hidden" style={{ display: 'none' }} />
-                    </>
-                  )}
+                  {/* Use lucide icons directly */}
+                  {userRole === "SUPER_ADMIN" && <Crown className="h-2.5 w-2.5 text-white" />}
+                  {userRole === "ADMIN" && <UserRoundCog className="h-2.5 w-2.5 text-white" />}
+                  {userRole === "OPERATOR" && <UserCheck className="h-2.5 w-2.5 text-white" />}
+                  {userRole === "VIEWER" && <Eye className="h-2.5 w-2.5 text-white" />}
                 </div>
               )}
             </div>
@@ -482,76 +417,12 @@ export function AppSidebar() {
                         userRole === "VIEWER" && "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20"
                       )}
                     >
-                      {/* Role Icon in Badge - Use PNG images if available, fallback to lucide icons */}
-                      <div className="relative h-3 w-3 shrink-0">
-                        {userRole === "SUPER_ADMIN" && (
-                          <>
-                            <Image
-                              src="/images/roles/super-admin.png"
-                              alt="Super Admin"
-                              width={12}
-                              height={12}
-                              className="h-3 w-3 object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'block';
-                              }}
-                            />
-                            <Crown className="h-3 w-3 absolute inset-0 hidden" style={{ display: 'none' }} />
-                          </>
-                        )}
-                        {userRole === "ADMIN" && (
-                          <>
-                            <Image
-                              src="/images/roles/admin.png"
-                              alt="Admin"
-                              width={12}
-                              height={12}
-                              className="h-3 w-3 object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'block';
-                              }}
-                            />
-                            <ShieldCheck className="h-3 w-3 absolute inset-0 hidden" style={{ display: 'none' }} />
-                          </>
-                        )}
-                        {userRole === "OPERATOR" && (
-                          <>
-                            <Image
-                              src="/images/roles/operator.png"
-                              alt="Operator"
-                              width={12}
-                              height={12}
-                              className="h-3 w-3 object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'block';
-                              }}
-                            />
-                            <Wrench className="h-3 w-3 absolute inset-0 hidden" style={{ display: 'none' }} />
-                          </>
-                        )}
-                        {userRole === "VIEWER" && (
-                          <>
-                            <Image
-                              src="/images/roles/viewer.png"
-                              alt="Viewer"
-                              width={12}
-                              height={12}
-                              className="h-3 w-3 object-contain"
-                              onError={(e) => {
-                                e.currentTarget.style.display = 'none';
-                                const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                if (fallback) fallback.style.display = 'block';
-                              }}
-                            />
-                            <Eye className="h-3 w-3 absolute inset-0 hidden" style={{ display: 'none' }} />
-                          </>
-                        )}
+                      {/* Role Icon in Badge - Use lucide icons directly */}
+                      <div className="relative h-3 w-3 shrink-0 flex items-center justify-center">
+                        {userRole === "SUPER_ADMIN" && <Crown className="h-3 w-3" />}
+                        {userRole === "ADMIN" && <UserRoundCog className="h-3 w-3" />}
+                        {userRole === "OPERATOR" && <UserCheck className="h-3 w-3" />}
+                        {userRole === "VIEWER" && <Eye className="h-3 w-3" />}
                       </div>
                       <span>{userRole}</span>
                     </Badge>
