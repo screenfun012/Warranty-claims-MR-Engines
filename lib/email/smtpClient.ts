@@ -5,7 +5,7 @@
  */
 
 import nodemailer from "nodemailer";
-import { prisma } from "@/lib/db/prisma";
+import { getPrisma } from "@/lib/db/prisma";
 import { getEmailConfig } from "@/lib/config/envLoader";
 
 export interface SendEmailParams {
@@ -98,6 +98,7 @@ export async function sendEmailAndSave(params: SendEmailParams & {
   const sendResult = await sendEmail(params);
 
   // Save to database
+  const prisma = await getPrisma();
   const config = getEmailConfig();
 
   const emailMessage = await prisma.emailMessage.create({
