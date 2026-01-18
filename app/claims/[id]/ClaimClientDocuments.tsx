@@ -173,12 +173,11 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
       });
 
       if (res.ok) {
-        // Refresh the claim data
+        // Refresh the claim data if onRefresh callback is available
         if (onRefresh) {
           await onRefresh();
-        } else {
-          window.location.reload();
         }
+        // No need to reload - onRefresh will update the UI
       } else {
         const errorData = await res.json();
         alert(`Neuspešno brisanje: ${errorData.error || "Unknown error"}`);
