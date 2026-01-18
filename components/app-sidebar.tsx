@@ -300,23 +300,29 @@ export function AppSidebar() {
             {/* User Avatar with Role Icon */}
             <div className="relative shrink-0">
               <div className="relative h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200 overflow-hidden">
-                {auth0User?.picture ? (
+                {auth0User?.picture && auth0User.picture.trim() !== '' ? (
                   <>
-                    <Image
+                    {/* Use regular img tag instead of Next.js Image for Auth0 compatibility */}
+                    <img
                       src={auth0User.picture}
                       alt={auth0User.name || "User"}
-                      fill
-                      className="object-cover"
-                      sizes="32px"
-                      unoptimized={auth0User.picture.includes('auth0.com') || auth0User.picture.includes('gravatar.com')}
+                      className="absolute inset-0 w-full h-full object-cover rounded-full"
                       onError={(e) => {
                         // Hide broken image and show User icon instead
                         const target = e.currentTarget;
                         target.style.display = 'none';
-                        const container = target.parentElement;
+                        const container = target.closest('.relative');
                         const userIcon = container?.querySelector('.fallback-user-icon') as HTMLElement;
                         if (userIcon) {
                           userIcon.style.display = 'flex';
+                        }
+                      }}
+                      onLoad={(e) => {
+                        // Ensure fallback is hidden when image loads successfully
+                        const container = e.currentTarget.closest('.relative');
+                        const userIcon = container?.querySelector('.fallback-user-icon') as HTMLElement;
+                        if (userIcon) {
+                          userIcon.style.display = 'none';
                         }
                       }}
                     />
