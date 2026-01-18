@@ -173,7 +173,7 @@ export async function PATCH(
 
     // Check if claim is locked (SUPER_ADMIN can always edit, regardless of lock status)
     // Lock is used by SUPER_ADMIN to control whether OTHER users can edit
-    const { isSuperAdmin } = await import("@/lib/auth/roles");
+    const { isSuperAdmin } = await import("@/lib/auth/permissions");
     const userIsSuperAdmin = await isSuperAdmin();
     
     if (!userIsSuperAdmin) {
