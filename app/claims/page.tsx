@@ -149,8 +149,10 @@ export default function ClaimsPage() {
   const [loading, setLoading] = useState(true);
   const [deleteClaimId, setDeleteClaimId] = useState<string | null>(null);
   const [unlockClaimId, setUnlockClaimId] = useState<string | null>(null);
+  const [lockClaimId, setLockClaimId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [isLocking, setIsLocking] = useState(false);
   const [filters, setFilters] = useState({
     status: [] as string[], // Changed to array for multi-select
     claimCode: "",
@@ -377,13 +379,14 @@ export default function ClaimsPage() {
       if (res.ok) {
         const data = await res.json();
         // Update local state immediately - unlock the claim (don't change status)
+        // This is instant - no table refresh needed, no page reload
         setClaims(prev => prev.map(c => c.id === claimId ? { ...c, isLocked: false } : c));
         setAllClaims(prev => prev.map(c => c.id === claimId ? { ...c, isLocked: false } : c));
         setUnlockClaimId(null);
-        // Dispatch event to update dashboard
+        // Dispatch event to update dashboard (other users will see update via their own refresh)
         window.dispatchEvent(new CustomEvent('claim-updated'));
-        // Refetch claims to ensure UI is up to date (no page reload needed)
-        await fetchClaims();
+        // NO REFETCH - instant update via state only
+        // Other users will see the change when they refresh or when their tables refresh naturally
       } else {
         const data = await res.json();
         alert(`Greška: ${data.error || "Neuspešno otključavanje"}`);
@@ -782,26 +785,106 @@ export default function ClaimsPage() {
                         <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       </Button>
                     ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        // Show confirmation dialog
-                        if (confirm("Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike.")) {
-                          try {
-                            const res = await fetch(`/api/claims/${claim.id}/lock`, {
-                              method: "POST",
-                            });
-                            if (res.ok) {
-                              const data = await res.json();
-                              // Update local state immediately
-                              setClaims(prev => prev.map(c => c.id === claim.id ? { ...c, isLocked: true } : c));
-                              setAllClaims(prev => prev.map(c => c.id === claim.id ? { ...c, isLocked: true } : c));
-                              // Refetch claims to ensure UI is up to date (no page reload needed)
-                              await fetchClaims();
-                            } else {
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLockClaimId(claim.id);
+                        }}
+                        title="Zaključaj reklamaciju"
+                      >
+                        <Unlock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </Button>
+                    );
+                  })()}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-red-100 dark:hover:bg-red-900/30"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteClaimId(claim.id);
+                    }}
+                    title="Obriši reklamaciju"
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+                  </Button>
+                </div>
+              ),
+            } : {}),
+          }))}
+          emptyMessage={
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="p-4 bg-muted/50 rounded-full mb-4 animate-pulse">
+                <FileText className="h-12 w-12 text-muted-foreground" />
+              </div>
+              <p className="text-lg font-semibold mb-2">No claims found</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Try adjusting your filters or create a new claim
+              </p>
+              <Button 
+                onClick={() => router.push("/claims/new")} 
+                variant="outline"
+                className="mt-2"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Create New Claim
+              </Button>
+            </div>
+          }
+          onRowClick={(row, index) => router.push(`/claims/${claims[index].id}`)}
+        />
+      </Card>
+
+      {/* Delete confirmation dialog */}
+      <ConfirmDialog
+        open={!!deleteClaimId}
+        onOpenChange={(open) => !open && setDeleteClaimId(null)}
+        onConfirm={() => deleteClaimId && handleDeleteClaim(deleteClaimId)}
+        title="Brisanje reklamacije"
+        description="Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna."
+        confirmText={isDeleting ? "Brisanje..." : "Obriši"}
+        cancelText="Otkaži"
+        variant="destructive"
+      />
+
+      {/* Unlock confirmation dialog */}
+      <ConfirmDialog
+        open={!!unlockClaimId}
+        onOpenChange={(open) => !open && setUnlockClaimId(null)}
+        onConfirm={() => unlockClaimId && handleUnlockClaim(unlockClaimId)}
+        title="Otključavanje reklamacije"
+        description="Da li ste sigurni da želite da otključate ovu reklamaciju? Reklamacija će biti dostupna za uređivanje ostalim korisnicima."
+        confirmText={isUnlocking ? "Otključavanje..." : "Otključaj"}
+        cancelText="Otkaži"
+        variant="default"
+      />
+
+      {/* Lock confirmation dialog */}
+      <ConfirmDialog
+        open={!!lockClaimId}
+        onOpenChange={(open) => !open && setLockClaimId(null)}
+        onConfirm={async () => {
+          if (!lockClaimId) return;
+          setIsLocking(true);
+          try {
+            const res = await fetch(`/api/claims/${lockClaimId}/lock`, {
+              method: "POST",
+            });
+            if (res.ok) {
+              const data = await res.json();
+              // Update local state immediately - lock the claim
+              // This is instant - no table refresh needed, no page reload
+              setClaims(prev => prev.map(c => c.id === lockClaimId ? { ...c, isLocked: true } : c));
+              setAllClaims(prev => prev.map(c => c.id === lockClaimId ? { ...c, isLocked: true } : c));
+              setLockClaimId(null);
+              // Dispatch event to update dashboard (other users will see update via their own refresh)
+              window.dispatchEvent(new CustomEvent('claim-updated'));
+              // NO REFETCH - instant update via state only
+              // Other users will see the change when they refresh or when their tables refresh naturally
+            } else {
                               const data = await res.json();
                               alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
                             }
