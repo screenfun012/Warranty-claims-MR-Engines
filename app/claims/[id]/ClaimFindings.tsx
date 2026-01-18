@@ -170,13 +170,8 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                                 const claimData = await claimRes.json();
                                 onUpdate({ reportSections: claimData.claim.reportSections });
                               }
-                            } else {
-                              // Fallback: reload page
-                              // Refresh claim data if onUpdate callback is available
-                              if (onUpdate) {
-                                onUpdate(claim);
-                              }
                             }
+                            // No need to reload - onUpdate will update the UI
                           } else {
                             const errorData = await res.json();
                             alert("Failed to delete section: " + (errorData.error || "Unknown error"));
