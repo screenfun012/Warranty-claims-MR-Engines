@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
-
-import { getPrisma } from "@/lib/db/prisma";
-import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { auth0 } from "@/lib/auth0";
 import { getUserByEmail, getUserRoles } from "@/lib/auth0-management";
 
