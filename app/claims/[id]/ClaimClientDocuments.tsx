@@ -76,7 +76,10 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
       const data = await res.json();
       if (data.success) {
         alert("Text extracted successfully");
-        window.location.reload();
+        // Refresh claim data if onRefresh callback is available
+        if (onRefresh) {
+          await onRefresh();
+        }
       } else {
         alert("Failed to extract text: " + data.error);
       }
@@ -112,7 +115,10 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
       const data = await res.json();
       if (data.translated) {
         alert("Translation completed");
-        window.location.reload();
+        // Refresh claim data if onRefresh callback is available
+        if (onRefresh) {
+          await onRefresh();
+        }
       } else {
         alert("Translation failed: " + (data.error || "Unknown error"));
       }

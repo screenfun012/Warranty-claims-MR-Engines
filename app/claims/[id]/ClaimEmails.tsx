@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +55,7 @@ const getOriginalSenderEmail = (claim: any): string => {
 };
 
 export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmailsProps) {
+  const router = useRouter();
   const [sending, setSending] = useState(false);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
   
@@ -264,13 +266,8 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         setReplyForm({ ...replyForm, text: "" });
         setSelectedAttachmentIds([]);
         
-        // Refresh claim data if onUpdate callback is available
-        if (onUpdate) {
-          onUpdate(claim);
-        }
-        
-        // Force full page reload to ensure status is updated (claim should now be CLOSED and read-only)
-        window.location.reload();
+        // Navigate back to claims list (table view)
+        router.push("/claims");
       } else {
         alert("Failed to send email: " + (data.error || "Unknown error"));
       }

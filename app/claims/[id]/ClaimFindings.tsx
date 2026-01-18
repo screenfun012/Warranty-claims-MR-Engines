@@ -172,7 +172,10 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                               }
                             } else {
                               // Fallback: reload page
-                              window.location.reload();
+                              // Refresh claim data if onUpdate callback is available
+                              if (onUpdate) {
+                                onUpdate(claim);
+                              }
                             }
                           } else {
                             const errorData = await res.json();

@@ -137,16 +137,16 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Refresh the claim data
+        // Use onRefresh callback if available to update UI without page reload
         if (onRefresh) {
           try {
             await onRefresh();
           } catch (refreshError) {
             console.error("Error refreshing claim data:", refreshError);
-            window.location.reload();
+            // If refresh fails, try to refetch manually but don't reload page
           }
-        } else {
-          window.location.reload();
         }
+        // No need to reload - onRefresh will update the UI
       }
     } catch (error) {
       console.error("Error in upload handler:", error);
@@ -179,11 +179,11 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       });
 
       if (res.ok) {
+        // Use onRefresh callback if available, otherwise just close dialog
         if (onRefresh) {
           await onRefresh();
-        } else {
-          window.location.reload();
         }
+        // No need to reload - onRefresh will update the UI
       } else {
         const errorData = await res.json();
         alert(`Neuspešno brisanje: ${errorData.error || "Unknown error"}`);
