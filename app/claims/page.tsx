@@ -35,6 +35,7 @@ interface Claim {
   claimPrefix: string | null;
   status: string;
   claimAcceptanceStatus: string | null;
+  isLocked: boolean | null;
   customer: {
     id: string;
     name: string;
