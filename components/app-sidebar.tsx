@@ -88,6 +88,8 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { user, isLoading: userLoading } = useUser();
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [avatarImageLoaded, setAvatarImageLoaded] = useState(false);
+  const [avatarImageError, setAvatarImageError] = useState(false);
   const { state } = useSidebar();
   const isCollapsed = state === "collapsed";
   const queryClient = useQueryClient();
@@ -130,6 +132,12 @@ export function AppSidebar() {
     };
   }
   const auth0User = user as Auth0User | undefined;
+  
+  // Reset avatar image state when picture URL changes
+  useEffect(() => {
+    setAvatarImageLoaded(false);
+    setAvatarImageError(false);
+  }, [auth0User?.picture]);
   
   // Debug: Log picture URL in development
   useEffect(() => {
@@ -315,31 +323,33 @@ export function AppSidebar() {
                   // Always show User icon as primary, img as overlay
                   return (
                     <>
-                      {/* Always show User icon as base */}
-                      <User className="h-4 w-4 text-primary relative z-0" />
+                      {/* Show User icon only if image hasn't loaded or failed */}
+                      {(!avatarImageLoaded || avatarImageError || !hasPicture) && (
+                        <User className="h-4 w-4 text-primary relative z-0" />
+                      )}
                       
-                      {/* Show Auth0 picture as overlay if available */}
-                      {hasPicture && (
+                      {/* Show Auth0 picture as overlay if available - use regular img tag, NOT Next.js Image */}
+                      {hasPicture && !avatarImageError && (
                         <img
                           src={pictureUrl}
                           alt={auth0User.name || "User"}
                           className="absolute inset-0 w-full h-full object-cover rounded-full z-10"
                           onError={(e) => {
-                            // If image fails, just hide it - User icon is already visible
-                            e.currentTarget.style.display = 'none';
+                            // If image fails, mark error and User icon will show
+                            setAvatarImageError(true);
                             if (process.env.NODE_ENV === 'development') {
                               console.warn('[UserAvatar] Failed to load Auth0 picture:', pictureUrl);
                             }
                           }}
                           onLoad={(e) => {
                             // When image loads successfully, hide User icon
-                            const container = e.currentTarget.closest('.relative');
-                            const userIcon = container?.querySelector('.h-4.w-4.text-primary') as HTMLElement;
-                            if (userIcon) {
-                              userIcon.style.display = 'none';
-                            }
+                            setAvatarImageLoaded(true);
                           }}
                           style={{ display: 'block' }}
+                          // Add crossorigin for Gravatar
+                          crossOrigin="anonymous"
+                          // Add referrerPolicy to avoid issues
+                          referrerPolicy="no-referrer"
                         />
                       )}
                     </>

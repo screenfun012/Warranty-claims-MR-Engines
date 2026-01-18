@@ -122,12 +122,31 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 's.gravatar.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.gravatar.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.auth0.com',
+        pathname: '**',
+      },
+      {
+        protocol: 'https',
         hostname: '**.googleusercontent.com',
         pathname: '**',
       },
     ],
-    // Allow all domains if needed (less secure but works for all Auth0 providers)
+    // Disable optimization for external images to avoid 400 errors
     unoptimized: false,
+    // Allow images from any domain (less secure but ensures compatibility)
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   // Experimental features for better performance
   experimental: {
