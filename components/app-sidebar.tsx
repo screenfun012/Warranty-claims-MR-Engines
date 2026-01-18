@@ -18,7 +18,7 @@ import {
   Crown,
   Eye,
   Wrench,
-  UserCog,
+  ShieldCheck,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -356,7 +356,7 @@ export function AppSidebar() {
                           if (fallback) fallback.style.display = 'block';
                         }}
                       />
-                      <UserCog className="h-2.5 w-2.5 text-white hidden" style={{ display: 'none' }} />
+                      <ShieldCheck className="h-2.5 w-2.5 text-white hidden" style={{ display: 'none' }} />
                     </>
                   )}
                   {userRole === "OPERATOR" && (
@@ -453,7 +453,7 @@ export function AppSidebar() {
                                 if (fallback) fallback.style.display = 'block';
                               }}
                             />
-                            <UserCog className="h-3 w-3 absolute inset-0 hidden" style={{ display: 'none' }} />
+                            <ShieldCheck className="h-3 w-3 absolute inset-0 hidden" style={{ display: 'none' }} />
                           </>
                         )}
                         {userRole === "OPERATOR" && (
