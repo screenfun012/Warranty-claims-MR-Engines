@@ -131,6 +131,13 @@ export function AppSidebar() {
   }
   const auth0User = user as Auth0User | undefined;
   
+  // Debug: Log picture URL in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && auth0User?.picture) {
+      console.log('[UserAvatar] Auth0 picture URL:', auth0User.picture);
+    }
+  }, [auth0User?.picture]);
+  
   // Get role from various possible locations
   const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
   const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
@@ -300,41 +307,44 @@ export function AppSidebar() {
             {/* User Avatar with Role Icon */}
             <div className="relative shrink-0">
               <div className="relative h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200 overflow-hidden">
-                {auth0User?.picture && auth0User.picture.trim() !== '' ? (
-                  <>
-                    {/* Use regular img tag instead of Next.js Image for Auth0 compatibility */}
-                    <img
-                      src={auth0User.picture}
-                      alt={auth0User.name || "User"}
-                      className="absolute inset-0 w-full h-full object-cover rounded-full"
-                      onError={(e) => {
-                        // Hide broken image and show User icon instead
-                        const target = e.currentTarget;
-                        target.style.display = 'none';
-                        const container = target.closest('.relative');
-                        const userIcon = container?.querySelector('.fallback-user-icon') as HTMLElement;
-                        if (userIcon) {
-                          userIcon.style.display = 'flex';
-                        }
-                      }}
-                      onLoad={(e) => {
-                        // Ensure fallback is hidden when image loads successfully
-                        const container = e.currentTarget.closest('.relative');
-                        const userIcon = container?.querySelector('.fallback-user-icon') as HTMLElement;
-                        if (userIcon) {
-                          userIcon.style.display = 'none';
-                        }
-                      }}
-                    />
-                    {/* Fallback User Icon - hidden by default, shown on error */}
-                    <div className="fallback-user-icon absolute inset-0 flex items-center justify-center w-full h-full bg-primary/10" style={{ display: 'none' }}>
-                      <User className="h-4 w-4 text-primary" />
-                    </div>
-                  </>
-                ) : (
-                  /* Show User icon if no picture at all */
-                  <User className="h-4 w-4 text-primary" />
-                )}
+                {(() => {
+                  // Check if picture exists and is valid
+                  const pictureUrl = auth0User?.picture;
+                  const hasPicture = pictureUrl && pictureUrl.trim() !== '' && pictureUrl !== 'undefined' && !pictureUrl.startsWith('undefined');
+                  
+                  // Always show User icon as primary, img as overlay
+                  return (
+                    <>
+                      {/* Always show User icon as base */}
+                      <User className="h-4 w-4 text-primary relative z-0" />
+                      
+                      {/* Show Auth0 picture as overlay if available */}
+                      {hasPicture && (
+                        <img
+                          src={pictureUrl}
+                          alt={auth0User.name || "User"}
+                          className="absolute inset-0 w-full h-full object-cover rounded-full z-10"
+                          onError={(e) => {
+                            // If image fails, just hide it - User icon is already visible
+                            e.currentTarget.style.display = 'none';
+                            if (process.env.NODE_ENV === 'development') {
+                              console.warn('[UserAvatar] Failed to load Auth0 picture:', pictureUrl);
+                            }
+                          }}
+                          onLoad={(e) => {
+                            // When image loads successfully, hide User icon
+                            const container = e.currentTarget.closest('.relative');
+                            const userIcon = container?.querySelector('.h-4.w-4.text-primary') as HTMLElement;
+                            if (userIcon) {
+                              userIcon.style.display = 'none';
+                            }
+                          }}
+                          style={{ display: 'block' }}
+                        />
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               {/* Role Icon Badge - Use PNG images if available, fallback to lucide icons */}
               {userRole && (
