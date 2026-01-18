@@ -10,7 +10,7 @@ import path from "path";
 import { env } from "@/lib/config/env";
 import { getPrisma } from "@/lib/db/prisma";
 import type { Claim } from "@prisma/client";
-import { sanitizeClaimCodeForPath } from "@/lib/domain/claimCode";
+import { sanitizeClaimCodeForPath, sanitizeCustomerNameForPath } from "@/lib/domain/claimCode";
 import { put, del, list } from "@vercel/blob";
 import { createClient } from "webdav";
 import type { WebDAVClient } from "webdav";
@@ -67,26 +67,44 @@ if (USE_WEBDAV) {
 
 /**
  * Get the base path/key for a claim's files
- * Returns: <claimYear or "unknown">/<sanitizedClaimCode or claim.id>/
+ * Returns: "<Customer Name> - <Claim Code>" format
+ * If customer is not provided, will try to load it from database
  */
-function getClaimBaseKey(claim: Claim): string {
-  const yearDir = claim.claimYear?.toString() || "unknown";
-  const claimDir = claim.claimCodeRaw
+async function getClaimBaseKey(claim: Claim & { customer?: { name: string | null } | null }): Promise<string> {
+  // Load customer if not provided
+  let customerName: string | null = null;
+  if (claim.customer) {
+    customerName = claim.customer.name;
+  } else if (claim.customerId) {
+    try {
+      const prismaClient = await getPrisma();
+      const customer = await prismaClient.customer.findUnique({
+        where: { id: claim.customerId },
+        select: { name: true },
+      });
+      customerName = customer?.name || null;
+    } catch (error) {
+      console.warn(`[getClaimBaseKey] Failed to load customer for claim ${claim.id}:`, error);
+    }
+  }
+
+  // Format: "Customer Name - Claim Code"
+  const sanitizedCustomerName = sanitizeCustomerNameForPath(customerName);
+  const sanitizedClaimCode = claim.claimCodeRaw
     ? sanitizeClaimCodeForPath(claim.claimCodeRaw)
     : claim.id;
-  return `${yearDir}/${claimDir}`;
+
+  return `${sanitizedCustomerName} - ${sanitizedClaimCode}`;
 }
 
 /**
  * Get the base path for a claim's files (filesystem only)
+ * Returns: "<Customer Name> - <Claim Code>" format
  */
-export function getClaimBasePath(claim: Claim): string {
+export async function getClaimBasePath(claim: Claim & { customer?: { name: string | null } | null }): Promise<string> {
   const rootPath = path.resolve(env.FILE_ROOT_PATH);
-  const yearDir = claim.claimYear?.toString() || "unknown";
-  const claimDir = claim.claimCodeRaw
-    ? sanitizeClaimCodeForPath(claim.claimCodeRaw)
-    : claim.id;
-  return path.join(rootPath, yearDir, claimDir);
+  const baseKey = await getClaimBaseKey(claim);
+  return path.join(rootPath, baseKey);
 }
 
 /**
@@ -171,7 +189,7 @@ export async function saveAttachmentForClaim(params: {
 
   if (USE_WEBDAV && webdavClient) {
     // Use WebDAV
-    const baseKey = getClaimBaseKey(claim);
+    const baseKey = await getClaimBaseKey(claim);
     const subfolder = params.subfolder || "03_attachments";
     const relativePath = `${baseKey}/${subfolder}/${sanitizedFileName}`;
     const webdavPath = getWebDAVPath(relativePath);
@@ -213,7 +231,7 @@ export async function saveAttachmentForClaim(params: {
     return `webdav:${finalRelativePath}`;
   } else if (USE_BLOB) {
     // Use Vercel Blob
-    const baseKey = getClaimBaseKey(claim);
+    const baseKey = await getClaimBaseKey(claim);
     const subfolder = params.subfolder || "03_attachments";
     const blobKey = `${baseKey}/${subfolder}/${sanitizedFileName}`;
 
@@ -246,7 +264,7 @@ export async function saveAttachmentForClaim(params: {
     return blob.url; // Return Blob URL
   } else {
     // Use filesystem
-    const basePath = getClaimBasePath(claim);
+    const basePath = await getClaimBasePath(claim);
     const subfolder = params.subfolder || "03_attachments";
     const targetDir = path.join(basePath, subfolder);
 

@@ -80,3 +80,22 @@ export function sanitizeClaimCodeForPath(claimCode: string): string {
     .replace(/_{2,}/g, "_");
 }
 
+/**
+ * Sanitize customer name for use in file paths
+ * Removes unsafe characters, keeps spaces and common special chars safe for folder names
+ */
+export function sanitizeCustomerNameForPath(customerName: string | null | undefined): string {
+  if (!customerName || !customerName.trim()) {
+    return "Unknown";
+  }
+  return customerName
+    .trim()
+    // Replace problematic characters with space
+    .replace(/[<>:"|?*\x00-\x1f]/g, " ")
+    // Replace multiple spaces with single space
+    .replace(/\s+/g, " ")
+    // Trim to reasonable length (max 100 chars)
+    .substring(0, 100)
+    .trim();
+}
+

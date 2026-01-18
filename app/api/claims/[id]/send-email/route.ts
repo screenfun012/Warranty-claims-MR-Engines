@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { sendEmailAndSave } from "@/lib/email/smtpClient";
-import { readAttachmentFile } from "@/lib/files/fileStorage";
+import { readAttachmentFile, saveAttachmentForClaim } from "@/lib/files/fileStorage";
 import { getClaimStatusEmailTemplate, getClaimProcessingEmailTemplate } from "@/lib/email/emailTemplates";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
@@ -206,6 +206,43 @@ export async function POST(
       attachments: attachments.length > 0 ? attachments : undefined,
     });
 
+    // After successful email send, save attachments to NAS in 04_sent_to_client folder
+    // This creates a folder on NAS with format "Customer Name - Claim Code" and saves attachments there
+    if (attachments.length > 0 && claim.claimCodeRaw) {
+      try {
+        console.log(`[send-email] Saving ${attachments.length} attachments to NAS folder 04_sent_to_client for claim ${id}`);
+        
+        // Reload claim with customer for folder name
+        const claimWithCustomer = await prisma.claim.findUnique({
+          where: { id },
+          include: { customer: true },
+        });
+
+        if (claimWithCustomer) {
+          for (const attachment of attachments) {
+            if (attachment.content) {
+              try {
+                await saveAttachmentForClaim({
+                  claim: claimWithCustomer,
+                  fileBuffer: attachment.content,
+                  originalFileName: attachment.filename,
+                  mimeType: attachment.contentType || "application/octet-stream",
+                  subfolder: "04_sent_to_client",
+                });
+                console.log(`[send-email] Saved attachment to NAS: ${attachment.filename}`);
+              } catch (saveError) {
+                console.error(`[send-email] Failed to save attachment ${attachment.filename} to NAS:`, saveError);
+                // Don't fail the whole process if one attachment fails
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error(`[send-email] Error saving attachments to NAS:`, error);
+        // Don't fail the email send if NAS save fails, but log it
+      }
+    }
+
     // After successful email send, update processingEmailSentAt if it was a processing email
     if (body._isProcessingEmail || body.type === "processing") {
       try {
@@ -219,35 +256,31 @@ export async function POST(
       }
     }
 
-    // After successful email send, update claim status to CLOSED if acceptance status is provided
-    if (body.claimAcceptanceStatus && (body.claimAcceptanceStatus === "ACCEPTED" || body.claimAcceptanceStatus === "REJECTED")) {
-      try {
-        console.log(`[send-email] Attempting to update claim ${id} with status=CLOSED and claimAcceptanceStatus=${body.claimAcceptanceStatus}`);
-        
-        // Use raw SQL for SQLite compatibility
+    // After successful email send, ALWAYS close the claim (status = CLOSED)
+    // This ensures that once an email is sent to client, the claim is closed
+    try {
+      console.log(`[send-email] Closing claim ${id} after sending email to client`);
+      
+      // Use raw SQL for SQLite compatibility
+      if (body.claimAcceptanceStatus) {
         await prisma.$executeRawUnsafe(
           `UPDATE Claim SET status = ?, claimAcceptanceStatus = ?, updatedAt = datetime('now') WHERE id = ?`,
           "CLOSED",
           body.claimAcceptanceStatus,
           id
         );
-        
-        console.log(`[send-email] SQL update executed for claim ${id}`);
-        
-        // Verify the update
-        const updatedClaim = await prisma.claim.findUnique({
-          where: { id },
-          select: { status: true, claimAcceptanceStatus: true },
-        });
-        console.log(`[send-email] Verification - claim status: ${updatedClaim?.status}, acceptanceStatus: ${updatedClaim?.claimAcceptanceStatus}`);
-        
-        if (updatedClaim?.status !== "CLOSED" || updatedClaim?.claimAcceptanceStatus !== body.claimAcceptanceStatus) {
-          console.error(`[send-email] Update verification failed! Expected CLOSED/${body.claimAcceptanceStatus}, got ${updatedClaim?.status}/${updatedClaim?.claimAcceptanceStatus}`);
-        }
-      } catch (updateError) {
-        console.error("Error updating claim status:", updateError);
-        // Don't fail the email send if status update fails, but log it
+      } else {
+        await prisma.$executeRawUnsafe(
+          `UPDATE Claim SET status = ?, updatedAt = datetime('now') WHERE id = ?`,
+          "CLOSED",
+          id
+        );
       }
+      
+      console.log(`[send-email] Claim ${id} closed successfully`);
+    } catch (updateError) {
+      console.error("Error closing claim:", updateError);
+      // Don't fail the email send if status update fails, but log it
     }
 
     return NextResponse.json({
