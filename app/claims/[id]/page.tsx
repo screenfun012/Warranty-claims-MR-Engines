@@ -44,6 +44,7 @@ interface Claim {
   status: string;
   claimAcceptanceStatus: string | null;
   processingEmailSentAt: string | null;
+  isLocked: boolean | null;
   customer: any;
   workOrder: any;
   engineType: string | null;
