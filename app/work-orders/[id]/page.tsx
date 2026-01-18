@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WorkOrder {
   id: string;
@@ -72,8 +72,43 @@ export default function WorkOrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size="lg" text="Učitavanje work order-a..." />
+      <div className="p-8">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between mb-6">
+          <Skeleton className="h-9 w-64" />
+          <Skeleton className="h-9 w-32" />
+        </div>
+
+        {/* Details Cards Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Card className="p-6">
+            <Skeleton className="h-7 w-24 mb-4" />
+            <div className="space-y-3">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-4 w-full" />
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Claims Table Skeleton */}
+        <Card className="p-6">
+          <Skeleton className="h-7 w-48 mb-4" />
+          <div className="space-y-3">
+            <div className="grid grid-cols-5 gap-4 pb-2 border-b">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-4 w-full" />
+              ))}
+            </div>
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="grid grid-cols-5 gap-4 py-3 border-b">
+                {[...Array(5)].map((_, j) => (
+                  <Skeleton key={j} className="h-4 w-full" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     );
   }

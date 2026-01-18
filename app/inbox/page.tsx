@@ -10,7 +10,7 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -651,8 +651,26 @@ function ThreadDetail({
         <Button onClick={onBack} variant="ghost" className="mb-4">
           ← Back
         </Button>
-        <div className="flex items-center justify-center min-h-[300px]">
-          <Spinner size="lg" text="Učitavanje email thread-a..." />
+        <div className="space-y-4">
+          {/* Header Skeleton */}
+          <Card className="p-6">
+            <Skeleton className="h-8 w-64 mb-4" />
+            <div className="flex gap-2 mb-4">
+              <Skeleton className="h-10 w-48" />
+              <Skeleton className="h-10 w-40" />
+            </div>
+          </Card>
+
+          {/* Message Cards Skeleton */}
+          {[...Array(3)].map((_, i) => (
+            <Card key={i} className="p-4">
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            </Card>
+          ))}
         </div>
       </div>
     );

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface WorkOrder {
   id: string;
@@ -61,8 +61,32 @@ export default function WorkOrdersPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size="lg" text="Učitavanje..." />
+      <div className="p-8">
+        <Skeleton className="h-9 w-48 mb-6" />
+        
+        <Card className="p-4 mb-6">
+          <Skeleton className="h-4 w-32 mb-2" />
+          <Skeleton className="h-10 w-full" />
+        </Card>
+
+        <Card className="p-4">
+          <div className="space-y-3">
+            {/* Table Header Skeleton */}
+            <div className="grid grid-cols-6 gap-4 pb-2 border-b">
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-4 w-full" />
+              ))}
+            </div>
+            {/* Table Rows Skeleton */}
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="grid grid-cols-6 gap-4 py-3 border-b">
+                {[...Array(6)].map((_, j) => (
+                  <Skeleton key={j} className="h-4 w-full" />
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
     );
   }

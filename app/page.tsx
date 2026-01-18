@@ -19,7 +19,7 @@ import {
   Users,
   Activity
 } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -161,8 +161,40 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Spinner size="lg" text="Učitavanje statistika..." />
+      <div className="p-6 space-y-6 animate-in fade-in duration-500">
+        {/* Header Skeleton */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <Skeleton className="h-10 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-9 w-24" />
+        </div>
+
+        {/* Unread Messages Card Skeleton */}
+        <Card className="p-6 bg-blue-500/5 border-blue-500/20">
+          <Skeleton className="h-20 w-full" />
+        </Card>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Card key={i} className="p-6">
+              <Skeleton className="h-4 w-24 mb-4" />
+              <Skeleton className="h-10 w-16 mb-2" />
+            </Card>
+          ))}
+        </div>
+
+        {/* Progress Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[...Array(2)].map((_, i) => (
+            <Card key={i} className="p-6">
+              <Skeleton className="h-6 w-32 mb-4" />
+              <Skeleton className="h-2 w-full" />
+            </Card>
+          ))}
+        </div>
       </div>
     );
   }

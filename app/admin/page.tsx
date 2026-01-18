@@ -7,7 +7,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Users, 
   Shield, 
@@ -81,8 +81,36 @@ export default function AdminDashboardPage() {
 
   if (isLoading || loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Spinner size="lg" text="Učitavanje..." />
+      <div className="p-6 space-y-6">
+        {/* Header Skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="p-6">
+              <Skeleton className="h-4 w-24 mb-4" />
+              <Skeleton className="h-10 w-16" />
+            </Card>
+          ))}
+        </div>
+
+        {/* Admin Sections Skeleton */}
+        <div className="space-y-4">
+          <Skeleton className="h-7 w-40" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(3)].map((_, i) => (
+              <Card key={i} className="p-6">
+                <Skeleton className="h-8 w-8 mb-4" />
+                <Skeleton className="h-6 w-32 mb-2" />
+                <Skeleton className="h-4 w-full" />
+              </Card>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
