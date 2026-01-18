@@ -13,6 +13,9 @@ import {
   Settings,
   Shield,
   LogOut,
+  User,
+  Mail,
+  Crown,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -284,49 +287,113 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t px-2 py-2 flex flex-col gap-2 transition-all duration-200">
-        <TooltipProvider delayDuration={0}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className={cn(
-                "opacity-70 hover:opacity-100 transition-all duration-200",
-                isCollapsed && "w-full"
-              )}>
-                <ThemeToggle />
-              </div>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <span>Promeni temu</span>
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider delayDuration={0}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <a
-                href="/auth/logout"
-                className={cn(
-                  "opacity-70 hover:opacity-100 transition-all duration-200",
-                  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium",
-                  "disabled:pointer-events-none disabled:opacity-50",
-                  "outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  "hover:text-destructive",
-                  isCollapsed ? "w-full size-9" : "w-full px-3 py-2"
+      <SidebarFooter className="border-t px-2 py-3 flex flex-col gap-3 transition-all duration-200">
+        {/* User Profile Section */}
+        {user && (
+          <div className={cn(
+            "flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/30 hover:bg-sidebar-accent/50 transition-all duration-200 group/user",
+            isCollapsed && "justify-center"
+          )}>
+            {/* User Avatar */}
+            <div className="relative shrink-0">
+              {auth0User?.picture ? (
+                <div className="relative h-8 w-8 rounded-full overflow-hidden ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200">
+                  <Image
+                    src={auth0User.picture}
+                    alt={auth0User.name || "User"}
+                    fill
+                    className="object-cover"
+                    sizes="32px"
+                  />
+                </div>
+              ) : (
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200">
+                  <User className="h-4 w-4 text-primary" />
+                </div>
+              )}
+              {/* Role Badge */}
+              {userRole && (userRole === "SUPER_ADMIN" || userRole === "ADMIN") && !isCollapsed && (
+                <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-amber-500 dark:bg-amber-600 flex items-center justify-center ring-2 ring-background">
+                  <Crown className="h-2.5 w-2.5 text-white" />
+                </div>
+              )}
+            </div>
+            
+            {/* User Info */}
+            {!isCollapsed && (
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-sm font-semibold text-foreground truncate">
+                    {auth0User?.name || "Korisnik"}
+                  </p>
+                  {userRole && (
+                    <Badge 
+                      variant={userRole === "SUPER_ADMIN" ? "default" : "secondary"} 
+                      className="h-4 px-1.5 text-xs shrink-0"
+                    >
+                      {userRole}
+                    </Badge>
+                  )}
+                </div>
+                {auth0User?.email && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
+                    <p className="text-xs text-muted-foreground truncate">
+                      {auth0User.email}
+                    </p>
+                  </div>
                 )}
-              >
-                <LogOut className="h-4 w-4" />
-                {!isCollapsed && <span>Odjavi se</span>}
-              </a>
-            </TooltipTrigger>
-            {isCollapsed && (
-              <TooltipContent side="right">
-                <span>Odjavi se</span>
-              </TooltipContent>
+              </div>
             )}
-          </Tooltip>
-        </TooltipProvider>
+          </div>
+        )}
+
+        {/* Theme Toggle and Logout */}
+        <div className="flex items-center gap-2">
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={cn(
+                  "flex-1 opacity-70 hover:opacity-100 transition-all duration-200",
+                  isCollapsed && "w-full"
+                )}>
+                  <ThemeToggle />
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <span>Promeni temu</span>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+          
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <a
+                  href="/auth/logout"
+                  className={cn(
+                    "opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all duration-200",
+                    "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium",
+                    "disabled:pointer-events-none disabled:opacity-50",
+                    "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-destructive/20",
+                    "border border-transparent hover:border-destructive/20",
+                    isCollapsed ? "size-9 flex-shrink-0" : "flex-1 px-3 py-2"
+                  )}
+                >
+                  <LogOut className="h-4 w-4" />
+                  {!isCollapsed && <span>Odjavi se</span>}
+                </a>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <span>Odjavi se</span>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

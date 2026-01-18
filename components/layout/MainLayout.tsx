@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -16,6 +17,105 @@ import {
 } from "@/components/ui/tooltip";
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { Home, ChevronRight } from "lucide-react";
+
+function PageTitle({ pathname }: { pathname: string | null }) {
+  if (!pathname) return null;
+
+  // Get breadcrumbs from pathname
+  const getBreadcrumbs = (path: string): Array<{ label: string; href: string }> => {
+    const parts = path.split("/").filter(Boolean);
+    const breadcrumbs: Array<{ label: string; href: string }> = [{ label: "Dashboard", href: "/" }];
+    
+    if (parts.length === 0) return breadcrumbs;
+    
+    let currentPath = "";
+    parts.forEach((part, index) => {
+      currentPath += `/${part}`;
+      
+      // Handle specific routes
+      if (part === "claims") {
+        if (parts[index + 1] === "new") {
+          breadcrumbs.push({ label: "Claims", href: "/claims" });
+          breadcrumbs.push({ label: "New Claim", href: currentPath + "/new" });
+          return;
+        } else if (parts[index + 1]) {
+          breadcrumbs.push({ label: "Claims", href: "/claims" });
+          breadcrumbs.push({ label: `Claim ${parts[index + 1].slice(0, 8)}...`, href: currentPath + "/" + parts[index + 1] });
+          return;
+        } else {
+          breadcrumbs.push({ label: "Claims", href: "/claims" });
+        }
+      } else if (part === "inbox") {
+        breadcrumbs.push({ label: "Inbox", href: "/inbox" });
+      } else if (part === "settings") {
+        breadcrumbs.push({ label: "Settings", href: "/settings" });
+      } else if (part === "admin" && parts[index + 1] === "users") {
+        breadcrumbs.push({ label: "Admin", href: "/admin" });
+        breadcrumbs.push({ label: "User Management", href: currentPath + "/users" });
+        return;
+      } else if (part === "work-orders") {
+        if (parts[index + 1]) {
+          breadcrumbs.push({ label: "Work Orders", href: "/work-orders" });
+          breadcrumbs.push({ label: "Details", href: currentPath + "/" + parts[index + 1] });
+          return;
+        } else {
+          breadcrumbs.push({ label: "Work Orders", href: "/work-orders" });
+        }
+      } else {
+        // Generic handling
+        const label = part.charAt(0).toUpperCase() + part.slice(1).replace(/-/g, " ");
+        breadcrumbs.push({ label, href: currentPath });
+      }
+    });
+    
+    return breadcrumbs;
+  };
+
+  const breadcrumbs = getBreadcrumbs(pathname);
+
+  return (
+    <div className="flex items-center gap-2 flex-1 min-w-0">
+      {breadcrumbs.length > 1 ? (
+        <nav className="flex items-center gap-1.5 text-sm min-w-0">
+          {breadcrumbs.map((crumb, index) => {
+            const isLast = index === breadcrumbs.length - 1;
+            return (
+              <React.Fragment key={crumb.href}>
+                {index > 0 && (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50" />
+                )}
+                {index === 0 ? (
+                  <a
+                    href={crumb.href}
+                    className="flex items-center gap-1.5 hover:text-foreground text-muted-foreground transition-colors duration-200"
+                  >
+                    <Home className="h-4 w-4 shrink-0" />
+                    {crumb.label}
+                  </a>
+                ) : isLast ? (
+                  <span className="font-semibold text-foreground truncate">{crumb.label}</span>
+                ) : (
+                  <a
+                    href={crumb.href}
+                    className="hover:text-foreground text-muted-foreground transition-colors duration-200 truncate"
+                  >
+                    {crumb.label}
+                  </a>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </nav>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Home className="h-4 w-4 text-muted-foreground" />
+          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SidebarTriggerWithTooltip() {
   const { state, toggleSidebar } = useSidebar();
@@ -53,11 +153,12 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 px-4 border-b transition-all duration-200">
+        <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
           <SidebarTriggerWithTooltip />
-          <Separator orientation="vertical" className="mr-2 h-4 transition-opacity duration-200" />
+          <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />
+          <PageTitle pathname={pathname} />
         </header>
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto bg-background/50">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
