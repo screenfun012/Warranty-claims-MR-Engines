@@ -278,10 +278,12 @@ export async function POST(
       console.log(`[send-email] Closing claim ${id} after sending email to client`);
       
       // Use Prisma update for Turso compatibility (works with both SQLite and Turso)
-      // When email is sent, claim is closed AND locked (read-only for non-SUPER_ADMIN)
+      // When email is sent, claim is closed
+      // Default behavior: CLOSED status = locked (no need to set isLocked explicitly)
+      // We set isLocked to null/undefined so default behavior applies
       const updateData: any = {
         status: "CLOSED",
-        isLocked: true, // Lock the claim after closing
+        // Don't set isLocked - CLOSED status = locked by default
         updatedAt: new Date(),
       };
       

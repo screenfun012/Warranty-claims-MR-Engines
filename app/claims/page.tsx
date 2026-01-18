@@ -764,48 +764,52 @@ export default function ClaimsPage() {
             ...(isSuperAdmin ? {
               actions: (
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                  {(claim.status === "CLOSED" || claim.isLocked) ? (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setUnlockClaimId(claim.id);
-                      }}
-                      title="Otključaj reklamaciju"
-                    >
-                      <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        if (confirm("Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike.")) {
-                          try {
-                            const res = await fetch(`/api/claims/${claim.id}/lock`, {
-                              method: "POST",
-                            });
-                            if (res.ok) {
-                              // Refresh claims to show updated lock status
-                              window.location.reload();
-                            } else {
-                              const data = await res.json();
-                              alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
+                  {(() => {
+                    // Check if claim is locked (CLOSED = locked by default, OR isLocked === true)
+                    const isLocked = claim.isLocked === true || (claim.status === "CLOSED" && claim.isLocked !== false);
+                    return isLocked ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setUnlockClaimId(claim.id);
+                        }}
+                        title="Otključaj reklamaciju"
+                      >
+                        <Lock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 hover:bg-green-100 dark:hover:bg-green-900/30"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          if (confirm("Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike.")) {
+                            try {
+                              const res = await fetch(`/api/claims/${claim.id}/lock`, {
+                                method: "POST",
+                              });
+                              if (res.ok) {
+                                // Refresh claims to show updated lock status
+                                window.location.reload();
+                              } else {
+                                const data = await res.json();
+                                alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
+                              }
+                            } catch (error) {
+                              alert("Greška pri zaključavanju reklamacije");
                             }
-                          } catch (error) {
-                            alert("Greška pri zaključavanju reklamacije");
                           }
-                        }
-                      }}
-                      title="Zaključaj reklamaciju"
-                    >
-                      <Unlock className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    </Button>
-                  )}
+                        }}
+                        title="Zaključaj reklamaciju"
+                      >
+                        <Unlock className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </Button>
+                    );
+                  })()}
                   <Button
                     variant="ghost"
                     size="sm"
