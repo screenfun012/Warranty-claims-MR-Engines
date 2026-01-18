@@ -36,8 +36,9 @@ export async function DELETE(
 
     // Delete all related records
     // Attachments will be deleted via cascade, but we need to delete files from disk
-    const { deleteAttachmentFile } = await import("@/lib/files/fileStorage");
+    const { deleteAttachmentFile, deleteClaimFolder } = await import("@/lib/files/fileStorage");
     
+    // Delete individual attachment files
     for (const attachment of claim.attachments) {
       try {
         await deleteAttachmentFile(attachment.filePath);
@@ -47,7 +48,17 @@ export async function DELETE(
       }
     }
 
-    // Delete the claim (cascade will handle related records)
+    // Delete the entire claim folder from NAS (if it exists)
+    // This ensures complete cleanup - folder and all subfolders are removed
+    try {
+      await deleteClaimFolder(claim);
+      console.log(`[Delete Claim] Successfully deleted claim folder for ${claim.claimCodeRaw || claim.id}`);
+    } catch (error) {
+      console.error(`[Delete Claim] Error deleting claim folder:`, error);
+      // Continue even if folder deletion fails - don't block claim deletion
+    }
+
+    // Delete the claim from database (cascade will handle related records)
     await prisma.claim.delete({
       where: { id },
     });

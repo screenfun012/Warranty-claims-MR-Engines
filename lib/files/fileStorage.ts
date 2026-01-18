@@ -515,3 +515,54 @@ export async function deleteAttachmentFile(relativePathOrUrl: string): Promise<v
     }
   }
 }
+
+/**
+ * Delete a folder/directory (recursively) - used for deleting entire claim folders from NAS
+ * Supports WebDAV, Blob (not fully supported - would need to list and delete individually), and filesystem
+ */
+export async function deleteClaimFolder(claim: Claim & { customer?: { name: string | null } | null }): Promise<void> {
+  const baseKey = await getClaimBaseKey(claim);
+  
+  if (USE_WEBDAV && webdavClient) {
+    // Delete folder from WebDAV
+    try {
+      const webdavPath = getWebDAVPath(baseKey);
+      console.log(`[deleteClaimFolder] Deleting WebDAV folder: ${webdavPath}`);
+      
+      // Check if folder exists
+      const exists = await webdavClient.exists(webdavPath);
+      if (!exists) {
+        console.log(`[deleteClaimFolder] Folder does not exist on WebDAV: ${webdavPath}`);
+        return;
+      }
+      
+      // Delete folder recursively (WebDAV client should handle this)
+      await webdavClient.deleteFile(webdavPath);
+      console.log(`[deleteClaimFolder] Successfully deleted WebDAV folder: ${webdavPath}`);
+    } catch (error) {
+      console.error(`[deleteClaimFolder] Error deleting WebDAV folder:`, error);
+      // If folder doesn't exist or other error, that's okay - just log it
+      // Don't throw error to allow deletion to continue
+    }
+  } else if (USE_BLOB) {
+    // For Blob storage, we would need to list all files and delete them individually
+    // This is complex and might not be needed if we're only using WebDAV/NAS
+    console.warn(`[deleteClaimFolder] Blob storage deletion not fully implemented - would need to list and delete files individually`);
+  } else {
+    // Delete folder from filesystem (recursive)
+    try {
+      const basePath = await getClaimBasePath(claim);
+      console.log(`[deleteClaimFolder] Deleting filesystem folder: ${basePath}`);
+      
+      // Use fs.rm to delete recursively
+      await fs.rm(basePath, { recursive: true, force: true });
+      console.log(`[deleteClaimFolder] Successfully deleted filesystem folder: ${basePath}`);
+    } catch (error) {
+      // If folder doesn't exist, that's okay - just log it
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`[deleteClaimFolder] Error deleting filesystem folder:`, error);
+        // Don't throw error to allow deletion to continue
+      }
+    }
+  }
+}

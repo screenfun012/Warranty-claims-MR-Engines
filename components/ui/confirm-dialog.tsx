@@ -40,17 +40,17 @@ export function ConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]" showCloseButton={false}>
+      <DialogContent className="sm:max-w-[425px] dark:bg-gray-900 dark:border-gray-700 dark:text-gray-100" showCloseButton={false}>
         <DialogHeader>
           <div className="flex items-center gap-3">
             {variant === "destructive" && (
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 dark:bg-destructive/20">
+                <AlertTriangle className="h-5 w-5 text-destructive dark:text-red-400" />
               </div>
             )}
-            <DialogTitle className="text-left">{title}</DialogTitle>
+            <DialogTitle className="text-left dark:text-gray-100">{title}</DialogTitle>
           </div>
-          <DialogDescription className="text-left pt-2">
+          <DialogDescription className="text-left pt-2 dark:text-gray-300">
             {description}
           </DialogDescription>
         </DialogHeader>
@@ -58,7 +58,7 @@ export function ConfirmDialog({
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="sm:min-w-[100px]"
+            className="sm:min-w-[100px] dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
           >
             {cancelText}
           </Button>
