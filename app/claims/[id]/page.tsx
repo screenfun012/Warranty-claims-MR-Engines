@@ -367,14 +367,13 @@ export default function ClaimDetailPage() {
       </div>
 
       {/* Compact Info Banner */}
-      {isClaimLocked && (
+      {isClaimLocked && !isSuperAdmin && (
         <Card className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
           <p className="text-xs text-blue-700 dark:text-blue-300">
             <strong>
               {claim.status === "CLOSED" ? "Završena reklamacija." : "Zaključana reklamacija."}
             </strong>{" "}
-            {!isSuperAdmin && "Svi podaci su read-only."}
-            {isSuperAdmin && "Kliknite na katanac u listi reklamacija da otključate."}
+            Svi podaci su read-only. Kontaktirajte super admina da otključa reklamaciju.
           </p>
         </Card>
       )}

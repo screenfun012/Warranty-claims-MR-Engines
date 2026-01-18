@@ -171,6 +171,24 @@ export async function PATCH(
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
 
+    // Check if claim is locked (SUPER_ADMIN can always edit, regardless of lock status)
+    // Lock is used by SUPER_ADMIN to control whether OTHER users can edit
+    const { isSuperAdmin } = await import("@/lib/auth/roles");
+    const userIsSuperAdmin = await isSuperAdmin();
+    
+    if (!userIsSuperAdmin) {
+      // For non-SUPER_ADMIN users, check if claim is locked
+      const isClaimLocked = existingClaim.isLocked === true || 
+                           (existingClaim.status === "CLOSED" && existingClaim.isLocked !== false);
+      
+      if (isClaimLocked) {
+        return NextResponse.json(
+          { error: "Claim is locked and cannot be edited. Please contact a super admin to unlock it." },
+          { status: 403 }
+        );
+      }
+    }
+
     // If claimCodeRaw is being updated, parse it
     // If claimPrefix is being updated separately, allow it
     const updateData: any = { ...body };
