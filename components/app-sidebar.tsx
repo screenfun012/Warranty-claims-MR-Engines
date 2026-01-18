@@ -16,6 +16,9 @@ import {
   User,
   Mail,
   Crown,
+  Eye,
+  Wrench,
+  UserCog,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -294,7 +297,7 @@ export function AppSidebar() {
             "flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/30 hover:bg-sidebar-accent/50 transition-all duration-200 group/user",
             isCollapsed && "justify-center"
           )}>
-            {/* User Avatar */}
+            {/* User Avatar with Role Icon */}
             <div className="relative shrink-0">
               {auth0User?.picture ? (
                 <div className="relative h-8 w-8 rounded-full overflow-hidden ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200">
@@ -311,10 +314,19 @@ export function AppSidebar() {
                   <User className="h-4 w-4 text-primary" />
                 </div>
               )}
-              {/* Role Badge */}
-              {userRole && (userRole === "SUPER_ADMIN" || userRole === "ADMIN") && !isCollapsed && (
-                <div className="absolute -bottom-1 -right-1 h-4 w-4 rounded-full bg-amber-500 dark:bg-amber-600 flex items-center justify-center ring-2 ring-background">
-                  <Crown className="h-2.5 w-2.5 text-white" />
+              {/* Role Icon Badge */}
+              {userRole && (
+                <div className={cn(
+                  "absolute -bottom-1 -right-1 h-4 w-4 rounded-full flex items-center justify-center ring-2 ring-background transition-all duration-200",
+                  userRole === "SUPER_ADMIN" && "bg-amber-500 dark:bg-amber-600",
+                  userRole === "ADMIN" && "bg-purple-500 dark:bg-purple-600",
+                  userRole === "OPERATOR" && "bg-blue-500 dark:bg-blue-600",
+                  userRole === "VIEWER" && "bg-gray-500 dark:bg-gray-600"
+                )}>
+                  {userRole === "SUPER_ADMIN" && <Crown className="h-2.5 w-2.5 text-white" />}
+                  {userRole === "ADMIN" && <UserCog className="h-2.5 w-2.5 text-white" />}
+                  {userRole === "OPERATOR" && <Wrench className="h-2.5 w-2.5 text-white" />}
+                  {userRole === "VIEWER" && <Eye className="h-2.5 w-2.5 text-white" />}
                 </div>
               )}
             </div>
@@ -328,10 +340,26 @@ export function AppSidebar() {
                   </p>
                   {userRole && (
                     <Badge 
-                      variant={userRole === "SUPER_ADMIN" ? "default" : "secondary"} 
-                      className="h-4 px-1.5 text-xs shrink-0"
+                      variant={
+                        userRole === "SUPER_ADMIN" ? "default" : 
+                        userRole === "ADMIN" ? "secondary" :
+                        userRole === "OPERATOR" ? "outline" :
+                        "outline"
+                      } 
+                      className={cn(
+                        "h-4 px-1.5 text-xs shrink-0 flex items-center gap-1",
+                        userRole === "SUPER_ADMIN" && "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
+                        userRole === "ADMIN" && "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
+                        userRole === "OPERATOR" && "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
+                        userRole === "VIEWER" && "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20"
+                      )}
                     >
-                      {userRole}
+                      {/* Role Icon in Badge */}
+                      {userRole === "SUPER_ADMIN" && <Crown className="h-3 w-3" />}
+                      {userRole === "ADMIN" && <UserCog className="h-3 w-3" />}
+                      {userRole === "OPERATOR" && <Wrench className="h-3 w-3" />}
+                      {userRole === "VIEWER" && <Eye className="h-3 w-3" />}
+                      <span>{userRole}</span>
                     </Badge>
                   )}
                 </div>
