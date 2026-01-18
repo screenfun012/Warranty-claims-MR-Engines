@@ -259,10 +259,13 @@ export async function POST(
     // After successful email send, update processingEmailSentAt if it was a processing email
     if (body._isProcessingEmail || body.type === "processing") {
       try {
-        await prisma.$executeRawUnsafe(
-          `UPDATE Claim SET processingEmailSentAt = datetime('now'), updatedAt = datetime('now') WHERE id = ?`,
-          id
-        );
+        await prisma.claim.update({
+          where: { id },
+          data: {
+            processingEmailSentAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
         console.log(`[send-email] Updated processingEmailSentAt for claim ${id}`);
       } catch (updateError) {
         console.error("Error updating processingEmailSentAt:", updateError);
@@ -274,26 +277,33 @@ export async function POST(
     try {
       console.log(`[send-email] Closing claim ${id} after sending email to client`);
       
-      // Use raw SQL for SQLite compatibility
+      // Use Prisma update for Turso compatibility (works with both SQLite and Turso)
+      const updateData: any = {
+        status: "CLOSED",
+        updatedAt: new Date(),
+      };
+      
       if (body.claimAcceptanceStatus) {
-        await prisma.$executeRawUnsafe(
-          `UPDATE Claim SET status = ?, claimAcceptanceStatus = ?, updatedAt = datetime('now') WHERE id = ?`,
-          "CLOSED",
-          body.claimAcceptanceStatus,
-          id
-        );
-      } else {
-        await prisma.$executeRawUnsafe(
-          `UPDATE Claim SET status = ?, updatedAt = datetime('now') WHERE id = ?`,
-          "CLOSED",
-          id
-        );
+        updateData.claimAcceptanceStatus = body.claimAcceptanceStatus;
       }
       
-      console.log(`[send-email] Claim ${id} closed successfully`);
+      await prisma.claim.update({
+        where: { id },
+        data: updateData,
+      });
+      
+      console.log(`[send-email] Claim ${id} closed successfully with status: CLOSED`);
     } catch (updateError) {
       console.error("Error closing claim:", updateError);
       // Don't fail the email send if status update fails, but log it
+      // Return error in response so frontend knows to refetch
+      return NextResponse.json({
+        success: true,
+        emailMessageId: result.emailMessageId,
+        messageId: result.messageId,
+        processingEmailSent: body._isProcessingEmail || body.type === "processing",
+        warning: "Email sent successfully, but failed to update claim status. Please refresh the page.",
+      }, { status: 200 });
     }
 
     return NextResponse.json({

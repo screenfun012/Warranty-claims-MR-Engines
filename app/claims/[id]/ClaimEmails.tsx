@@ -254,13 +254,25 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       const data = await res.json();
       
       if (data.success) {
-        alert("Email sent successfully and claim status updated to CLOSED");
+        if (data.warning) {
+          alert(`Email sent successfully!\n\nWarning: ${data.warning}`);
+        } else {
+          alert("Email sent successfully! Claim has been closed.");
+        }
+        
+        // Reset form
         setReplyForm({ ...replyForm, text: "" });
         setSelectedAttachmentIds([]);
-        // Force full page reload to ensure status is updated
+        
+        // Refresh claim data if onUpdate callback is available
+        if (onUpdate) {
+          onUpdate(claim);
+        }
+        
+        // Force full page reload to ensure status is updated (claim should now be CLOSED and read-only)
         window.location.reload();
       } else {
-        alert("Failed to send email: " + data.error);
+        alert("Failed to send email: " + (data.error || "Unknown error"));
       }
     } catch (error) {
       console.error("Error sending email:", error);

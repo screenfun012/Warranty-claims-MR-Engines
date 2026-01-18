@@ -97,8 +97,29 @@ export async function syncNewEmails(): Promise<SyncResult> {
   let newClaimsCount = 0;
   let highestUid: string | null = null;
 
+  // Get email config to filter out outbound emails we sent
+  const { getEmailConfig } = await import("@/lib/config/envLoader");
+  const emailConfig = getEmailConfig();
+  const ourEmailAddresses = [
+    emailConfig.smtpUserEmail?.toLowerCase().trim(),
+    emailConfig.imapUserEmail?.toLowerCase().trim(),
+  ].filter(Boolean);
+
   for (const fetchedMsg of fetchedMessages) {
     try {
+      // Skip outbound emails that we sent ourselves (from our SMTP address)
+      // This prevents emails we send from appearing in the inbox
+      const fromEmail = fetchedMsg.headers.from?.toLowerCase().trim();
+      if (fromEmail && ourEmailAddresses.some(addr => fromEmail.includes(addr || ''))) {
+        console.log(`[Sync] Skipping outbound email we sent: ${fetchedMsg.headers.messageId || fetchedMsg.uid} (from: ${fetchedMsg.headers.from})`);
+        // Still track UID for progress
+        const uidNum = parseInt(fetchedMsg.uid, 10);
+        if (!highestUid || uidNum > parseInt(highestUid, 10)) {
+          highestUid = fetchedMsg.uid;
+        }
+        continue;
+      }
+
       // Update highest UID (always track highest, even if message is duplicate)
       const uidNum = parseInt(fetchedMsg.uid, 10);
       if (!highestUid || uidNum > parseInt(highestUid, 10)) {
