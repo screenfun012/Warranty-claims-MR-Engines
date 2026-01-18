@@ -302,10 +302,14 @@ export function AppSidebar() {
       <SidebarFooter className="border-t px-2 py-3 flex flex-col gap-3 transition-all duration-200">
         {/* User Profile Section */}
         {user && (
-          <div className={cn(
-            "flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/30 hover:bg-sidebar-accent/50 transition-all duration-200 group/user",
-            isCollapsed && "justify-center"
-          )}>
+          <Link 
+            href="/profile"
+            className={cn(
+              "flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/30 hover:bg-sidebar-accent/50 transition-all duration-200 group/user cursor-pointer no-underline hover:no-underline visited:no-underline active:no-underline text-inherit hover:text-inherit visited:text-inherit active:text-inherit",
+              isCollapsed && "justify-center"
+            )}
+            style={{ textDecoration: 'none', color: 'inherit' }}
+          >
             {/* User Avatar with Role Icon */}
             <div className="relative shrink-0">
               <div className="relative h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200 overflow-hidden">
@@ -374,7 +378,7 @@ export function AppSidebar() {
                 )}
               </div>
             )}
-          </div>
+          </Link>
         )}
 
         {/* Theme Toggle and Logout */}
