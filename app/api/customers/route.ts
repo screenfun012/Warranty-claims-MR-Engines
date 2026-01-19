@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
   try {
     const prisma = await getPrisma();
     const body = await request.json();
-    const { name, claimId } = body;
+    const { name, company, claimId } = body;
 
     if (!name) {
       return NextResponse.json({ error: "Customer name is required" }, { status: 400 });
@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     const customer = await prisma.customer.create({
       data: {
         name,
+        company: company || undefined,
       },
     });
 

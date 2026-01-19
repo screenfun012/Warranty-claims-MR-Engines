@@ -75,6 +75,7 @@ model VerificationToken {
 model Customer {
   id        String   @id @default(cuid())
   name      String
+  company   String?  // Customer company name
   email     String?
   country   String?
   notes     String?
@@ -100,7 +101,7 @@ model WorkOrder {
 model Claim {
   id                   String          @id @default(cuid())
   claimCodeRaw         String?
-  claimPrefix          String?
+  claimPrefix          String?         // Deprecated - kept for backward compatibility
   claimNumber          Int?
   claimYear            Int?
   status               String          @default("NEW") // NEW, IN_ANALYSIS, APPROVED, REJECTED, CLOSED
@@ -115,8 +116,14 @@ model Claim {
   mrEngineCode         String?
   customerReference    String?
   invoiceNumber        String?
-  assignedToId         String?
+  assignedToId         String?        // Ko je radio motor (ne ko je radio reklamaciju)
   assignedTo           User?           @relation("ClaimAssignedTo", fields: [assignedToId], references: [id])
+  faultDepartmentId    String?        // Odeljenje gde je nastao problem
+  faultDepartment      Department?    @relation(fields: [faultDepartmentId], references: [id])
+  workerFault          String?        // Koji radnik je kriv
+  yearEngineDone       Int?           // Godina kada je motor bio sklopljen
+  reason               String?        // Kratak razlog zašto je došlo do reklamacije
+  isDomesticMarket     Boolean        @default(false) // Da li je domaće ili strano tržište
   serverFolderPath     String?
   summarySr            String?
   summaryEn            String?
@@ -247,4 +254,14 @@ model DeletedEmailMessage {
   deletedBy String?  // User who deleted it (optional)
   
   @@index([messageId])
+}
+
+// Department model for fault departments (odeljenja)
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique // Name of the department (e.g., "Blokovi", "Klipnjace")
+  isSystem    Boolean  @default(false) // System departments cannot be deleted
+  claims      Claim[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

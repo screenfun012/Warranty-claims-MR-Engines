@@ -166,18 +166,53 @@ export async function POST(request: NextRequest) {
     // If creating from email thread, link the thread to the claim
     const emailThreadId = body.emailThreadId;
     
+    // Validate required fields for new claims (if not from email thread)
+    if (!body.emailThreadId) {
+      if (!body.claimCodeRaw) {
+        return NextResponse.json(
+          { error: "Claim Code is required" },
+          { status: 400 }
+        );
+      }
+      if (!body.customerName) {
+        return NextResponse.json(
+          { error: "Customer Name is required" },
+          { status: 400 }
+        );
+      }
+      if (!body.customerCompany) {
+        return NextResponse.json(
+          { error: "Customer Company is required" },
+          { status: 400 }
+        );
+      }
+      if (!body.yearEngineDone) {
+        return NextResponse.json(
+          { error: "Year Engine Done is required" },
+          { status: 400 }
+        );
+      }
+    }
+
     const claim = await prisma.claim.create({
       data: {
         status: body.status || "NEW",
+        claimCodeRaw: body.claimCodeRaw,
         customerId: body.customerId,
         workOrderId: body.workOrderId,
         engineType: body.engineType,
         mrEngineCode: body.mrEngineCode,
         assignedToId: body.assignedToId,
+        faultDepartmentId: body.faultDepartmentId,
+        workerFault: body.workerFault,
+        yearEngineDone: body.yearEngineDone ? parseInt(body.yearEngineDone, 10) : null,
+        reason: body.reason,
+        isDomesticMarket: body.isDomesticMarket || false,
         summarySr: body.summarySr,
       },
       include: {
         customer: true,
+        faultDepartment: true,
         workOrder: true,
         assignedTo: true,
       },
@@ -327,12 +362,41 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // If customerName and customerCompany provided, create/update customer
+    if (body.customerName) {
+      let customer;
+      if (body.customerId) {
+        // Update existing customer
+        customer = await prisma.customer.update({
+          where: { id: body.customerId },
+          data: {
+            name: body.customerName,
+            company: body.customerCompany || undefined,
+          },
+        });
+      } else {
+        // Create new customer
+        customer = await prisma.customer.create({
+          data: {
+            name: body.customerName,
+            company: body.customerCompany || undefined,
+          },
+        });
+        // Link to claim
+        await prisma.claim.update({
+          where: { id: claim.id },
+          data: { customerId: customer.id },
+        });
+      }
+    }
+
     // Fetch updated claim with all relations (same as GET endpoint)
     console.log(`[create-claim] Fetching updated claim with ID: ${claim.id} (type: ${typeof claim.id})`);
     const updatedClaim = await prisma.claim.findUnique({
       where: { id: claim.id },
       include: {
         customer: true,
+        faultDepartment: true,
         workOrder: {
           include: {
             worker: {

@@ -40,6 +40,7 @@ export async function GET(
       where: { id },
       include: {
         customer: true,
+        faultDepartment: true,
         workOrder: {
           include: {
             worker: {
@@ -293,6 +294,7 @@ export async function PATCH(
           data: updateData as any,
           include: {
             customer: true,
+            faultDepartment: true,
             workOrder: {
               include: {
                 worker: {

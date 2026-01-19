@@ -16,38 +16,56 @@ export default function NewClaimPage() {
     status: "NEW",
     claimCodeRaw: "",
     customerName: "",
+    customerCompany: "",
+    yearEngineDone: "",
     engineType: "",
     mrEngineCode: "",
     summarySr: "",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    if (!formData.claimCodeRaw.trim()) {
+      newErrors.claimCodeRaw = "Claim Code is required";
+    }
+    if (!formData.customerName.trim()) {
+      newErrors.customerName = "Customer Name is required";
+    }
+    if (!formData.customerCompany.trim()) {
+      newErrors.customerCompany = "Customer Company is required";
+    }
+    if (!formData.yearEngineDone.trim()) {
+      newErrors.yearEngineDone = "Year Engine Done is required";
+    } else {
+      const year = parseInt(formData.yearEngineDone, 10);
+      if (isNaN(year) || year < 1900 || year > 2100) {
+        newErrors.yearEngineDone = "Please enter a valid year (1900-2100)";
+      }
+    }
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
+    
+    setErrors({});
     setLoading(true);
 
     try {
-      // First, create customer if name is provided
-      let customerId = null;
-      if (formData.customerName.trim()) {
-        const customerRes = await fetch("/api/customers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: formData.customerName }),
-        });
-        const customerData = await customerRes.json();
-        if (customerData.customer) {
-          customerId = customerData.customer.id;
-        }
-      }
-
-      // Create claim
+      // Create claim with all data
       const res = await fetch("/api/claims", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status: formData.status,
           claimCodeRaw: formData.claimCodeRaw,
-          customerId,
+          customerName: formData.customerName,
+          customerCompany: formData.customerCompany,
+          yearEngineDone: parseInt(formData.yearEngineDone, 10),
           engineType: formData.engineType,
           mrEngineCode: formData.mrEngineCode,
           summarySr: formData.summarySr,
@@ -88,12 +106,19 @@ export default function NewClaimPage() {
         <Card className="p-6">
           <div className="space-y-4">
             <div>
-              <Label>Claim Code</Label>
+              <Label>Claim Code <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.claimCodeRaw}
-                onChange={(e) => setFormData({ ...formData, claimCodeRaw: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, claimCodeRaw: e.target.value });
+                  if (errors.claimCodeRaw) setErrors({ ...errors, claimCodeRaw: "" });
+                }}
                 placeholder="MR1234/25"
+                className={errors.claimCodeRaw ? "border-red-500" : ""}
               />
+              {errors.claimCodeRaw && (
+                <p className="text-sm text-red-500 mt-1">{errors.claimCodeRaw}</p>
+              )}
             </div>
 
             <div>
@@ -116,12 +141,54 @@ export default function NewClaimPage() {
             </div>
 
             <div>
-              <Label>Customer Name</Label>
+              <Label>Customer Name <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.customerName}
-                onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, customerName: e.target.value });
+                  if (errors.customerName) setErrors({ ...errors, customerName: "" });
+                }}
                 placeholder="Customer name"
+                className={errors.customerName ? "border-red-500" : ""}
               />
+              {errors.customerName && (
+                <p className="text-sm text-red-500 mt-1">{errors.customerName}</p>
+              )}
+            </div>
+
+            <div>
+              <Label>Customer Company <span className="text-red-500">*</span></Label>
+              <Input
+                value={formData.customerCompany}
+                onChange={(e) => {
+                  setFormData({ ...formData, customerCompany: e.target.value });
+                  if (errors.customerCompany) setErrors({ ...errors, customerCompany: "" });
+                }}
+                placeholder="Customer company"
+                className={errors.customerCompany ? "border-red-500" : ""}
+              />
+              {errors.customerCompany && (
+                <p className="text-sm text-red-500 mt-1">{errors.customerCompany}</p>
+              )}
+            </div>
+
+            <div>
+              <Label>Year Engine Done <span className="text-red-500">*</span></Label>
+              <Input
+                type="number"
+                value={formData.yearEngineDone}
+                onChange={(e) => {
+                  setFormData({ ...formData, yearEngineDone: e.target.value });
+                  if (errors.yearEngineDone) setErrors({ ...errors, yearEngineDone: "" });
+                }}
+                placeholder="YYYY"
+                min="1900"
+                max="2100"
+                className={errors.yearEngineDone ? "border-red-500" : ""}
+              />
+              {errors.yearEngineDone && (
+                <p className="text-sm text-red-500 mt-1">{errors.yearEngineDone}</p>
+              )}
             </div>
 
             <div>
