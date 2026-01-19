@@ -15,14 +15,8 @@ import {
   Filter, 
   X,
 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/responsive-table";
+import { useRouter } from "next/navigation";
 
 interface Claim {
   id: string;
@@ -64,6 +58,7 @@ interface Filters {
 }
 
 export default function StatisticsPage() {
+  const router = useRouter();
   const [filters, setFilters] = useState<Filters>({
     status: [],
     customerId: "",
@@ -471,109 +466,52 @@ export default function StatisticsPage() {
             <p className="text-muted-foreground">No claims found matching the filters</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("claimCodeRaw")}
-                  >
-                    Claim Code {sortField === "claimCodeRaw" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("status")}
-                  >
-                    Status {sortField === "status" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("customer")}
-                  >
-                    Customer {sortField === "customer" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("customer")}
-                  >
-                    Company {sortField === "customer" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("engineType")}
-                  >
-                    Engine Type {sortField === "engineType" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("mrEngineCode")}
-                  >
-                    Engine Code {sortField === "mrEngineCode" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("faultDepartment")}
-                  >
-                    Fault Dept {sortField === "faultDepartment" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("yearEngineDone")}
-                  >
-                    Year {sortField === "yearEngineDone" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("assignedTo")}
-                  >
-                    Assigned To {sortField === "assignedTo" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("isDomesticMarket")}
-                  >
-                    Market {sortField === "isDomesticMarket" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort("createdAt")}
-                  >
-                    Created {sortField === "createdAt" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedClaims.map((claim) => (
-                  <TableRow key={claim.id}>
-                    <TableCell className="font-medium">
-                      {claim.claimCodeRaw || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{claim.status}</Badge>
-                    </TableCell>
-                    <TableCell>{claim.customer?.name || "-"}</TableCell>
-                    <TableCell>{claim.customer?.company || "-"}</TableCell>
-                    <TableCell>{claim.engineType || "-"}</TableCell>
-                    <TableCell>{claim.mrEngineCode || "-"}</TableCell>
-                    <TableCell>{claim.faultDepartment?.name || "-"}</TableCell>
-                    <TableCell>{claim.yearEngineDone || "-"}</TableCell>
-                    <TableCell>{claim.assignedTo?.fullName || "-"}</TableCell>
-                    <TableCell>
-                      {claim.isDomesticMarket ? (
-                        <Badge variant="secondary">Domestic</Badge>
-                      ) : (
-                        <Badge variant="outline">International</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {new Date(claim.createdAt).toLocaleDateString()}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ResponsiveTable
+            headers={[
+              { key: "claimCode", label: "Claim Code" },
+              { key: "status", label: "Status" },
+              { key: "customer", label: "Customer" },
+              { key: "company", label: "Company" },
+              { key: "engineType", label: "Engine Type" },
+              { key: "engineCode", label: "Engine Code" },
+              { key: "faultDept", label: "Fault Dept" },
+              { key: "year", label: "Year" },
+              { key: "assignedTo", label: "Assigned To" },
+              { key: "market", label: "Market" },
+              { key: "created", label: "Created" },
+            ]}
+            data={sortedClaims.map((claim) => ({
+              claimCode: (
+                <span className="font-medium">{claim.claimCodeRaw || "-"}</span>
+              ),
+              status: <Badge variant="outline">{claim.status}</Badge>,
+              customer: claim.customer?.name || "-",
+              company: claim.customer?.company || "-",
+              engineType: claim.engineType || "-",
+              engineCode: claim.mrEngineCode || "-",
+              faultDept: claim.faultDepartment?.name || "-",
+              year: claim.yearEngineDone?.toString() || "-",
+              assignedTo: claim.assignedTo?.fullName || "-",
+              market: claim.isDomesticMarket ? (
+                <Badge variant="secondary">Domestic</Badge>
+              ) : (
+                <Badge variant="outline">International</Badge>
+              ),
+              created: new Date(claim.createdAt).toLocaleDateString(),
+            }))}
+            emptyMessage={
+              <div className="text-center py-12">
+                <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No claims found matching the filters</p>
+              </div>
+            }
+            onRowClick={(row, index) => {
+              const claim = sortedClaims[index];
+              if (claim) {
+                router.push(`/claims/${claim.id}`);
+              }
+            }}
+          />
         )}
       </Card>
     </div>

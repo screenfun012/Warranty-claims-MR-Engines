@@ -10,8 +10,10 @@ import { requirePermission, PERMISSIONS } from "@/lib/auth/permissions";
 export async function GET(request: NextRequest) {
   try {
     const prisma = await getPrisma();
-    // VIEWER+ can read statistics
-    await requirePermission(PERMISSIONS.CLAIMS_READ);
+    // Only ADMIN+ can read statistics
+    const { requireMinimumRole } = await import("@/lib/auth/permissions");
+    const { ROLES } = await import("@/lib/auth/roles");
+    await requireMinimumRole(ROLES.ADMIN);
 
     const searchParams = request.nextUrl.searchParams;
     

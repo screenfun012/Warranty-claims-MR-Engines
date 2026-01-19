@@ -27,6 +27,11 @@ export async function DELETE(
             attachments: true,
           },
         },
+        claim: {
+          include: {
+            attachments: true,
+          },
+        },
       },
     });
 
@@ -35,6 +40,37 @@ export async function DELETE(
         { error: "Email thread not found" },
         { status: 404 }
       );
+    }
+
+    // If thread has an associated claim, delete the claim and all its files
+    if (thread.claimId && thread.claim) {
+      const claim = thread.claim;
+      
+      // Delete all claim attachment files
+      const { deleteAttachmentFile, deleteClaimFolder } = await import("@/lib/files/fileStorage");
+      
+      for (const attachment of claim.attachments) {
+        try {
+          await deleteAttachmentFile(attachment.filePath);
+        } catch (error) {
+          console.error(`Error deleting claim file ${attachment.filePath}:`, error);
+        }
+      }
+
+      // Delete the entire claim folder from NAS/Synology
+      try {
+        await deleteClaimFolder(claim);
+        console.log(`[Delete Email Thread] Successfully deleted claim folder for ${claim.claimCodeRaw || claim.id}`);
+      } catch (error) {
+        console.error(`[Delete Email Thread] Error deleting claim folder:`, error);
+      }
+
+      // Delete the claim from database (cascade will handle related records)
+      await prisma.claim.delete({
+        where: { id: claim.id },
+      });
+      
+      console.log(`[Delete Email Thread] Deleted associated claim ${claim.id}`);
     }
 
     // CRITICAL: Track deleted messageIds BEFORE deletion to prevent sync from recreating them

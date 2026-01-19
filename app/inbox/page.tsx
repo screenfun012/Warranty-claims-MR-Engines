@@ -1084,9 +1084,13 @@ function ThreadDetail({
             setIsDeleting(false);
           }
         }}
-        title="Brisanje poruke"
-        description="Da li ste sigurni da želite da obrišete ovu poruku? Ova akcija je nepovratna i obrišće sve povezane podatke."
-        confirmText="Obriši"
+        title={fullThread?.claimId ? "Brisanje poruke i reklamacije" : "Brisanje poruke"}
+        description={
+          fullThread?.claimId
+            ? `UPOZORENJE: Ova poruka je povezana sa reklamacijom ${fullThread.claim?.claimCodeRaw || ""}. Brisanjem ove poruke će se TRAJNO obrisati:\n\n• Email poruka i svi attachmenti\n• Povezana reklamacija i svi njeni podaci\n• Svi fajlovi sa Synology/NAS servera\n\nOva akcija je NEPOVRATNA. Da li ste sigurni?`
+            : "Da li ste sigurni da želite da obrišete ovu poruku? Ova akcija je nepovratna i obrišće sve povezane podatke i fajlove sa Synology/NAS servera."
+        }
+        confirmText="Obriši trajno"
         cancelText="Otkaži"
         variant="destructive"
       />

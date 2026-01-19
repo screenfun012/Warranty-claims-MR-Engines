@@ -60,7 +60,7 @@ const allNavigation: NavigationItemWithRole[] = [
   { name: "Dashboard", href: "/", icon: Home, minRole: "VIEWER" },
   { name: "Inbox", href: "/inbox", icon: Inbox, showBadge: true, minRole: "VIEWER" },
   { name: "Claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
-  { name: "Statistics", href: "/statistics", icon: BarChart3, minRole: "VIEWER" },
+  { name: "Statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
   { name: "Settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
   { name: "Admin", href: "/admin/users", icon: Shield, minRole: "SUPER_ADMIN" },
 ];
