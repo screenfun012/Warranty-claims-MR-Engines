@@ -57,15 +57,16 @@ type NavigationItem = {
 
 type NavigationItemWithRole = NavigationItem & {
   minRole?: "VIEWER" | "OPERATOR" | "ADMIN" | "SUPER_ADMIN";
+  translationKey: string;
 };
 
 const allNavigation: NavigationItemWithRole[] = [
-  { name: "Dashboard", href: "/", icon: Home, minRole: "VIEWER" },
-  { name: "Inbox", href: "/inbox", icon: Inbox, showBadge: true, minRole: "VIEWER" },
-  { name: "Claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
-  { name: "Statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
-  { name: "Settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
-  { name: "Admin", href: "/admin/users", icon: Shield, minRole: "SUPER_ADMIN" },
+  { name: "Dashboard", translationKey: "nav.dashboard", href: "/", icon: Home, minRole: "VIEWER" },
+  { name: "Inbox", translationKey: "nav.inbox", href: "/inbox", icon: Inbox, showBadge: true, minRole: "VIEWER" },
+  { name: "Claims", translationKey: "nav.claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
+  { name: "Statistics", translationKey: "nav.statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
+  { name: "Settings", translationKey: "nav.settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
+  { name: "Admin", translationKey: "nav.admin", href: "/admin/users", icon: Shield, minRole: "SUPER_ADMIN" },
 ];
 
 // Role hierarchy for permission checks
@@ -258,7 +259,7 @@ export function AppSidebar() {
                           "transition-all duration-200",
                           isCollapsed && "opacity-0 w-0 overflow-hidden"
                         )}>
-                          {item.name}
+                          {t(item.translationKey)}
                         </span>
                         {showBadge && (
                           <Badge 
@@ -284,7 +285,7 @@ export function AppSidebar() {
                           </SidebarMenuItem>
                         </TooltipTrigger>
                         <TooltipContent side="right" className="flex items-center gap-2">
-                          <span>{item.name}</span>
+                          <span>{t(item.translationKey)}</span>
                           {showBadge && (
                             <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
                               {unreadCount > 99 ? "99+" : unreadCount}

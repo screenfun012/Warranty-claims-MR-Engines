@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AnimatedCounter } from "@/components/animated-counter";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
+import { useTranslations } from "next-intl";
 
 // Dynamically import recharts to avoid SSR issues
 const LineChart = dynamic(
@@ -99,28 +100,6 @@ interface DashboardStats {
   }>;
 }
 
-const getStatusLabel = (status: string) => {
-  const labels: Record<string, string> = {
-    NEW: "NOVO",
-    IN_ANALYSIS: "U OBRADI",
-    CLOSED: "ZATVORENO",
-    APPROVED: "ODOBRENO",
-    REJECTED: "ODBIJENO",
-  };
-  return labels[status] || status;
-};
-
-const getStatusColor = (status: string) => {
-  const colors: Record<string, string> = {
-    NEW: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800",
-    IN_ANALYSIS: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
-    CLOSED: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800",
-    APPROVED: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
-    REJECTED: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800",
-  };
-  return colors[status] || "bg-muted text-muted-foreground";
-};
-
 const fetchStats = async (): Promise<DashboardStats> => {
   const res = await fetch("/api/dashboard/stats");
   if (!res.ok) {
@@ -133,14 +112,39 @@ const fetchStats = async (): Promise<DashboardStats> => {
 export default function DashboardPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const t = useTranslations();
+  const tClaims = useTranslations('claims');
+  const tDashboard = useTranslations('dashboard');
+
+  const getStatusLabel = (status: string) => {
+    try {
+      return tClaims(`status.${status}`);
+    } catch {
+      return status;
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      NEW: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800",
+      IN_ANALYSIS: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+      IN_PROGRESS: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800",
+      CLOSED: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800",
+      RESOLVED: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800",
+      APPROVED: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800",
+      REJECTED: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800",
+      CANCELLED: "bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800",
+    };
+    return colors[status] || "bg-muted text-muted-foreground";
+  };
 
   // Fetch stats sa React Query
   const { data: stats, isLoading: loading } = useQuery({
     queryKey: ["dashboardStats"],
     queryFn: fetchStats,
-    refetchInterval: 120000, // 120 sekundi (2 minuta) umesto 60 (2x manje request-ova)
+    refetchInterval: 120000,
     refetchIntervalInBackground: false,
-    staleTime: 60 * 1000, // 60 sekundi - data je fresh 60 sekundi
+    staleTime: 60 * 1000,
   });
 
   // Listen for claim updates
@@ -162,7 +166,6 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="p-6 space-y-6 animate-in fade-in duration-500">
-        {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <Skeleton className="h-10 w-48" />
@@ -171,12 +174,10 @@ export default function DashboardPage() {
           <Skeleton className="h-9 w-24" />
         </div>
 
-        {/* Unread Messages Card Skeleton */}
         <Card className="p-6 bg-blue-500/5 border-blue-500/20">
           <Skeleton className="h-20 w-full" />
         </Card>
 
-        {/* Stats Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {[...Array(5)].map((_, i) => (
             <Card key={i} className="p-6">
@@ -186,7 +187,6 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Progress Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[...Array(2)].map((_, i) => (
             <Card key={i} className="p-6">
@@ -203,9 +203,9 @@ export default function DashboardPage() {
     return (
       <div className="p-8">
         <Card className="p-6">
-          <p className="text-destructive">Neuspešno učitavanje statistika</p>
+          <p className="text-destructive">{t('common.error')}</p>
           <Button onClick={() => queryClient.invalidateQueries({ queryKey: ["dashboardStats"] })} className="mt-4" variant="outline">
-            Pokušaj ponovo
+            {t('common.loading')}
           </Button>
         </Card>
       </div>
@@ -224,30 +224,30 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Pregled statistika reklamacija</p>
+          <h1 className="text-4xl font-bold tracking-tight">{tDashboard('title')}</h1>
+          <p className="text-muted-foreground mt-1">{tDashboard('welcome')}</p>
         </div>
         <Button 
-          onClick={fetchStats} 
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["dashboardStats"] })} 
           variant="outline" 
           size="sm"
           disabled={loading}
         >
           <Activity className="h-4 w-4 mr-2" />
-          Osveži
+          {t('common.loading')}
         </Button>
       </div>
 
-      {/* Unread Emails Alert - moved to top */}
+      {/* Unread Emails Alert */}
       {stats.unreadEmailsCount !== undefined && stats.unreadEmailsCount > 0 && (
         <Card className="p-4 sm:p-6 bg-blue-500/5 border-blue-500/20">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-start sm:items-center gap-3 min-w-0">
               <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 sm:mt-0" />
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">Nepročitane poruke</p>
+                <p className="font-semibold">{tDashboard('unreadEmails')}</p>
                 <p className="text-sm text-muted-foreground break-words">
-                  Imate <span className="font-bold text-blue-600 dark:text-blue-400">{stats.unreadEmailsCount}</span> nepročitanih email poruka
+                  {tDashboard('unreadEmailsDesc', { count: stats.unreadEmailsCount })}
                 </p>
               </div>
             </div>
@@ -256,7 +256,7 @@ export default function DashboardPage() {
               onClick={() => router.push("/inbox")}
               className="w-full sm:w-auto shrink-0 self-start sm:self-auto"
             >
-              Otvori inbox
+              {tDashboard('openInbox')}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
@@ -267,7 +267,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="p-6 bg-gradient-to-br from-background to-muted/50 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">Ukupno reklamacija</p>
+            <p className="text-sm font-medium text-muted-foreground">{tDashboard('totalClaims')}</p>
             <FileText className="h-5 w-5 text-muted-foreground" />
           </div>
           <p className="text-4xl font-bold">
@@ -277,7 +277,7 @@ export default function DashboardPage() {
 
         <Card className="p-6 bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">Rešene</p>
+            <p className="text-sm font-medium text-muted-foreground">{tDashboard('closedClaims')}</p>
             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
           </div>
           <p className="text-4xl font-bold text-green-600 dark:text-green-400">
@@ -287,7 +287,7 @@ export default function DashboardPage() {
 
         <Card className="p-6 bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">Prihvaćene</p>
+            <p className="text-sm font-medium text-muted-foreground">{tClaims('acceptance.ACCEPTED')}</p>
             <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
           <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
@@ -297,7 +297,7 @@ export default function DashboardPage() {
 
         <Card className="p-6 bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">Odbijene</p>
+            <p className="text-sm font-medium text-muted-foreground">{tClaims('acceptance.REJECTED')}</p>
             <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
           </div>
           <p className="text-4xl font-bold text-red-600 dark:text-red-400">
@@ -307,7 +307,7 @@ export default function DashboardPage() {
 
         <Card className="p-6 bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">U procesu</p>
+            <p className="text-sm font-medium text-muted-foreground">{tDashboard('pendingClaims')}</p>
             <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
           </div>
           <p className="text-4xl font-bold text-amber-600 dark:text-amber-400">
@@ -322,7 +322,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-semibold">Stopa rešavanja</h3>
+              <h3 className="font-semibold">{t('common.status')}</h3>
             </div>
             <span className="text-2xl font-bold">{resolutionRate}%</span>
           </div>
@@ -333,7 +333,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-semibold">Stopa prihvatanja</h3>
+              <h3 className="font-semibold">{tClaims('acceptance.ACCEPTED')}</h3>
             </div>
             <span className="text-2xl font-bold">{approvalRate}%</span>
           </div>
@@ -348,14 +348,14 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              Najnovije reklamacije
+              {tDashboard('recentClaims')}
             </h2>
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => router.push("/claims")}
             >
-              Vidi sve
+              {tDashboard('viewAll')}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
@@ -370,7 +370,7 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-medium truncate">
-                        {claim.claimCodeRaw || "Bez koda"}
+                        {claim.claimCodeRaw || "-"}
                       </span>
                       <Badge 
                         variant="outline" 
@@ -390,7 +390,7 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8">Nema nedavnih reklamacija</p>
+            <p className="text-muted-foreground text-center py-8">{tDashboard('noClaims')}</p>
           )}
         </Card>
 
@@ -399,14 +399,14 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              Hitne reklamacije
+              {tDashboard('pendingClaims')}
             </h2>
             <Button 
               variant="ghost" 
               size="sm"
               onClick={() => router.push("/claims")}
             >
-              Vidi sve
+              {tDashboard('viewAll')}
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
@@ -425,7 +425,7 @@ export default function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-medium truncate">
-                          {claim.claimCodeRaw || "Bez koda"}
+                          {claim.claimCodeRaw || "-"}
                         </span>
                         <Badge 
                           variant="outline" 
@@ -437,7 +437,7 @@ export default function DashboardPage() {
                           variant="outline" 
                           className="text-xs bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30"
                         >
-                          {daysAgo} {daysAgo === 1 ? 'dan' : 'dana'}
+                          {daysAgo}d
                         </Badge>
                       </div>
                       {claim.customer && (
@@ -452,7 +452,7 @@ export default function DashboardPage() {
               })}
             </div>
           ) : (
-            <p className="text-muted-foreground text-center py-8">Nema hitnih reklamacija</p>
+            <p className="text-muted-foreground text-center py-8">{tDashboard('noClaims')}</p>
           )}
         </Card>
       </div>
@@ -461,7 +461,7 @@ export default function DashboardPage() {
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <Activity className="h-5 w-5" />
-          Reklamacije po statusu
+          {t('common.status')}
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {stats.claimsByStatus.map((item) => {
@@ -491,7 +491,7 @@ export default function DashboardPage() {
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <Users className="h-5 w-5" />
-          Reklamacije po klijentu
+          {tClaims('customer')}
         </h2>
         {stats.claimsByCustomer.length > 0 ? (
           <div className="space-y-2">
@@ -516,15 +516,15 @@ export default function DashboardPage() {
             })}
           </div>
         ) : (
-          <p className="text-muted-foreground text-center py-8">Nema podataka o reklamacijama po klijentu</p>
+          <p className="text-muted-foreground text-center py-8">{t('common.noData')}</p>
         )}
       </Card>
 
-      {/* Claims Trend Chart - Prihvaćene i Odbijene tokom godine */}
+      {/* Claims Trend Chart */}
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <TrendingUp className="h-5 w-5" />
-          Trend reklamacija tokom godine
+          {tDashboard('quickStats')}
         </h2>
         {stats.claimsByMonth && stats.claimsByMonth.length > 0 ? (
           <div className="h-80">
@@ -543,7 +543,7 @@ export default function DashboardPage() {
                   dataKey="accepted" 
                   stroke="#22c55e" 
                   strokeWidth={2}
-                  name="Prihvaćene"
+                  name={tClaims('acceptance.ACCEPTED')}
                   dot={{ r: 4, fill: "#22c55e" }}
                 />
                 <Line 
@@ -551,14 +551,14 @@ export default function DashboardPage() {
                   dataKey="rejected" 
                   stroke="#ef4444" 
                   strokeWidth={2}
-                  name="Odbijene"
+                  name={tClaims('acceptance.REJECTED')}
                   dot={{ r: 4, fill: "#ef4444" }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <p className="text-muted-foreground text-center py-8">Nema podataka za grafikon</p>
+          <p className="text-muted-foreground text-center py-8">{t('common.noData')}</p>
         )}
       </Card>
     </div>

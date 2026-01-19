@@ -6,15 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Clock, Mail, LogOut, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { clearApprovalCache } from "@/components/approval-guard";
 
 export default function PendingApprovalPage() {
   const { user } = useUser();
   const router = useRouter();
   const [checking, setChecking] = useState(false);
+  const t = useTranslations('pendingApproval');
 
   const handleCheckStatus = async () => {
     setChecking(true);
     try {
+      // Clear cache to force fresh check
+      clearApprovalCache();
+      
       const res = await fetch("/api/auth/check-approval");
       const data = await res.json();
       
@@ -24,7 +30,7 @@ export default function PendingApprovalPage() {
         router.refresh();
       } else {
         // Still pending
-        alert("Vaš nalog još uvek čeka odobrenje. Molimo pokušajte kasnije.");
+        alert(t('stillPending'));
       }
     } catch (error) {
       console.error("Error checking status:", error);
@@ -34,6 +40,7 @@ export default function PendingApprovalPage() {
   };
 
   const handleLogout = () => {
+    clearApprovalCache();
     window.location.href = "/auth/logout";
   };
 
@@ -45,9 +52,9 @@ export default function PendingApprovalPage() {
         </div>
 
         <div className="space-y-2">
-          <h1 className="text-2xl font-bold">Čeka se odobrenje</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="text-muted-foreground">
-            Vaš nalog je kreiran, ali morate sačekati da vas administrator odobri pre nego što možete pristupiti aplikaciji.
+            {t('description')}
           </p>
         </div>
 
@@ -61,10 +68,6 @@ export default function PendingApprovalPage() {
         )}
 
         <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Administrator će vas obavestiti kada vaš nalog bude odobren. Možete proveriti status klikom na dugme ispod.
-          </p>
-
           <Button 
             onClick={handleCheckStatus} 
             className="w-full"
@@ -73,12 +76,12 @@ export default function PendingApprovalPage() {
             {checking ? (
               <>
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                Proveravam...
+                {t('checking')}
               </>
             ) : (
               <>
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Proveri status
+                {t('checkStatus')}
               </>
             )}
           </Button>
@@ -89,12 +92,12 @@ export default function PendingApprovalPage() {
             className="w-full"
           >
             <LogOut className="w-4 h-4 mr-2" />
-            Odjavi se
+            {t('logout')}
           </Button>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Ako ste administrator i želite odobriti ovaj nalog, prijavite se na svoj admin nalog i idite na Admin → Upravljanje korisnicima.
+          {t('adminNote')}
         </p>
       </Card>
     </div>

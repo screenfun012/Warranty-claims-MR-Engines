@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Users, Shield, UserCheck, UserX, CheckCircle, XCircle, Clock } from "lucide-react";
 import { ROLES } from "@/lib/auth/roles";
+import { useTranslations } from "next-intl";
 
 interface User {
   id: string;
@@ -27,6 +28,8 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const t = useTranslations('admin.users');
+  const tCommon = useTranslations('common');
 
   interface Auth0User {
     'https://mr-engines-warranty/roles'?: string[] | string;
@@ -179,10 +182,10 @@ export default function AdminUsersPage() {
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2">
             <Users className="w-8 h-8" />
-            Upravljanje korisnicima
+            {t('title')}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Upravljajte korisnicima i njihovim ulogama u sistemu
+            {t('description')}
           </p>
         </div>
       </div>
@@ -194,7 +197,7 @@ export default function AdminUsersPage() {
             <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Ukupno korisnika</p>
+            <p className="text-sm text-muted-foreground">{t('totalUsers')}</p>
             <p className="text-2xl font-bold">{totalUsersCount}</p>
           </div>
         </Card>
@@ -204,7 +207,7 @@ export default function AdminUsersPage() {
             <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Aktivni korisnici</p>
+            <p className="text-sm text-muted-foreground">{t('activeUsers')}</p>
             <p className="text-2xl font-bold">{activeUsersCount}</p>
           </div>
         </Card>
@@ -214,7 +217,7 @@ export default function AdminUsersPage() {
             <Clock className={`w-6 h-6 ${pendingApprovalCount > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-600 dark:text-gray-400'}`} />
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Čeka odobrenje</p>
+            <p className="text-sm text-muted-foreground">{t('pendingApproval')}</p>
             <p className="text-2xl font-bold">{pendingApprovalCount}</p>
           </div>
         </Card>
@@ -225,16 +228,16 @@ export default function AdminUsersPage() {
         <Card className="p-6 border-orange-500 border-2 bg-orange-50 dark:bg-orange-950/20">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-orange-700 dark:text-orange-400">
             <Clock className="w-5 h-5" />
-            Korisnici koji čekaju odobrenje ({pendingApprovalCount})
+            {t('pendingUsers', { count: pendingApprovalCount })}
           </h2>
           <div className="space-y-3">
             {users.filter(u => !u.approved).map((pendingUser) => (
               <div key={pendingUser.id} className="flex items-center justify-between p-4 bg-white dark:bg-gray-900 rounded-lg border">
                 <div>
-                  <p className="font-medium">{pendingUser.fullName || "Nepoznato ime"}</p>
+                  <p className="font-medium">{pendingUser.fullName || "-"}</p>
                   <p className="text-sm text-muted-foreground">{pendingUser.email}</p>
                   <p className="text-xs text-muted-foreground">
-                    Registrovan: {new Date(pendingUser.createdAt).toLocaleDateString("sr-RS")}
+                    {t('registeredOn')}: {new Date(pendingUser.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -246,7 +249,7 @@ export default function AdminUsersPage() {
                     className="bg-green-600 hover:bg-green-700"
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Odobri
+                    {t('approve')}
                   </Button>
                 </div>
               </div>
@@ -257,16 +260,16 @@ export default function AdminUsersPage() {
 
       {/* All Users Table */}
       <Card className="p-6">
-        <h2 className="text-lg font-semibold mb-4">Svi korisnici</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('allUsers')}</h2>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b">
-                <th className="text-left p-3">Korisnik</th>
-                <th className="text-left p-3">Uloga</th>
-                <th className="text-left p-3">Odobrenje</th>
-                <th className="text-left p-3">Status</th>
-                <th className="text-left p-3">Akcije</th>
+                <th className="text-left p-3">{t('user')}</th>
+                <th className="text-left p-3">{tCommon('role')}</th>
+                <th className="text-left p-3">{t('approval')}</th>
+                <th className="text-left p-3">{tCommon('status')}</th>
+                <th className="text-left p-3">{tCommon('actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -274,7 +277,7 @@ export default function AdminUsersPage() {
                 <tr key={u.id} className="border-b hover:bg-muted/50">
                   <td className="p-3">
                     <div>
-                      <p className="font-medium">{u.fullName || "Nepoznato ime"}</p>
+                      <p className="font-medium">{u.fullName || "-"}</p>
                       <p className="text-sm text-muted-foreground">{u.email}</p>
                     </div>
                   </td>
@@ -308,12 +311,12 @@ export default function AdminUsersPage() {
                       {u.approved ? (
                         <>
                           <CheckCircle className="w-3 h-3 mr-1" />
-                          Odobren
+                          {t('approved')}
                         </>
                       ) : (
                         <>
                           <Clock className="w-3 h-3 mr-1" />
-                          Čeka
+                          {t('pending')}
                         </>
                       )}
                     </Badge>
@@ -323,7 +326,7 @@ export default function AdminUsersPage() {
                       variant={u.active ? "default" : "destructive"}
                       className={u.active ? "bg-blue-600" : "bg-red-500"}
                     >
-                      {u.active ? "Aktivan" : "Neaktivan"}
+                      {u.active ? tCommon('active') : tCommon('inactive')}
                     </Badge>
                   </td>
                   <td className="p-3">
@@ -337,7 +340,7 @@ export default function AdminUsersPage() {
                           className="text-green-600 border-green-600 hover:bg-green-50"
                         >
                           <CheckCircle className="w-4 h-4 mr-1" />
-                          Odobri
+                          {t('approve')}
                         </Button>
                       )}
                       {u.approved && u.role !== "SUPER_ADMIN" && (
@@ -349,7 +352,7 @@ export default function AdminUsersPage() {
                           className="text-orange-600 border-orange-600 hover:bg-orange-50"
                         >
                           <XCircle className="w-4 h-4 mr-1" />
-                          Povuci
+                          {t('revoke')}
                         </Button>
                       )}
                       <Button
@@ -361,12 +364,12 @@ export default function AdminUsersPage() {
                         {u.active ? (
                           <>
                             <UserX className="w-4 h-4 mr-1" />
-                            Deaktiviraj
+                            {t('deactivate')}
                           </>
                         ) : (
                           <>
                             <UserCheck className="w-4 h-4 mr-1" />
-                            Aktiviraj
+                            {t('activate')}
                           </>
                         )}
                       </Button>
@@ -378,7 +381,7 @@ export default function AdminUsersPage() {
           </table>
           {users.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              Nema korisnika u sistemu
+              {t('noUsers')}
             </div>
           )}
         </div>

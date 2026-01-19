@@ -1,83 +1,161 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
 
 interface ApprovalGuardProps {
   children: React.ReactNode;
+}
+
+const APPROVAL_CACHE_KEY = 'user-approval-status';
+const APPROVAL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+interface ApprovalCache {
+  approved: boolean;
+  timestamp: number;
+  email: string;
+}
+
+function getApprovalCache(email: string): boolean | null {
+  if (typeof window === 'undefined') return null;
+  
+  try {
+    const cached = localStorage.getItem(APPROVAL_CACHE_KEY);
+    if (!cached) return null;
+    
+    const data: ApprovalCache = JSON.parse(cached);
+    
+    // Check if cache is for same user and not expired
+    if (data.email === email && Date.now() - data.timestamp < APPROVAL_CACHE_DURATION) {
+      return data.approved;
+    }
+    
+    // Cache expired or different user
+    localStorage.removeItem(APPROVAL_CACHE_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function setApprovalCache(email: string, approved: boolean) {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const data: ApprovalCache = {
+      approved,
+      timestamp: Date.now(),
+      email,
+    };
+    localStorage.setItem(APPROVAL_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 
 export function ApprovalGuard({ children }: ApprovalGuardProps) {
   const { user, isLoading: userLoading } = useUser();
   const router = useRouter();
   const pathname = usePathname();
-  const [isApproved, setIsApproved] = useState<boolean | null>(null);
-  const [checking, setChecking] = useState(true);
+  const [approvalState, setApprovalState] = useState<'loading' | 'approved' | 'pending' | 'error'>('loading');
 
   // Skip check for these paths
   const skipPaths = ['/pending-approval', '/auth', '/login'];
   const shouldSkip = skipPaths.some(path => pathname?.startsWith(path));
 
-  useEffect(() => {
-    // Skip if no user or on exempt paths
-    if (userLoading || shouldSkip) {
-      setChecking(false);
+  const checkApproval = useCallback(async (email: string) => {
+    // First check cache
+    const cachedApproval = getApprovalCache(email);
+    if (cachedApproval !== null) {
+      if (cachedApproval) {
+        setApprovalState('approved');
+      } else {
+        setApprovalState('pending');
+        router.replace("/pending-approval");
+      }
       return;
     }
 
-    if (!user) {
-      setChecking(false);
+    // No cache, fetch from server
+    try {
+      const res = await fetch("/api/auth/check-approval");
+      const data = await res.json();
+
+      if (data.approved) {
+        setApprovalCache(email, true);
+        setApprovalState('approved');
+      } else {
+        setApprovalCache(email, false);
+        setApprovalState('pending');
+        router.replace("/pending-approval");
+      }
+    } catch (error) {
+      console.error("Error checking approval:", error);
+      // On error, assume approved to not block users
+      setApprovalState('approved');
+    }
+  }, [router]);
+
+  useEffect(() => {
+    // Skip if on exempt paths
+    if (shouldSkip) {
+      setApprovalState('approved');
+      return;
+    }
+
+    // Wait for user loading
+    if (userLoading) {
+      return;
+    }
+
+    // No user means not logged in, let Auth0 handle it
+    if (!user || !user.email) {
+      setApprovalState('approved');
       return;
     }
 
     // Check approval status
-    const checkApproval = async () => {
-      try {
-        const res = await fetch("/api/auth/check-approval");
-        const data = await res.json();
+    checkApproval(user.email);
+  }, [user, userLoading, shouldSkip, checkApproval]);
 
-        if (data.approved) {
-          setIsApproved(true);
-        } else {
-          setIsApproved(false);
-          // Redirect to pending approval page
-          router.push("/pending-approval");
-        }
-      } catch (error) {
-        console.error("Error checking approval:", error);
-        // On error, assume approved to not block users
-        setIsApproved(true);
-      } finally {
-        setChecking(false);
-      }
-    };
-
-    checkApproval();
-  }, [user, userLoading, router, shouldSkip]);
-
-  // Show loading while checking
-  if (userLoading || (checking && !shouldSkip)) {
+  // Show loading screen while checking
+  if (userLoading || approvalState === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="space-y-4 w-full max-w-md p-8">
-          <Skeleton className="h-8 w-48 mx-auto" />
-          <Skeleton className="h-4 w-64 mx-auto" />
-          <div className="space-y-3 mt-8">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="p-8 text-center space-y-4 max-w-sm mx-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Učitavanje...</h2>
+            <p className="text-sm text-muted-foreground">Proveravam pristup...</p>
           </div>
-        </div>
+        </Card>
       </div>
     );
   }
 
-  // If not approved and not on pending page, show nothing (redirect will happen)
-  if (isApproved === false && !shouldSkip) {
-    return null;
+  // If pending approval, show nothing (redirect will happen)
+  if (approvalState === 'pending') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Card className="p-8 text-center space-y-4 max-w-sm mx-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <div className="space-y-2">
+            <h2 className="text-lg font-semibold">Preusmeravanje...</h2>
+          </div>
+        </Card>
+      </div>
+    );
   }
 
   return <>{children}</>;
+}
+
+// Clear approval cache (call on logout)
+export function clearApprovalCache() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(APPROVAL_CACHE_KEY);
 }

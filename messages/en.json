@@ -40,7 +40,8 @@
     "settings": "Settings",
     "admin": "Admin",
     "profile": "Profile",
-    "logout": "Log out"
+    "logout": "Log out",
+    "workOrders": "Work Orders"
   },
   "dashboard": {
     "title": "Dashboard",

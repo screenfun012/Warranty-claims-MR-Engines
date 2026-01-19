@@ -40,7 +40,8 @@
     "settings": "Podešavanja",
     "admin": "Admin",
     "profile": "Profil",
-    "logout": "Odjavi se"
+    "logout": "Odjavi se",
+    "workOrders": "Radni nalozi"
   },
   "dashboard": {
     "title": "Početna",
