@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
         email: true,
         role: true,
         active: true,
+        approved: true,
         createdAt: true,
       },
       orderBy: {
@@ -73,6 +74,7 @@ export async function GET(request: NextRequest) {
                 email: true,
                 role: true,
                 active: true,
+                approved: true,
                 createdAt: true,
               },
               orderBy: {

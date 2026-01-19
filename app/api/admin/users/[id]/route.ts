@@ -15,7 +15,7 @@ export async function PATCH(
 
     const { id } = await params;
     const body = await request.json();
-    const { role, active } = body;
+    const { role, active, approved } = body;
 
     // Provera da li korisnik postoji u Prisma bazi
     const user = await prisma.user.findUnique({
@@ -90,6 +90,7 @@ export async function PATCH(
     const updateData: any = {};
     if (role !== undefined) updateData.role = role;
     if (active !== undefined) updateData.active = active;
+    if (approved !== undefined) updateData.approved = approved;
 
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -100,6 +101,7 @@ export async function PATCH(
         email: true,
         role: true,
         active: true,
+        approved: true,
         createdAt: true,
       },
     });

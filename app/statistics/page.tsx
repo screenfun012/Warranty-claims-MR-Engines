@@ -9,14 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DatePicker } from "@/components/ui/date-picker";
 import { 
   BarChart3, 
   Download, 
   Filter, 
   X,
+  CalendarIcon,
 } from "lucide-react";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { useRouter } from "next/navigation";
+import { format } from "date-fns";
 
 interface Claim {
   id: string;
@@ -431,20 +434,26 @@ export default function StatisticsPage() {
               {/* Date From */}
               <div>
                 <Label>Date From</Label>
-                <Input
-                  type="date"
-                  value={filters.dateFrom}
-                  onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                <DatePicker
+                  date={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
+                  onSelect={(date) => setFilters(prev => ({ 
+                    ...prev, 
+                    dateFrom: date ? format(date, "yyyy-MM-dd") : "" 
+                  }))}
+                  placeholder="Select start date"
                 />
               </div>
 
               {/* Date To */}
               <div>
                 <Label>Date To</Label>
-                <Input
-                  type="date"
-                  value={filters.dateTo}
-                  onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                <DatePicker
+                  date={filters.dateTo ? new Date(filters.dateTo) : undefined}
+                  onSelect={(date) => setFilters(prev => ({ 
+                    ...prev, 
+                    dateTo: date ? format(date, "yyyy-MM-dd") : "" 
+                  }))}
+                  placeholder="Select end date"
                 />
               </div>
             </div>

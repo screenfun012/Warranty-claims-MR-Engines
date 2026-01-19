@@ -18,6 +18,7 @@ import {
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Home, ChevronRight } from "lucide-react";
+import { ApprovalGuard } from "@/components/approval-guard";
 
 function PageTitle({ pathname }: { pathname: string | null }) {
   if (!pathname) return null;
@@ -143,24 +144,32 @@ function SidebarTriggerWithTooltip() {
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === "/login" || !pathname;
+  const isPendingApproval = pathname === "/pending-approval";
 
   // Na login/register stranicama, ne prikazuj sidebar
   if (isAuthPage) {
     return <>{children}</>;
   }
 
+  // Na pending-approval stranici, ne prikazuj sidebar
+  if (isPendingApproval) {
+    return <>{children}</>;
+  }
+
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
-          <SidebarTriggerWithTooltip />
-          <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />
-          <PageTitle pathname={pathname} />
-        </header>
-        <main className="flex-1 overflow-auto bg-background/50">{children}</main>
-      </SidebarInset>
-    </SidebarProvider>
+    <ApprovalGuard>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
+            <SidebarTriggerWithTooltip />
+            <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />
+            <PageTitle pathname={pathname} />
+          </header>
+          <main className="flex-1 overflow-auto bg-background/50">{children}</main>
+        </SidebarInset>
+      </SidebarProvider>
+    </ApprovalGuard>
   );
 }
 

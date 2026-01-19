@@ -18,11 +18,12 @@ model User {
   fullName        String?  // Made optional for OAuth users
   email           String   @unique
   password        String?  // Heširana lozinka (opciono za OAuth korisnike)
-  role            String @default("OPERATOR") // SUPER_ADMIN, ADMIN, MANAGER, OPERATOR, TECHNICIAN, WORKER
+  role            String @default("VIEWER") // SUPER_ADMIN, ADMIN, MANAGER, OPERATOR, TECHNICIAN, WORKER, VIEWER
   emailVerified   DateTime?
   emailVerificationToken String? // 6-cifreni token za verifikaciju emaila
   emailVerificationTokenExpires DateTime? // Token expiration time
   active          Boolean  @default(true) // Za deaktivaciju korisnika
+  approved        Boolean  @default(false) // Korisnik mora biti odobren od SUPER_ADMIN pre pristupa
   // NextAuth adapter fields
   accounts        Account[]
   sessions        Session[]

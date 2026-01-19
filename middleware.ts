@@ -12,8 +12,17 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
   // Za /auth/profile, POTPUNO preskoči Auth0 middleware
-  // Profile ruta će sama vratiti 204 ako nema session-a
   if (pathname === '/auth/profile') {
+    return NextResponse.next();
+  }
+  
+  // Za pending-approval stranicu, dozvoli pristup (provera approval se radi client-side)
+  if (pathname === '/pending-approval') {
+    return NextResponse.next();
+  }
+  
+  // Za check-approval API, dozvoli pristup
+  if (pathname === '/api/auth/check-approval') {
     return NextResponse.next();
   }
   
