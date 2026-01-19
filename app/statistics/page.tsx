@@ -324,11 +324,11 @@ export default function StatisticsPage() {
               <div>
                 <Label>Status</Label>
                 <Select
-                  value={filters.status.join(",")}
+                  value={filters.status.length > 0 ? filters.status.join(",") : "all"}
                   onValueChange={(value) => {
                     setFilters(prev => ({
                       ...prev,
-                      status: value ? value.split(",") : [],
+                      status: value === "all" ? [] : value.split(","),
                     }));
                   }}
                 >
@@ -336,7 +336,7 @@ export default function StatisticsPage() {
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All statuses</SelectItem>
+                    <SelectItem value="all">All statuses</SelectItem>
                     <SelectItem value="NEW">New</SelectItem>
                     <SelectItem value="IN_ANALYSIS">In Analysis</SelectItem>
                     <SelectItem value="APPROVED">Approved</SelectItem>
@@ -370,11 +370,11 @@ export default function StatisticsPage() {
               <div>
                 <Label>Fault Department</Label>
                 <Select
-                  value={filters.faultDepartmentId.join(",")}
+                  value={filters.faultDepartmentId.length > 0 ? filters.faultDepartmentId.join(",") : "all"}
                   onValueChange={(value) => {
                     setFilters(prev => ({
                       ...prev,
-                      faultDepartmentId: value ? value.split(",") : [],
+                      faultDepartmentId: value === "all" ? [] : value.split(","),
                     }));
                   }}
                 >
@@ -382,7 +382,7 @@ export default function StatisticsPage() {
                     <SelectValue placeholder="All departments" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All departments</SelectItem>
+                    <SelectItem value="all">All departments</SelectItem>
                     {departmentsData?.departments?.map((dept: any) => (
                       <SelectItem key={dept.id} value={dept.id}>
                         {dept.name}
@@ -419,14 +419,14 @@ export default function StatisticsPage() {
               <div>
                 <Label>Market</Label>
                 <Select
-                  value={filters.isDomesticMarket}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, isDomesticMarket: value }))}
+                  value={filters.isDomesticMarket || "all"}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, isDomesticMarket: value === "all" ? "" : value }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="All markets" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All markets</SelectItem>
+                    <SelectItem value="all">All markets</SelectItem>
                     <SelectItem value="true">Domestic</SelectItem>
                     <SelectItem value="false">International</SelectItem>
                   </SelectContent>
