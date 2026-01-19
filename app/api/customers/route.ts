@@ -1,10 +1,30 @@
 /**
  * API routes for customers
+ * GET /api/customers - List all customers
  * POST /api/customers - Create customer
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
+
+export async function GET(request: NextRequest) {
+  try {
+    const prisma = await getPrisma();
+    const customers = await prisma.customer.findMany({
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return NextResponse.json({ customers });
+  } catch (error) {
+    console.error("Error fetching customers:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch customers" },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {

@@ -19,6 +19,7 @@ import {
   Eye,
   UserRoundCog,
   UserCheck,
+  BarChart3,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ const allNavigation: NavigationItemWithRole[] = [
   { name: "Dashboard", href: "/", icon: Home, minRole: "VIEWER" },
   { name: "Inbox", href: "/inbox", icon: Inbox, showBadge: true, minRole: "VIEWER" },
   { name: "Claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
+  { name: "Statistics", href: "/statistics", icon: BarChart3, minRole: "VIEWER" },
   { name: "Settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
   { name: "Admin", href: "/admin/users", icon: Shield, minRole: "SUPER_ADMIN" },
 ];
