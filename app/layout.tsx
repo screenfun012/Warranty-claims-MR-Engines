@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Public_Sans } from "next/font/google";
 import "./globals.css";
+import { cookies } from "next/headers";
 
 const publicSans = Public_Sans({
   variable: "--font-public-sans",
@@ -12,19 +13,37 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { IdleSyncStarter } from "@/components/IdleSyncStarter";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { SessionProvider } from "@/lib/providers/session-provider";
+import { IntlProvider } from "@/lib/providers/intl-provider";
+import { defaultLocale, locales, type Locale } from "@/i18n/config";
 
 export const metadata: Metadata = {
   title: "MR Engines – Warranty Claims",
   description: "Warranty claims management system for MR Engines",
 };
 
-export default function RootLayout({
+async function getMessages(locale: Locale) {
+  try {
+    return (await import(`../messages/${locale}.json`)).default;
+  } catch {
+    return (await import(`../messages/${defaultLocale}.json`)).default;
+  }
+}
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const localeCookie = cookieStore.get('locale')?.value;
+  const locale: Locale = locales.includes(localeCookie as Locale) 
+    ? (localeCookie as Locale) 
+    : defaultLocale;
+  
+  const messages = await getMessages(locale);
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <head>
         <script
           dangerouslySetInnerHTML={{
@@ -50,8 +69,10 @@ export default function RootLayout({
       >
         <SessionProvider>
           <QueryProvider>
-            <IdleSyncStarter />
-            <MainLayout>{children}</MainLayout>
+            <IntlProvider locale={locale} messages={messages}>
+              <IdleSyncStarter />
+              <MainLayout>{children}</MainLayout>
+            </IntlProvider>
           </QueryProvider>
         </SessionProvider>
       </body>

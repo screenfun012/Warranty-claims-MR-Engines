@@ -25,6 +25,9 @@ import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { useLocale } from "@/components/language-switcher";
+import { useTranslations } from "next-intl";
 import {
   Tooltip,
   TooltipContent,
@@ -94,6 +97,8 @@ export function AppSidebar() {
   const { state, isMobile, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const queryClient = useQueryClient();
+  const currentLocale = useLocale();
+  const t = useTranslations();
 
   // Eksplicitno pozovi profil endpoint da vidimo role
   useEffect(() => {
@@ -383,13 +388,33 @@ export function AppSidebar() {
           </Link>
         )}
 
-        {/* Theme Toggle and Logout */}
+        {/* Language Switcher, Theme Toggle and Logout */}
         <div className="flex items-center gap-2">
+          {/* Language Switcher */}
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className={cn(
-                  "flex-1 opacity-70 hover:opacity-100 transition-all duration-200",
+                  "opacity-70 hover:opacity-100 transition-all duration-200",
+                  isCollapsed && "w-full"
+                )}>
+                  <LanguageSwitcher currentLocale={currentLocale} />
+                </div>
+              </TooltipTrigger>
+              {isCollapsed && (
+                <TooltipContent side="right">
+                  <span>Promeni jezik</span>
+                </TooltipContent>
+              )}
+            </Tooltip>
+          </TooltipProvider>
+
+          {/* Theme Toggle */}
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className={cn(
+                  "opacity-70 hover:opacity-100 transition-all duration-200",
                   isCollapsed && "w-full"
                 )}>
                   <ThemeToggle />
@@ -403,6 +428,7 @@ export function AppSidebar() {
             </Tooltip>
           </TooltipProvider>
           
+          {/* Logout */}
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -418,12 +444,12 @@ export function AppSidebar() {
                   )}
                 >
                   <LogOut className="h-4 w-4" />
-                  {!isCollapsed && <span>Odjavi se</span>}
+                  {!isCollapsed && <span>{t('nav.logout')}</span>}
                 </a>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
-                  <span>Odjavi se</span>
+                  <span>{t('nav.logout')}</span>
                 </TooltipContent>
               )}
             </Tooltip>
