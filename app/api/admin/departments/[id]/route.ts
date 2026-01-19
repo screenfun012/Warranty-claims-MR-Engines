@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { requirePermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { requireMinimumRole } from "@/lib/auth/permissions";
+import { ROLES } from "@/lib/auth/roles";
 
 export async function DELETE(
   request: NextRequest,
@@ -14,7 +15,7 @@ export async function DELETE(
   try {
     const prisma = await getPrisma();
     // Only ADMIN+ can delete departments
-    await requirePermission(PERMISSIONS.ADMIN_ACCESS);
+    await requireMinimumRole(ROLES.ADMIN);
 
     const { id } = await params;
 

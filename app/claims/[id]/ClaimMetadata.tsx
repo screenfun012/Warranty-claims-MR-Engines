@@ -218,7 +218,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   ]);
 
   // Save field on blur
-  const handleFieldBlur = (field: string, value: string | number | boolean) => {
+  const handleFieldBlur = (field: string, value: string | number | boolean | null) => {
     setEditingField(null);
     
     // Get original value

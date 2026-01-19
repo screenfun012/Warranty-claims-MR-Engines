@@ -49,7 +49,15 @@ interface Claim {
   claimAcceptanceStatus: string | null;
   processingEmailSentAt: string | null;
   isLocked: boolean | null;
-  customer: any;
+  customer: {
+    id: string;
+    name: string;
+    company: string | null;
+  } | null;
+  faultDepartment: {
+    id: string;
+    name: string;
+  } | null;
   workOrder: any;
   engineType: string | null;
   mrEngineCode: string | null;

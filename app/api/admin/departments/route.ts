@@ -6,7 +6,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { requirePermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { requireMinimumRole } from "@/lib/auth/permissions";
+import { ROLES } from "@/lib/auth/roles";
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
   try {
     const prisma = await getPrisma();
     // Only ADMIN+ can create departments
-    await requirePermission(PERMISSIONS.ADMIN_ACCESS);
+    await requireMinimumRole(ROLES.ADMIN);
 
     const body = await request.json();
     const { name } = body;
