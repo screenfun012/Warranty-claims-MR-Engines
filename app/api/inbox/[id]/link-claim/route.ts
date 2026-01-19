@@ -114,15 +114,25 @@ export async function POST(
           console.log(`[link-claim] Skipping logo image ${attachment.id}`);
           attachmentsSkipped++;
         } else {
-          await prisma.photo.create({
-            data: {
-              claimId,
-              attachmentId: attachment.id,
-              internalUpload: false,
-            },
+          // Check if photo already exists for this attachment
+          const existingPhoto = await prisma.photo.findUnique({
+            where: { attachmentId: attachment.id },
           });
-          photosCreated++;
-          console.log(`[link-claim] Created photo for attachment ${attachment.id}`);
+          
+          if (!existingPhoto) {
+            await prisma.photo.create({
+              data: {
+                claimId,
+                attachmentId: attachment.id,
+                internalUpload: false,
+              },
+            });
+            photosCreated++;
+            console.log(`[link-claim] Created photo for attachment ${attachment.id}`);
+          } else {
+            console.log(`[link-claim] Photo already exists for attachment ${attachment.id}, skipping`);
+            attachmentsSkipped++;
+          }
         }
       }
 

@@ -221,7 +221,12 @@ export async function POST(request: NextRequest) {
         // Auto-populate summarySr from first email bodyText if not provided
         if (!body.summarySr && thread.messages.length > 0) {
           const firstMessage = thread.messages[0];
-          const emailBody = firstMessage.bodyText || firstMessage.bodyHtml?.replace(/<[^>]*>/g, "").trim() || "";
+          // Use getCleanEmailBody to properly extract and clean email body text
+          const { getCleanEmailBody } = await import("@/lib/email/emailBodyCleaner");
+          const emailBody = getCleanEmailBody({
+            bodyText: firstMessage.bodyText,
+            bodyHtml: firstMessage.bodyHtml,
+          });
           
           if (emailBody) {
             // Update claim with summary from email
@@ -280,15 +285,24 @@ export async function POST(request: NextRequest) {
             if (attachment.isProbablyLogo) {
               console.log(`[create-claim] Skipping logo image ${attachment.id}`);
             } else {
-              await prisma.photo.create({
-                data: {
-                  claimId: claim.id,
-                  attachmentId: attachment.id,
-                  internalUpload: false,
-                },
+              // Check if photo already exists for this attachment
+              const existingPhoto = await prisma.photo.findUnique({
+                where: { attachmentId: attachment.id },
               });
-              photosCreated++;
-              console.log(`[create-claim] Created photo for attachment ${attachment.id}`);
+              
+              if (!existingPhoto) {
+                await prisma.photo.create({
+                  data: {
+                    claimId: claim.id,
+                    attachmentId: attachment.id,
+                    internalUpload: false,
+                  },
+                });
+                photosCreated++;
+                console.log(`[create-claim] Created photo for attachment ${attachment.id}`);
+              } else {
+                console.log(`[create-claim] Photo already exists for attachment ${attachment.id}, skipping`);
+              }
             }
           }
 

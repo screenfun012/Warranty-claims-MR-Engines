@@ -86,13 +86,22 @@ export async function POST(
 
     // Create Photo if it's an image (and NOT a PDF/DOCX)
     if (isImage && !isPdf && !isDocx) {
-      await prisma.photo.create({
-        data: {
-          claimId: claim.id,
-          attachmentId: attachment.id,
-          internalUpload: true,
-        },
+      // Check if photo already exists for this attachment
+      const existingPhoto = await prisma.photo.findUnique({
+        where: { attachmentId: attachment.id },
       });
+      
+      if (!existingPhoto) {
+        await prisma.photo.create({
+          data: {
+            claimId: claim.id,
+            attachmentId: attachment.id,
+            internalUpload: true,
+          },
+        });
+      } else {
+        console.log(`[upload-attachment] Photo already exists for attachment ${attachment.id}, skipping`);
+      }
     }
 
     // Create ClientDocument if it's PDF or DOCX (and NOT an image)
