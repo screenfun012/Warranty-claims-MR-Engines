@@ -231,7 +231,24 @@ class OpenAITranslator implements Translator {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} ${errorText}`);
+        let errorMessage = `OpenAI API error: ${response.status}`;
+        
+        // Parse error response for better error messages
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error) {
+            if (errorData.error.code === "insufficient_quota" || response.status === 429) {
+              errorMessage = "OpenAI API quota exceeded. Please check your OpenAI account billing and add credits. Visit https://platform.openai.com/account/billing";
+            } else if (errorData.error.message) {
+              errorMessage = `OpenAI API error: ${errorData.error.message}`;
+            }
+          }
+        } catch {
+          // If parsing fails, use the raw error text
+          errorMessage = `OpenAI API error: ${response.status} ${errorText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();
