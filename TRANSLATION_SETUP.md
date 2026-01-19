@@ -50,14 +50,14 @@ Aplikacija podržava automatsko prevodenje teksta kroz različite provajdere. Tr
    TRANSLATION_PROVIDER=openai
    TRANSLATION_API_KEY=<tvoj-openai-api-key>
    TRANSLATION_BASE_URL=https://api.openai.com/v1/chat/completions
-   TRANSLATION_MODEL=gpt-3.5-turbo
+   TRANSLATION_MODEL=gpt-4o-mini
    ```
    
    **Napomena:**
    - **TRANSLATION_BASE_URL je opciono** - ako ostaviš prazno, koristi se `https://api.openai.com/v1/chat/completions`
-   - **TRANSLATION_MODEL je opciono** - ako ostaviš prazno, koristi se `gpt-3.5-turbo`
-   - Za bolji kvalitet: `TRANSLATION_MODEL=gpt-4` (skupije)
-   - Za brzinu i nižu cenu: `TRANSLATION_MODEL=gpt-3.5-turbo` (preporučeno)
+   - **TRANSLATION_MODEL je opciono** - ako ostaviš prazno, koristi se `gpt-4o-mini` (default)
+   - Za bolji kvalitet: `TRANSLATION_MODEL=gpt-4` ili `gpt-4o` (skupije)
+   - Za brzinu i nižu cenu: `TRANSLATION_MODEL=gpt-4o-mini` (preporučeno - default)
 
 ## Primeri Konfiguracije
 
@@ -80,7 +80,7 @@ TRANSLATION_API_KEY=your-deepl-paid-api-key-here
 TRANSLATION_PROVIDER=openai
 TRANSLATION_API_KEY=sk-your-openai-api-key-here
 TRANSLATION_BASE_URL=https://api.openai.com/v1/chat/completions
-TRANSLATION_MODEL=gpt-3.5-turbo
+TRANSLATION_MODEL=gpt-4o-mini
 ```
 
 ### Onemogući Prevod
@@ -138,8 +138,9 @@ TRANSLATION_PROVIDER=none
 - **Paid:** €4.99/mesec za 1M karaktera, €9.99/mesec za 5M karaktera
 
 ### OpenAI
-- **GPT-3.5-turbo:** ~$0.001 per 1K tokena (jeftinije)
-- **GPT-4:** ~$0.03 per 1K tokena (skuplje, ali bolji kvalitet)
+- **GPT-4o-mini:** ~$0.15 per 1M input tokena, ~$0.60 per 1M output tokena (preporučeno - najbolji odnos cene i kvaliteta)
+- **GPT-4o:** ~$2.50 per 1M input tokena, ~$10 per 1M output tokena (bolji kvalitet, skuplje)
+- **GPT-4:** ~$30 per 1M input tokena (najskuplje)
 
 ## Preporuka
 

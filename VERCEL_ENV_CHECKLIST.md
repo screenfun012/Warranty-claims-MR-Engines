@@ -54,7 +54,7 @@
 - [ ] `TRANSLATION_PROVIDER` - `openai`
 - [ ] `TRANSLATION_API_KEY` - OpenAI API key (možeš dobiti na https://platform.openai.com/api-keys)
 - [ ] `TRANSLATION_BASE_URL` - `https://api.openai.com/v1/chat/completions` (ili ostavi prazno - default)
-- [ ] `TRANSLATION_MODEL` - `gpt-3.5-turbo` (ili `gpt-4` za bolji kvalitet, ili ostavi prazno - default je gpt-3.5-turbo)
+- [ ] `TRANSLATION_MODEL` - `gpt-4o-mini` (ili `gpt-4o`/`gpt-4` za bolji kvalitet, ili ostavi prazno - default je gpt-4o-mini)
 
 **Onemogući prevod:**
 - [ ] `TRANSLATION_PROVIDER` - `none` (default - prevod neće raditi)

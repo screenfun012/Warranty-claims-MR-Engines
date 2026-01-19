@@ -188,7 +188,7 @@ class OpenAITranslator implements Translator {
   constructor(apiKey: string, baseUrl?: string, model?: string) {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl || "https://api.openai.com/v1/chat/completions";
-    this.model = model || "gpt-3.5-turbo";
+    this.model = model || "gpt-4o-mini";
   }
 
   async translate(params: { text: string; sourceLang?: string; targetLang: string }): Promise<string> {
