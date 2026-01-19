@@ -51,19 +51,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Customer filter
-    if (customerId) {
-      where.customerId = customerId;
-    }
-
-    // Customer company filter
-    if (customerCompany) {
-      where.customer = {
-        company: {
-          contains: customerCompany,
-          mode: "insensitive",
-        },
-      };
+    // Customer filters (combine name and company if both provided)
+    if (customerId || customerCompany) {
+      const customerConditions: any = {};
+      if (customerId) {
+        customerConditions.name = { contains: customerId };
+      }
+      if (customerCompany) {
+        customerConditions.company = { contains: customerCompany };
+      }
+      where.customer = customerConditions;
     }
 
     // Fault department filter
@@ -85,7 +82,6 @@ export async function GET(request: NextRequest) {
     if (engineType) {
       where.engineType = {
         contains: engineType,
-        mode: "insensitive",
       };
     }
 
