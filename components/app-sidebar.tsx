@@ -390,21 +390,21 @@ export function AppSidebar() {
         )}
 
         {/* Language Switcher, Theme Toggle and Logout */}
-        <div className="flex items-center gap-2">
+        <div className={cn(
+          "flex items-center gap-1",
+          isCollapsed ? "flex-col" : "flex-row justify-between"
+        )}>
           {/* Language Switcher */}
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className={cn(
-                  "opacity-70 hover:opacity-100 transition-all duration-200",
-                  isCollapsed && "w-full"
-                )}>
-                  <LanguageSwitcher currentLocale={currentLocale} />
+                <div className="shrink-0">
+                  <LanguageSwitcher currentLocale={currentLocale} collapsed={isCollapsed} />
                 </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
-                  <span>Promeni jezik</span>
+                  <span>{t('common.language') || 'Jezik'}</span>
                 </TooltipContent>
               )}
             </Tooltip>
@@ -414,16 +414,13 @@ export function AppSidebar() {
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className={cn(
-                  "opacity-70 hover:opacity-100 transition-all duration-200",
-                  isCollapsed && "w-full"
-                )}>
+                <div className="shrink-0">
                   <ThemeToggle />
                 </div>
               </TooltipTrigger>
               {isCollapsed && (
                 <TooltipContent side="right">
-                  <span>Promeni temu</span>
+                  <span>{t('common.theme') || 'Tema'}</span>
                 </TooltipContent>
               )}
             </Tooltip>
@@ -436,16 +433,15 @@ export function AppSidebar() {
                 <a
                   href="/auth/logout"
                   className={cn(
-                    "opacity-70 hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all duration-200",
+                    "hover:bg-destructive/10 hover:text-destructive transition-all duration-200",
                     "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium",
-                    "disabled:pointer-events-none disabled:opacity-50",
-                    "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-destructive/20",
-                    "border border-transparent hover:border-destructive/20",
-                    isCollapsed ? "size-9 flex-shrink-0" : "flex-1 px-3 py-2"
+                    "outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "h-9 shrink-0",
+                    isCollapsed ? "w-9" : "px-3"
                   )}
                 >
-                  <LogOut className="h-4 w-4" />
-                  {!isCollapsed && <span>{t('nav.logout')}</span>}
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  {!isCollapsed && <span className="truncate">{t('nav.logout')}</span>}
                 </a>
               </TooltipTrigger>
               {isCollapsed && (

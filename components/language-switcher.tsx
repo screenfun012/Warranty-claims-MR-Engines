@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Globe, Check } from "lucide-react";
 import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
+import { cn } from "@/lib/utils";
 
 interface LanguageSwitcherProps {
   currentLocale: Locale;
+  collapsed?: boolean;
 }
 
-export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
+export function LanguageSwitcher({ currentLocale, collapsed = false }: LanguageSwitcherProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -31,20 +33,33 @@ export function LanguageSwitcher({ currentLocale }: LanguageSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-2" disabled={isPending}>
-          <Globe className="h-4 w-4" />
-          <span className="hidden sm:inline">{localeFlags[currentLocale]} {localeNames[currentLocale]}</span>
-          <span className="sm:hidden">{localeFlags[currentLocale]}</span>
+        <Button 
+          variant="ghost" 
+          size={collapsed ? "icon" : "sm"}
+          className={cn(
+            "transition-all duration-200",
+            collapsed ? "h-9 w-9" : "gap-2 px-3"
+          )}
+          disabled={isPending}
+        >
+          {collapsed ? (
+            <span className="text-base">{localeFlags[currentLocale]}</span>
+          ) : (
+            <>
+              <span className="text-base">{localeFlags[currentLocale]}</span>
+              <span className="truncate">{localeNames[currentLocale]}</span>
+            </>
+          )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align={collapsed ? "center" : "end"} side={collapsed ? "right" : "top"}>
         {locales.map((locale) => (
           <DropdownMenuItem
             key={locale}
             onClick={() => handleLocaleChange(locale)}
-            className="gap-2"
+            className="gap-2 cursor-pointer"
           >
-            <span>{localeFlags[locale]}</span>
+            <span className="text-base">{localeFlags[locale]}</span>
             <span>{localeNames[locale]}</span>
             {currentLocale === locale && <Check className="h-4 w-4 ml-auto" />}
           </DropdownMenuItem>

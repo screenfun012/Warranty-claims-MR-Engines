@@ -30,7 +30,9 @@
     "noData": "Nema podataka",
     "error": "Greška",
     "success": "Uspešno",
-    "warning": "Upozorenje"
+    "warning": "Upozorenje",
+    "language": "Jezik",
+    "theme": "Tema"
   },
   "nav": {
     "dashboard": "Početna",

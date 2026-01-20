@@ -376,12 +376,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   };
 
   return (
-    <Card className="p-6">
+    <Card className="p-4 sm:p-6 overflow-hidden">
       <h2 className="text-lg font-semibold mb-6 text-primary flex items-center gap-2">
         <Settings className="h-5 w-5" />
         Metadata
       </h2>
-      <div className="space-y-4">
+      <div className="space-y-4 overflow-hidden">
         {/* Claim Code - Required */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -517,13 +517,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         {/* Fault Department */}
         <div>
           <Label className="text-sm font-medium mb-2">Fault Department</Label>
-          <div className="flex gap-2">
+          <div className="flex gap-2 min-w-0">
             <Select
               value={faultDepartmentId}
               onValueChange={handleFaultDepartmentChange}
               disabled={isReadOnly || loadingDepartments}
             >
-              <SelectTrigger className="h-9 flex-1">
+              <SelectTrigger className="h-9 flex-1 min-w-0">
                 <SelectValue placeholder="Select department" />
               </SelectTrigger>
               <SelectContent>
@@ -537,7 +537,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             {canManageDepartments && (
               <Dialog open={showAddDepartment} onOpenChange={setShowAddDepartment}>
                 <DialogTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9" disabled={isReadOnly}>
+                  <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" disabled={isReadOnly}>
                     <Plus className="h-4 w-4" />
                   </Button>
                 </DialogTrigger>
