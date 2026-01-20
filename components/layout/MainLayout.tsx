@@ -19,6 +19,7 @@ import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { Home, ChevronRight } from "lucide-react";
 import { ApprovalGuard } from "@/components/approval-guard";
+import { useRealtime } from "@/hooks/useRealtime";
 
 function PageTitle({ pathname }: { pathname: string | null }) {
   if (!pathname) return null;
@@ -145,6 +146,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAuthPage = pathname === "/login" || !pathname;
   const isPendingApproval = pathname === "/pending-approval";
+
+  // Subscribe to real-time updates on all pages (except auth pages)
+  if (!isAuthPage && !isPendingApproval) {
+    useRealtime();
+  }
 
   // Na login/register stranicama, ne prikazuj sidebar
   if (isAuthPage) {

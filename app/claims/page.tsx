@@ -15,7 +15,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { useRealtime } from "@/hooks/useRealtime";
 
 // Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {
@@ -111,9 +110,6 @@ export default function ClaimsPage() {
   const router = useRouter();
   const { user } = useUser();
   const queryClient = useQueryClient();
-  
-  // Subscribe to real-time updates
-  useRealtime();
   
   // Get user role
   interface Auth0User {
