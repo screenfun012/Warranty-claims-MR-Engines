@@ -20,6 +20,7 @@ import {
   UserRoundCog,
   UserCheck,
   BarChart3,
+  ChevronUp,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -27,13 +28,24 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { useLocale } from "@/components/language-switcher";
+import { locales, localeNames, localeFlags, type Locale } from "@/i18n/config";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { Moon, Sun, Globe, Check } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sidebar,
   SidebarContent,
@@ -100,6 +112,8 @@ export function AppSidebar() {
   const queryClient = useQueryClient();
   const currentLocale = useLocale();
   const t = useTranslations();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   // Eksplicitno pozovi profil endpoint da vidimo role
   useEffect(() => {
@@ -307,157 +321,131 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className={cn(
-        "border-t transition-all duration-200",
-        isCollapsed ? "px-0 py-2" : "px-2 py-3"
-      )}>
-        {/* Collapsed Mode - Just icons stacked vertically */}
-        {isCollapsed ? (
-          <div className="flex flex-col items-center gap-1">
-            <TooltipProvider delayDuration={0}>
-              {/* User Profile Icon */}
-              {user && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Link 
-                      href="/profile"
-                      className="flex items-center justify-center h-10 w-10 rounded-lg hover:bg-sidebar-accent transition-colors"
-                    >
-                      <User className="h-5 w-5" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <span>{auth0User?.name || t('nav.profile')}</span>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-
-              {/* Language Switcher */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center justify-center h-10 w-10">
-                    <LanguageSwitcher currentLocale={currentLocale} collapsed={true} />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <span>{t('common.language')}</span>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Theme Toggle */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center justify-center h-10 w-10">
-                    <ThemeToggle />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <span>{t('common.theme')}</span>
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Logout */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <a
-                    href="/auth/logout"
-                    className="flex items-center justify-center h-10 w-10 rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors"
-                  >
-                    <LogOut className="h-5 w-5" />
-                  </a>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <span>{t('nav.logout')}</span>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        ) : (
-          /* Expanded Mode - Full user info and horizontal buttons */
-          <div className="flex flex-col gap-3">
-            {/* User Profile Section */}
-            {user && (
-              <Link 
-                href="/profile"
-                className="flex items-center gap-3 px-2 py-2 rounded-lg bg-sidebar-accent/30 hover:bg-sidebar-accent/50 transition-all duration-200 group/user cursor-pointer"
-                style={{ textDecoration: 'none', color: 'inherit' }}
-              >
-                {/* User Avatar with Role Icon */}
-                <div className="relative shrink-0">
-                  <div className="relative h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent group-hover/user:ring-primary transition-all duration-200 overflow-hidden">
-                    <User className="h-4 w-4 text-primary" />
-                  </div>
-                  {/* Role Icon Badge */}
-                  {userRole && (
-                    <div className={cn(
-                      "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background transition-all duration-200",
-                      userRole === "SUPER_ADMIN" && "bg-amber-500 dark:bg-amber-600",
-                      userRole === "ADMIN" && "bg-purple-500 dark:bg-purple-600",
-                      userRole === "OPERATOR" && "bg-blue-500 dark:bg-blue-600",
-                      userRole === "VIEWER" && "bg-gray-500 dark:bg-gray-600"
-                    )}>
-                      {userRole === "SUPER_ADMIN" && <Crown className="h-2.5 w-2.5 text-white" />}
-                      {userRole === "ADMIN" && <UserRoundCog className="h-2.5 w-2.5 text-white" />}
-                      {userRole === "OPERATOR" && <UserCheck className="h-2.5 w-2.5 text-white" />}
-                      {userRole === "VIEWER" && <Eye className="h-2.5 w-2.5 text-white" />}
-                    </div>
-                  )}
-                </div>
-                
-                {/* User Info */}
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold text-foreground truncate">
-                      {auth0User?.name || "Korisnik"}
-                    </p>
-                    {userRole && (
-                      <Badge 
-                        variant="outline"
-                        className={cn(
-                          "h-4 px-1.5 text-xs shrink-0 flex items-center gap-1",
-                          userRole === "SUPER_ADMIN" && "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
-                          userRole === "ADMIN" && "bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20",
-                          userRole === "OPERATOR" && "bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/20",
-                          userRole === "VIEWER" && "bg-gray-500/10 text-gray-700 dark:text-gray-400 border-gray-500/20"
-                        )}
-                      >
-                        <div className="relative h-3 w-3 shrink-0 flex items-center justify-center">
-                          {userRole === "SUPER_ADMIN" && <Crown className="h-3 w-3" />}
-                          {userRole === "ADMIN" && <UserRoundCog className="h-3 w-3" />}
-                          {userRole === "OPERATOR" && <UserCheck className="h-3 w-3" />}
-                          {userRole === "VIEWER" && <Eye className="h-3 w-3" />}
-                        </div>
-                        <span>{userRole}</span>
-                      </Badge>
+      <SidebarFooter className="border-t px-2 py-2">
+        {user && (
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className={cn(
+                      "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
+                      isCollapsed && "size-10"
                     )}
-                  </div>
-                  {auth0User?.email && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <Mail className="h-3 w-3 text-muted-foreground shrink-0" />
-                      <p className="text-xs text-muted-foreground truncate">
-                        {auth0User.email}
-                      </p>
+                  >
+                    {/* User Avatar */}
+                    <div className="relative shrink-0">
+                      <div className={cn(
+                        "rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent transition-all",
+                        isCollapsed ? "h-8 w-8" : "h-8 w-8"
+                      )}>
+                        <User className={cn(
+                          "text-primary",
+                          isCollapsed ? "h-4 w-4" : "h-4 w-4"
+                        )} />
+                      </div>
+                      {/* Role Icon Badge */}
+                      {userRole && !isCollapsed && (
+                        <div className={cn(
+                          "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background",
+                          userRole === "SUPER_ADMIN" && "bg-amber-500 dark:bg-amber-600",
+                          userRole === "ADMIN" && "bg-purple-500 dark:bg-purple-600",
+                          userRole === "OPERATOR" && "bg-blue-500 dark:bg-blue-600",
+                          userRole === "VIEWER" && "bg-gray-500 dark:bg-gray-600"
+                        )}>
+                          {userRole === "SUPER_ADMIN" && <Crown className="h-2.5 w-2.5 text-white" />}
+                          {userRole === "ADMIN" && <UserRoundCog className="h-2.5 w-2.5 text-white" />}
+                          {userRole === "OPERATOR" && <UserCheck className="h-2.5 w-2.5 text-white" />}
+                          {userRole === "VIEWER" && <Eye className="h-2.5 w-2.5 text-white" />}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </Link>
-            )}
-
-            {/* Language, Theme Toggle and Logout - Horizontal */}
-            <div className="flex items-center justify-between gap-1">
-              <LanguageSwitcher currentLocale={currentLocale} collapsed={false} />
-              <div className="flex items-center gap-1">
-                <ThemeToggle />
-                <a
-                  href="/auth/logout"
-                  className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-md text-sm font-medium hover:bg-destructive/10 hover:text-destructive transition-colors"
+                    {!isCollapsed && (
+                      <>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                          <span className="truncate font-semibold">{auth0User?.name || "Korisnik"}</span>
+                          {auth0User?.email && (
+                            <span className="truncate text-xs text-muted-foreground">{auth0User.email}</span>
+                          )}
+                        </div>
+                        <ChevronUp className="ml-auto size-4" />
+                      </>
+                    )}
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                  side={isCollapsed ? "right" : "top"}
+                  align={isCollapsed ? "start" : "end"}
+                  sideOffset={4}
                 >
-                  <LogOut className="h-4 w-4" />
-                  <span>{t('nav.logout')}</span>
-                </a>
-              </div>
-            </div>
-          </div>
+                  {/* Profile Link */}
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>{t('nav.profile')}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* Language Switcher in Dropdown */}
+                  {locales.map((locale) => (
+                    <DropdownMenuItem
+                      key={locale}
+                      onClick={() => {
+                        document.cookie = `locale=${locale};path=/;max-age=${60 * 60 * 24 * 365}`;
+                        startTransition(() => {
+                          router.refresh();
+                        });
+                      }}
+                      className="cursor-pointer"
+                    >
+                      <Globe className="mr-2 h-4 w-4" />
+                      <span className="text-base mr-2">{localeFlags[locale]}</span>
+                      <span>{localeNames[locale]}</span>
+                      {currentLocale === locale && <Check className="ml-auto h-4 w-4" />}
+                    </DropdownMenuItem>
+                  ))}
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* Theme Toggle in Dropdown */}
+                  <DropdownMenuItem
+                    onClick={() => {
+                      const newTheme = theme === "light" ? "dark" : "light";
+                      setTheme(newTheme);
+                      localStorage.setItem("theme", newTheme);
+                      if (newTheme === "dark") {
+                        document.documentElement.classList.add("dark");
+                      } else {
+                        document.documentElement.classList.remove("dark");
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {theme === "light" ? (
+                      <Moon className="mr-2 h-4 w-4" />
+                    ) : (
+                      <Sun className="mr-2 h-4 w-4" />
+                    )}
+                    <span>{t('common.theme')}</span>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* Logout */}
+                  <DropdownMenuItem asChild>
+                    <a href="/auth/logout" className="cursor-pointer text-destructive focus:text-destructive">
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>{t('nav.logout')}</span>
+                    </a>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
         )}
       </SidebarFooter>
     </Sidebar>
