@@ -97,7 +97,10 @@
     "noClaims": "No claims found",
     "status": {
       "NEW": "New",
+      "IN_ANALYSIS": "In Analysis",
       "IN_PROGRESS": "In Progress",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
       "WAITING_FOR_PARTS": "Waiting for Parts",
       "WAITING_FOR_CUSTOMER": "Waiting for Customer",
       "RESOLVED": "Resolved",

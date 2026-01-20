@@ -97,7 +97,10 @@
     "noClaims": "Nema reklamacija",
     "status": {
       "NEW": "Nova",
+      "IN_ANALYSIS": "U Obradi",
       "IN_PROGRESS": "U toku",
+      "APPROVED": "Prihvaćeno",
+      "REJECTED": "Odbijeno",
       "WAITING_FOR_PARTS": "Čeka delove",
       "WAITING_FOR_CUSTOMER": "Čeka kupca",
       "RESOLVED": "Rešena",
