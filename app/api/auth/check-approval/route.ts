@@ -34,7 +34,18 @@ export async function GET(request: NextRequest) {
     });
 
     // If user doesn't exist, create them (new signup)
+    // IMPORTANT: User is created ONLY when there's a valid Auth0 session (real login)
+    // This prevents accidental creation from Customer data or other sources
     if (!user) {
+      // Double-check that we have a valid Auth0 session with user data
+      if (!session.user || !session.user.email || session.user.email !== email) {
+        console.error(`[Check Approval] Invalid session data - email mismatch or missing user data`);
+        return NextResponse.json(
+          { approved: false, reason: "invalid_session" },
+          { status: 401 }
+        );
+      }
+
       user = await prisma.user.create({
         data: {
           email,
@@ -53,7 +64,7 @@ export async function GET(request: NextRequest) {
         },
       });
       
-      console.log(`[Check Approval] Created new user: ${email}`);
+      console.log(`[Check Approval] Created new user from Auth0 login: ${email}`);
     }
 
     // Check if user is approved
