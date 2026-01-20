@@ -32,25 +32,11 @@ export async function GET(request: NextRequest) {
     const where: any = {};
 
     // Status filter
+    // Unified status filter - all statuses use the main status field
     if (status.length > 0) {
-      const statusFilters = status.filter(s => !["ACCEPTED", "REJECTED"].includes(s));
-      const acceptanceFilters = status.filter(s => ["ACCEPTED", "REJECTED"].includes(s));
-      
-      const orConditions: any[] = [];
-      
-      if (statusFilters.length > 0) {
-        orConditions.push({ status: { in: statusFilters } });
-      }
-      
-      if (acceptanceFilters.length > 0) {
-        acceptanceFilters.forEach(af => {
-          orConditions.push({ claimAcceptanceStatus: af });
-        });
-      }
-      
-      if (orConditions.length > 0) {
-        where.OR = orConditions;
-      }
+      // Map ACCEPTED to APPROVED for backwards compatibility
+      const mappedStatuses = status.map(s => s === "ACCEPTED" ? "APPROVED" : s);
+      where.status = { in: mappedStatuses };
     }
 
     // Customer filters (combine name and company if both provided)

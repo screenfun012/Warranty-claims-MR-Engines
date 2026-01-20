@@ -68,10 +68,10 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     subject: `Re: ${claim.emailThreads?.[0]?.subjectOriginal || "Claim"}`,
     text: "",
   });
-  const [claimAcceptanceStatus, setClaimAcceptanceStatus] = useState<string>(
-    claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED" 
-      ? claim.claimAcceptanceStatus 
-      : ""
+  // Use main status for acceptance (APPROVED/REJECTED)
+  const [acceptanceStatus, setAcceptanceStatus] = useState<string>(
+    claim.status === "APPROVED" ? "ACCEPTED" : 
+    claim.status === "REJECTED" ? "REJECTED" : ""
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
@@ -81,38 +81,42 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
   const prevStatusRef = useRef<string | null>(null);
   useEffect(() => {
     if (prevClaimIdRef.current !== claim.id) {
-      const newStatus = claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED" 
-        ? claim.claimAcceptanceStatus 
-        : "";
-      setClaimAcceptanceStatus(newStatus);
+      // Map status to acceptance display: APPROVED -> ACCEPTED, REJECTED -> REJECTED
+      const newStatus = claim.status === "APPROVED" ? "ACCEPTED" : 
+                        claim.status === "REJECTED" ? "REJECTED" : "";
+      setAcceptanceStatus(newStatus);
       prevClaimIdRef.current = claim.id;
-      prevStatusRef.current = claim.claimAcceptanceStatus;
+      prevStatusRef.current = claim.status;
       
       // Update "To" field with original sender when claim changes
       const newOriginalSender = getOriginalSenderEmail(claim);
       setReplyForm(prev => ({ ...prev, to: newOriginalSender }));
-    } else if (claim.claimAcceptanceStatus && 
-               claim.claimAcceptanceStatus !== prevStatusRef.current &&
-               (claim.claimAcceptanceStatus === "ACCEPTED" || claim.claimAcceptanceStatus === "REJECTED")) {
+    } else if (claim.status !== prevStatusRef.current &&
+               (claim.status === "APPROVED" || claim.status === "REJECTED")) {
       // Only sync if status actually changed
-      setClaimAcceptanceStatus(claim.claimAcceptanceStatus);
-      prevStatusRef.current = claim.claimAcceptanceStatus;
+      const newStatus = claim.status === "APPROVED" ? "ACCEPTED" : "REJECTED";
+      setAcceptanceStatus(newStatus);
+      prevStatusRef.current = claim.status;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [claim.id, claim.claimAcceptanceStatus, claim.emailThreads, claim.customer]);
+  }, [claim.id, claim.status, claim.emailThreads, claim.customer]);
 
-  // When acceptance status is selected, update claimAcceptanceStatus but keep status as is
+  // When acceptance status is selected, update main status (APPROVED/REJECTED)
   const handleAcceptanceStatusChange = async (value: string) => {
-    // If clicking the same checkbox that's already selected, deselect it
-    const newValue = claimAcceptanceStatus === value ? null : value;
+    // If clicking the same checkbox that's already selected, deselect it (revert to IN_ANALYSIS)
+    const isDeselecting = acceptanceStatus === value;
+    const newAcceptanceValue = isDeselecting ? "" : value;
     
+    // Map ACCEPTED/REJECTED to status values
+    const newStatus = isDeselecting ? "IN_ANALYSIS" : 
+                      value === "ACCEPTED" ? "APPROVED" : "REJECTED";
     
     // Update local state immediately
-    setClaimAcceptanceStatus(newValue || "");
+    setAcceptanceStatus(newAcceptanceValue);
     
     // Update parent immediately so header shows the change right away
     if (onUpdate) {
-      onUpdate({ ...claim, claimAcceptanceStatus: newValue });
+      onUpdate({ ...claim, status: newStatus });
     }
     
     try {
@@ -120,7 +124,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          claimAcceptanceStatus: newValue,
+          status: newStatus,
         }),
       });
       
@@ -128,10 +132,11 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         const errorText = await res.text();
         console.error('[ClaimEmails] API error:', errorText);
         // Revert on error
-        const revertedStatus = claim.claimAcceptanceStatus || "";
-        setClaimAcceptanceStatus(revertedStatus);
+        const revertedStatus = claim.status === "APPROVED" ? "ACCEPTED" : 
+                               claim.status === "REJECTED" ? "REJECTED" : "";
+        setAcceptanceStatus(revertedStatus);
         if (onUpdate) {
-          onUpdate({ ...claim, claimAcceptanceStatus: claim.claimAcceptanceStatus });
+          onUpdate({ ...claim, status: claim.status });
         }
         alert(`Failed to update: ${errorText}`);
         return;
@@ -139,17 +144,9 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       
       const data = await res.json();
       if (data.claim && onUpdate) {
-        // Only update parent if API returned a valid claimAcceptanceStatus
-        // If API returns undefined, keep the optimistic update we already did
-        if (data.claim.claimAcceptanceStatus !== undefined) {
-          onUpdate(data.claim);
-          // Dispatch event to refresh claims list
-          window.dispatchEvent(new Event('claim-updated'));
-        } else {
-          // Don't update parent - keep the optimistic update we already did
-          // But still dispatch event to refresh claims list
-          window.dispatchEvent(new Event('claim-updated'));
-        }
+        onUpdate(data.claim);
+        // Dispatch event to refresh claims list
+        window.dispatchEvent(new Event('claim-updated'));
       } else {
         // Even if claim is not returned, dispatch event to refresh claims list
         window.dispatchEvent(new Event('claim-updated'));
@@ -157,10 +154,11 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     } catch (error) {
       console.error("Error updating acceptance status:", error);
       // Revert on error
-      const revertedStatus = claim.claimAcceptanceStatus || "";
-      setClaimAcceptanceStatus(revertedStatus);
+      const revertedStatus = claim.status === "APPROVED" ? "ACCEPTED" : 
+                             claim.status === "REJECTED" ? "REJECTED" : "";
+      setAcceptanceStatus(revertedStatus);
       if (onUpdate) {
-        onUpdate({ ...claim, claimAcceptanceStatus: claim.claimAcceptanceStatus });
+        onUpdate({ ...claim, status: claim.status });
       }
       alert("Failed to update acceptance status");
     }
@@ -221,7 +219,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     setSending(true);
     try {
       // Only send email if acceptance status is set
-      if (!claimAcceptanceStatus || (claimAcceptanceStatus !== "ACCEPTED" && claimAcceptanceStatus !== "REJECTED")) {
+      if (!acceptanceStatus || (acceptanceStatus !== "ACCEPTED" && acceptanceStatus !== "REJECTED")) {
         alert("Please select Claim Acceptance Status (Accepted or Rejected) before sending email");
         setSending(false);
         return;
@@ -229,11 +227,11 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
 
       // Build email body with acceptance message
       let emailBody = replyForm.text;
-      if (claimAcceptanceStatus === "ACCEPTED") {
+      if (acceptanceStatus === "ACCEPTED") {
         emailBody = emailBody 
           ? `${emailBody}\n\nYour warranty claim has been processed and We accept your claim.`
           : `Your warranty claim has been processed and We accept your claim.`;
-      } else if (claimAcceptanceStatus === "REJECTED") {
+      } else if (acceptanceStatus === "REJECTED") {
         emailBody = emailBody 
           ? `${emailBody}\n\nYour warranty claim has been processed and We reject your claim.`
           : `Your warranty claim has been processed and We reject your claim.`;
@@ -250,7 +248,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           ...replyForm,
           text: emailBody,
           attachmentIds,
-          claimAcceptanceStatus, // Send acceptance status so API can update claim
+          acceptanceStatus, // Send acceptance status for email template
         }),
       });
       const data = await res.json();
@@ -541,18 +539,18 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                 onClick={() => handleAcceptanceStatusChange("ACCEPTED")}
                 className={cn(
                   "relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
-                  claimAcceptanceStatus === "ACCEPTED"
+                  acceptanceStatus === "ACCEPTED"
                     ? "border-green-500 bg-green-500 dark:border-green-400 dark:bg-green-400"
                     : "border-muted-foreground/40 hover:border-green-500/50 dark:border-muted-foreground/60 dark:hover:border-green-400/50"
                 )}
                 aria-label="Prihvaćeno"
               >
-                {claimAcceptanceStatus === "ACCEPTED" && (
+                {acceptanceStatus === "ACCEPTED" && (
                   <div className="h-2.5 w-2.5 rounded-full bg-white dark:bg-gray-900" />
                 )}
               </button>
               <Label htmlFor="accepted" className="cursor-pointer font-medium text-sm text-foreground">
-                Prihvaćeno
+                Završeno (Prihvaćeno)
               </Label>
             </div>
             <div className="flex items-center gap-3">
@@ -561,18 +559,18 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                 onClick={() => handleAcceptanceStatusChange("REJECTED")}
                 className={cn(
                   "relative flex h-5 w-5 items-center justify-center rounded-full border-2 transition-all",
-                  claimAcceptanceStatus === "REJECTED"
+                  acceptanceStatus === "REJECTED"
                     ? "border-red-500 bg-red-500 dark:border-red-400 dark:bg-red-400"
                     : "border-muted-foreground/40 hover:border-red-500/50 dark:border-muted-foreground/60 dark:hover:border-red-400/50"
                 )}
                 aria-label="Odbijeno"
               >
-                {claimAcceptanceStatus === "REJECTED" && (
+                {acceptanceStatus === "REJECTED" && (
                   <div className="h-2.5 w-2.5 rounded-full bg-white dark:bg-gray-900" />
                 )}
               </button>
               <Label htmlFor="rejected" className="cursor-pointer font-medium text-sm text-foreground">
-                Odbijeno
+                Završeno (Odbijeno)
               </Label>
             </div>
           </div>

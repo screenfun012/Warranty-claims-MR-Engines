@@ -50,7 +50,6 @@ interface Claim {
   claimNumber: number | null;
   claimYear: number | null;
   status: string;
-  claimAcceptanceStatus: string | null;
   processingEmailSentAt: string | null;
   isLocked: boolean | null;
   customer: {
@@ -82,15 +81,14 @@ interface Claim {
 }
 
 // Status badge component with icons - styled like the table
-// Text is neutral gray, icons are colored and animated
-const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceStatus?: string | null }) => {
+// Text is neutral gray, icons are colored and animated - unified status system
+const StatusBadge = ({ status }: { status: string }) => {
   const getIcon = () => {
     switch (status) {
       case "NEW":
         return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400 animate-pulse" />;
       case "IN_ANALYSIS":
         return <StatusSpinner color="amber" />;
-      case "CLOSED":
       case "APPROVED":
         return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 dark:text-green-400 fill-green-500 dark:fill-green-400" />;
       case "REJECTED":
@@ -100,22 +98,12 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
     }
   };
 
-  const getAcceptanceIcon = () => {
-    if (acceptanceStatus === "ACCEPTED") {
-      return <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />;
-    } else if (acceptanceStatus === "REJECTED") {
-      return <XCircle className="h-3 w-3 text-red-600 dark:text-red-400 fill-red-600 dark:fill-red-400" />;
-    }
-    return null;
-  };
-
   const getStatusColor = () => {
     switch (status) {
       case "NEW":
         return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20";
       case "IN_ANALYSIS":
         return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
-      case "CLOSED":
       case "APPROVED":
         return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20";
       case "REJECTED":
@@ -126,38 +114,23 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Badge 
-        variant="outline" 
-        className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
-      >
-        {getIcon()}
-        <span className="text-sm font-medium">
-          {statusLabels[status] || status}
-        </span>
-      </Badge>
-      {acceptanceStatus && (acceptanceStatus === "ACCEPTED" || acceptanceStatus === "REJECTED") && (
-        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all ${
-          acceptanceStatus === "ACCEPTED" 
-            ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-            : "bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
-        }`}>
-          {getAcceptanceIcon()}
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-            {acceptanceStatus === "ACCEPTED" ? "Prihvaćeno" : "Odbijeno"}
-          </span>
-        </div>
-      )}
-    </div>
+    <Badge 
+      variant="outline" 
+      className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
+    >
+      {getIcon()}
+      <span className="text-sm font-medium">
+        {statusLabels[status] || status}
+      </span>
+    </Badge>
   );
 };
 
 const statusLabels: Record<string, string> = {
-  NEW: "NOVO",
-  IN_ANALYSIS: "U OBRADI",
-  APPROVED: "ODOBRENO",
-  REJECTED: "ODBIJENO",
-  CLOSED: "ZATVORENO",
+  NEW: "Novo",
+  IN_ANALYSIS: "U Obradi",
+  APPROVED: "Završeno (Prihvaćeno)",
+  REJECTED: "Završeno (Odbijeno)",
 };
 
 // Fetch function for React Query
@@ -268,9 +241,8 @@ export default function ClaimDetailPage() {
         queryClient.setQueryData(['claim', claimId], { ...claim, ...updateData });
       }
       
-      // Skip API call for claimAcceptanceStatus as it's handled by ClaimEmails component
-      if (!('claimAcceptanceStatus' in updateData)) {
-        try {
+      // Make API call for all updates
+      try {
           const res = await fetch(`/api/claims/${claimId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -288,12 +260,7 @@ export default function ClaimDetailPage() {
 
           const data = await res.json();
           if (data.claim) {
-            // Preserve claimAcceptanceStatus from current claim when updating
-            const preservedClaim = {
-              ...data.claim,
-              claimAcceptanceStatus: claim?.claimAcceptanceStatus ?? data.claim.claimAcceptanceStatus,
-            };
-            queryClient.setQueryData(['claim', claimId], preservedClaim);
+            queryClient.setQueryData(['claim', claimId], data.claim);
           }
         } catch (error) {
           console.error("Error saving claim update:", error);
@@ -302,7 +269,6 @@ export default function ClaimDetailPage() {
             queryClient.setQueryData(['claim', claimId], previousClaim);
           }
         }
-      }
     } catch (error) {
       console.error("Error updating claim:", error);
     }
@@ -353,7 +319,7 @@ export default function ClaimDetailPage() {
             <h1 className="text-xl font-bold truncate">
               {claim.claimCodeRaw || "Unassigned Claim"}
             </h1>
-            <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />
+            <StatusBadge status={claim.status} />
           </div>
           {claim.customer?.name && (
             <p className="text-sm text-muted-foreground truncate">{claim.customer.name}</p>

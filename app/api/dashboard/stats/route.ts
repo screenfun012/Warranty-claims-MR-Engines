@@ -80,48 +80,28 @@ export async function GET() {
       console.error("Error calculating resolved count:", error);
     }
 
-    // Get approved claims - based on claimAcceptanceStatus = "ACCEPTED"
-    // Use raw SQL to ensure we get the latest values (Prisma might cache after raw SQL updates)
+    // Get approved claims - based on status = 'APPROVED' (unified status system)
     let approvedCount = 0;
     try {
-      const approvedResult = await prisma.$queryRawUnsafe<Array<{ count: bigint | number }>>(
-        `SELECT COUNT(*) as count FROM Claim WHERE claimAcceptanceStatus = 'ACCEPTED'`
-      );
-      approvedCount = Number(approvedResult[0]?.count || 0);
+      approvedCount = await prisma.claim.count({
+        where: {
+          status: "APPROVED",
+        },
+      });
     } catch (error) {
       console.warn("Error counting approved claims:", error);
-      // Fallback to Prisma
-      try {
-        approvedCount = await prisma.claim.count({
-          where: {
-            claimAcceptanceStatus: "ACCEPTED",
-          },
-        });
-      } catch (fallbackError) {
-        console.warn("Fallback also failed:", fallbackError);
-      }
     }
 
-    // Get rejected claims - based on claimAcceptanceStatus = "REJECTED"
-    // Use raw SQL to ensure we get the latest values
+    // Get rejected claims - based on status = 'REJECTED' (unified status system)
     let rejectedCount = 0;
     try {
-      const rejectedResult = await prisma.$queryRawUnsafe<Array<{ count: bigint | number }>>(
-        `SELECT COUNT(*) as count FROM Claim WHERE claimAcceptanceStatus = 'REJECTED'`
-      );
-      rejectedCount = Number(rejectedResult[0]?.count || 0);
+      rejectedCount = await prisma.claim.count({
+        where: {
+          status: "REJECTED",
+        },
+      });
     } catch (error) {
       console.warn("Error counting rejected claims:", error);
-      // Fallback to Prisma
-      try {
-        rejectedCount = await prisma.claim.count({
-          where: {
-            claimAcceptanceStatus: "REJECTED",
-          },
-        });
-      } catch (fallbackError) {
-        console.warn("Fallback also failed:", fallbackError);
-      }
     }
 
     // Get in process claims (NEW, IN_ANALYSIS) - exclude CLOSED
@@ -229,32 +209,15 @@ export async function GET() {
       console.error("Error mapping claims by customer:", error);
     }
 
-    // Get claims by acceptance status
+    // Get claims by final status (APPROVED/REJECTED) - unified status system
     let claimsByAcceptanceStatus: Array<{ acceptanceStatus: string; count: number }> = [];
     try {
-      const acceptanceStatusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null; count: bigint | number }>>(
-        `SELECT claimAcceptanceStatus, COUNT(*) as count FROM Claim WHERE claimAcceptanceStatus IS NOT NULL GROUP BY claimAcceptanceStatus`
-      );
-      claimsByAcceptanceStatus = acceptanceStatusResult.map((item) => ({
-        acceptanceStatus: item.claimAcceptanceStatus || "UNKNOWN",
-        count: Number(item.count || 0),
-      }));
+      claimsByAcceptanceStatus = [
+        { acceptanceStatus: "APPROVED", count: approvedCount },
+        { acceptanceStatus: "REJECTED", count: rejectedCount },
+      ].filter(item => item.count > 0);
     } catch (error) {
-      console.warn("Error fetching claims by acceptance status:", error);
-      // Fallback: count manually
-      const allClaims = await prisma.claim.findMany({
-        select: { claimAcceptanceStatus: true },
-      });
-      const acceptanceMap = new Map<string | null, number>();
-      allClaims.forEach((claim) => {
-        if (claim.claimAcceptanceStatus) {
-          acceptanceMap.set(claim.claimAcceptanceStatus, (acceptanceMap.get(claim.claimAcceptanceStatus) || 0) + 1);
-        }
-      });
-      claimsByAcceptanceStatus = Array.from(acceptanceMap.entries()).map(([acceptanceStatus, count]) => ({
-        acceptanceStatus: acceptanceStatus || "UNKNOWN",
-        count,
-      }));
+      console.warn("Error building claims by acceptance status:", error);
     }
 
     // Get recent claims (last 10)
@@ -354,7 +317,7 @@ export async function GET() {
       console.error("Error fetching urgent claims:", error);
     }
 
-    // Get claims by month for trend chart (last 12 months)
+    // Get claims by month for trend chart (last 12 months) - unified status system
     let claimsByMonth: Array<{
       month: string;
       accepted: number;
@@ -365,18 +328,18 @@ export async function GET() {
       const twelveMonthsAgo = new Date();
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
       
-      // Get all claims from last 12 months with acceptance status
+      // Get all claims from last 12 months with APPROVED/REJECTED status
       const claims = await prisma.claim.findMany({
         where: {
           createdAt: {
             gte: twelveMonthsAgo,
           },
-          claimAcceptanceStatus: {
-            in: ["ACCEPTED", "REJECTED"],
+          status: {
+            in: ["APPROVED", "REJECTED"],
           },
         },
         select: {
-          claimAcceptanceStatus: true,
+          status: true,
           createdAt: true,
         },
       });
@@ -394,15 +357,15 @@ export async function GET() {
         monthMap.set(monthKey, { accepted: 0, rejected: 0, label: monthLabel });
       }
 
-      // Count claims by month
+      // Count claims by month using unified status
       claims.forEach((claim) => {
         const date = new Date(claim.createdAt);
         const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
         const monthData = monthMap.get(monthKey);
         if (monthData) {
-          if (claim.claimAcceptanceStatus === "ACCEPTED") {
+          if (claim.status === "APPROVED") {
             monthData.accepted++;
-          } else if (claim.claimAcceptanceStatus === "REJECTED") {
+          } else if (claim.status === "REJECTED") {
             monthData.rejected++;
           }
         }

@@ -26,7 +26,6 @@ interface Claim {
   claimCodeRaw: string | null;
   customerNumber: string | null;
   status: string;
-  claimAcceptanceStatus: string | null;
   createdAt: string;
   customer: {
     id: string;

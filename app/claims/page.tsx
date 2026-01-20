@@ -35,7 +35,6 @@ interface Claim {
   claimCodeRaw: string | null;
   claimPrefix: string | null;
   status: string;
-  claimAcceptanceStatus: string | null;
   isLocked: boolean | null;
   customer: {
     id: string;
@@ -54,16 +53,15 @@ interface Claim {
   createdAt: string;
 }
 
-// Status badge component with icons - styled like the image
+// Status badge component with icons - unified status system
 // Text is neutral gray, icons are colored and animated
-const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceStatus?: string | null }) => {
+const StatusBadge = ({ status }: { status: string }) => {
   const getIcon = () => {
     switch (status) {
       case "NEW":
         return <Circle className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 fill-blue-500 dark:fill-blue-400 animate-pulse" />;
       case "IN_ANALYSIS":
         return <StatusSpinner color="amber" />;
-      case "CLOSED":
       case "APPROVED":
         return <CheckCircle2 className="h-3.5 w-3.5 text-green-500 dark:text-green-400 fill-green-500 dark:fill-green-400" />;
       case "REJECTED":
@@ -73,22 +71,12 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
     }
   };
 
-  const getAcceptanceIcon = () => {
-    if (acceptanceStatus === "ACCEPTED") {
-      return <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 fill-green-600 dark:fill-green-400" />;
-    } else if (acceptanceStatus === "REJECTED") {
-      return <XCircle className="h-3 w-3 text-red-600 dark:text-red-400 fill-red-600 dark:fill-red-400" />;
-    }
-    return null;
-  };
-
   const getStatusColor = () => {
     switch (status) {
       case "NEW":
         return "border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20";
       case "IN_ANALYSIS":
         return "border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20";
-      case "CLOSED":
       case "APPROVED":
         return "border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20";
       case "REJECTED":
@@ -99,29 +87,15 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
   };
 
   return (
-    <div className="flex items-center gap-2">
-      <Badge 
-        variant="outline" 
-        className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
-      >
-        {getIcon()}
-        <span className="text-sm font-medium">
-          {statusLabels[status] || status}
-        </span>
-      </Badge>
-      {acceptanceStatus && (acceptanceStatus === "ACCEPTED" || acceptanceStatus === "REJECTED") && (
-        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-md border transition-all ${
-          acceptanceStatus === "ACCEPTED" 
-            ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800"
-            : "bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-800"
-        }`}>
-          {getAcceptanceIcon()}
-          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-            {acceptanceStatus === "ACCEPTED" ? "Prihvaćeno" : "Odbijeno"}
-          </span>
-        </div>
-      )}
-    </div>
+    <Badge 
+      variant="outline" 
+      className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
+    >
+      {getIcon()}
+      <span className="text-sm font-medium">
+        {statusLabels[status] || status}
+      </span>
+    </Badge>
   );
 };
 
@@ -331,17 +305,15 @@ export default function ClaimsPage() {
       });
     }
     
-    // Apply status filter (multi-select) - real-time filtering
+    // Apply status filter (multi-select) - real-time filtering using unified status
     if (filters.status.length > 0) {
       filtered = filtered.filter(claim => {
         return filters.status.some(selectedStatus => {
-          // For NEW and IN_ANALYSIS, check status field
+          // All statuses use the main status field now
           if (selectedStatus === "NEW" && claim.status === "NEW") return true;
           if (selectedStatus === "IN_ANALYSIS" && claim.status === "IN_ANALYSIS") return true;
-          
-          // For ACCEPTED and REJECTED, check claimAcceptanceStatus
-          if (selectedStatus === "ACCEPTED" && claim.claimAcceptanceStatus === "ACCEPTED") return true;
-          if (selectedStatus === "REJECTED" && claim.claimAcceptanceStatus === "REJECTED") return true;
+          if (selectedStatus === "APPROVED" && claim.status === "APPROVED") return true;
+          if (selectedStatus === "REJECTED" && claim.status === "REJECTED") return true;
           
           return false;
         });
@@ -522,7 +494,7 @@ export default function ClaimsPage() {
               >
                 {status === "NEW" ? "Novo" : 
                  status === "IN_ANALYSIS" ? "U obradi" :
-                 status === "ACCEPTED" ? "Završeno (Prihvaćeno)" :
+                 status === "APPROVED" ? "Završeno (Prihvaćeno)" :
                  status === "REJECTED" ? "Završeno (Odbijeno)" : status}
                 <button
                   onClick={() => {
@@ -597,7 +569,7 @@ export default function ClaimsPage() {
                     : filters.status.length === 1 
                       ? (filters.status[0] === "NEW" ? "Novo" : 
                          filters.status[0] === "IN_ANALYSIS" ? "U obradi" :
-                         filters.status[0] === "ACCEPTED" ? "Završeno (Prihvaćeno)" :
+                         filters.status[0] === "APPROVED" ? "Završeno (Prihvaćeno)" :
                          filters.status[0] === "REJECTED" ? "Završeno (Odbijeno)" : filters.status[0])
                       : `${filters.status.length} izabrano`}
                 </span>
@@ -608,8 +580,8 @@ export default function ClaimsPage() {
                   <div className="p-2 space-y-1">
                     {[
                       { value: "NEW", label: "Novo" },
-                      { value: "IN_ANALYSIS", label: "U obradi" },
-                      { value: "ACCEPTED", label: "Završeno (Prihvaćeno)" },
+                      { value: "IN_ANALYSIS", label: "U Obradi" },
+                      { value: "APPROVED", label: "Završeno (Prihvaćeno)" },
                       { value: "REJECTED", label: "Završeno (Odbijeno)" },
                     ].map((option) => {
                       const isSelected = filters.status.includes(option.value);
@@ -803,7 +775,7 @@ export default function ClaimsPage() {
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
               </span>
             ),
-            status: <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />,
+            status: <StatusBadge status={claim.status} />,
             customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.company || "-"}</span>,
             engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
             assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,
