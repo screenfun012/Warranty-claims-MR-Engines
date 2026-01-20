@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { createClaimFolder } from "@/lib/files/fileStorage";
 
 export async function GET(request: NextRequest) {
   try {
@@ -249,6 +250,22 @@ export async function POST(request: NextRequest) {
       select: { id: true, status: true },
     });
     console.log(`[create-claim] Verification query result:`, verifyClaim ? `Found claim ${verifyClaim.id}` : "Claim NOT found in database!");
+
+    // Create folder structure on Synology/NAS
+    try {
+      const folderPath = await createClaimFolder(claim);
+      if (folderPath) {
+        console.log(`[create-claim] Created Synology folder: ${folderPath}`);
+        // Update claim with server folder path
+        await prisma.claim.update({
+          where: { id: claim.id },
+          data: { serverFolderPath: folderPath },
+        });
+      }
+    } catch (folderError) {
+      console.error(`[create-claim] Error creating Synology folder:`, folderError);
+      // Don't fail the claim creation if folder creation fails
+    }
 
     // Link email thread to claim if provided and process attachments
     let photosCreated = 0;

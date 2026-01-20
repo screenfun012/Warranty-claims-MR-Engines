@@ -154,6 +154,64 @@ function getWebDAVPath(relativePath: string): string {
 }
 
 /**
+ * Create the folder structure for a claim on Synology/NAS
+ * Called when a new claim is created
+ */
+export async function createClaimFolder(claim: Claim & { customer?: { name: string | null; company?: string | null } | null }): Promise<string | null> {
+  const baseKey = await getClaimBaseKey(claim);
+  
+  console.log(`[createClaimFolder] Creating folder structure for claim ${claim.id}: ${baseKey}`);
+  
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      // Create base folder
+      await ensureDir(baseKey);
+      
+      // Create standard subfolders
+      const subfolders = [
+        '01_photos',
+        '02_documents', 
+        '03_attachments',
+        '04_reports'
+      ];
+      
+      for (const subfolder of subfolders) {
+        await ensureDir(`${baseKey}/${subfolder}`);
+      }
+      
+      console.log(`[createClaimFolder] Successfully created WebDAV folder structure: ${baseKey}`);
+      return baseKey;
+    } catch (error) {
+      console.error(`[createClaimFolder] Error creating WebDAV folder:`, error);
+      return null;
+    }
+  } else if (!USE_BLOB) {
+    // Local filesystem
+    try {
+      const rootPath = path.resolve(env.FILE_ROOT_PATH);
+      const basePath = path.join(rootPath, baseKey);
+      
+      await ensureDir(baseKey);
+      
+      const subfolders = ['01_photos', '02_documents', '03_attachments', '04_reports'];
+      for (const subfolder of subfolders) {
+        await ensureDir(`${baseKey}/${subfolder}`);
+      }
+      
+      console.log(`[createClaimFolder] Successfully created local folder structure: ${basePath}`);
+      return basePath;
+    } catch (error) {
+      console.error(`[createClaimFolder] Error creating local folder:`, error);
+      return null;
+    }
+  }
+  
+  // Blob storage doesn't need folder pre-creation
+  console.log(`[createClaimFolder] Using Blob storage, no folder creation needed`);
+  return null;
+}
+
+/**
  * Save an attachment file for a claim
  * @param params - Attachment parameters
  * @returns Blob URL (if using Blob) or relative file path (if using filesystem)
