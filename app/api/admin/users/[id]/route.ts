@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { ROLES } from "@/lib/auth/roles";
-import { getUserByEmail, getUserRoles, assignRoleToUser, removeRoleFromUser } from "@/lib/auth0-management";
+import { getUserByEmail, getUserRoles, assignRoleToUser, removeRoleFromUser, clearRoleCache } from "@/lib/auth0-management";
 
 export async function PATCH(
   request: NextRequest,
@@ -62,6 +62,9 @@ export async function PATCH(
         // assignRoleToUser već uklanja sve postojeće role i dodeljuje novu
         // Nema potrebe da pozivamo removeRoleFromUser u loop-u - to samo povećava broj API poziva
         await assignRoleToUser(auth0User.user_id, role);
+        
+        // Očisti role cache za ovog korisnika (assignRoleToUser već poziva clearRoleCache, ali dodajemo za sigurnost)
+        clearRoleCache(auth0User.user_id);
         
         console.log(`[Update User] Updated role for ${user.email} to ${role} in Auth0`);
       } catch (error) {

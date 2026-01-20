@@ -24,6 +24,10 @@ if (!clientId || !clientSecret) {
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt: number = 0;
 
+// Cache za role (userId -> {roles: string[], expiresAt: number})
+const roleCache = new Map<string, { roles: string[]; expiresAt: number }>();
+const ROLE_CACHE_TTL = 5 * 60 * 1000; // 5 minuta
+
 /**
  * Retry helper sa exponential backoff za rate limiting greške
  */
@@ -93,6 +97,19 @@ export function clearTokenCache() {
 }
 
 /**
+ * Očisti role cache (pozovi nakon promene role korisnika)
+ */
+export function clearRoleCache(auth0UserId?: string) {
+  if (auth0UserId) {
+    roleCache.delete(auth0UserId);
+    console.log(`[Auth0 Management] Role cache cleared for user ${auth0UserId}`);
+  } else {
+    roleCache.clear();
+    console.log('[Auth0 Management] All role caches cleared');
+  }
+}
+
+/**
  * Dobij Management API access token (sa caching-om)
  */
 async function getManagementApiToken(): Promise<string> {
@@ -126,12 +143,19 @@ async function getManagementApiToken(): Promise<string> {
 }
 
 /**
- * Get user roles from Auth0 - koristi direktan HTTP poziv
+ * Get user roles from Auth0 - koristi direktan HTTP poziv sa caching-om
  */
 export async function getUserRoles(auth0UserId: string): Promise<string[]> {
   if (!domain || !clientId || !clientSecret) {
     console.error('[Auth0 Management] Missing credentials');
     return ['VIEWER'];
+  }
+
+  // Proveri cache prvo
+  const cached = roleCache.get(auth0UserId);
+  if (cached && Date.now() < cached.expiresAt) {
+    console.log('[Auth0 Management] Roles from cache:', cached.roles);
+    return cached.roles;
   }
 
   try {
@@ -150,21 +174,38 @@ export async function getUserRoles(auth0UserId: string): Promise<string[]> {
     if (!rolesResponse.ok) {
       const errorData = await rolesResponse.text();
       console.error('[Auth0 Management] Error fetching roles:', rolesResponse.status, errorData);
+      // Ako imamo stari cache, koristi ga
+      if (cached) {
+        console.log('[Auth0 Management] Using stale cache due to API error');
+        return cached.roles;
+      }
       return ['VIEWER'];
     }
     
     const rolesData = await rolesResponse.json();
     
+    let roleNames: string[] = ['VIEWER'];
     if (rolesData && Array.isArray(rolesData) && rolesData.length > 0) {
-      const roleNames = rolesData.map((role: any) => role.name || role.id || role);
+      roleNames = rolesData.map((role: any) => role.name || role.id || role);
       console.log('[Auth0 Management] Roles from API:', roleNames);
-      return roleNames;
+    } else {
+      console.log('[Auth0 Management] No roles found, using default VIEWER');
     }
     
-    console.log('[Auth0 Management] No roles found, using default VIEWER');
-    return ['VIEWER'];
+    // Sačuvaj u cache
+    roleCache.set(auth0UserId, {
+      roles: roleNames,
+      expiresAt: Date.now() + ROLE_CACHE_TTL
+    });
+    
+    return roleNames;
   } catch (error) {
     console.error('[Auth0 Management] Error getting user roles:', error);
+    // Ako imamo stari cache, koristi ga
+    if (cached) {
+      console.log('[Auth0 Management] Using stale cache due to error');
+      return cached.roles;
+    }
     return ['VIEWER'];
   }
 }
@@ -261,6 +302,9 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
     }
     
     console.log(`[Auth0 Management] Assigned role '${roleName}' to user ${auth0UserId}`);
+    
+    // Očisti role cache za ovog korisnika nakon promene
+    clearRoleCache(auth0UserId);
   } catch (error) {
     console.error('[Auth0 Management] Error assigning role:', error);
     throw new Error(`Failed to assign role: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -326,6 +370,9 @@ export async function removeRoleFromUser(auth0UserId: string, roleName: string):
     }
     
     console.log(`[Auth0 Management] Removed role '${roleName}' from user ${auth0UserId}`);
+    
+    // Očisti role cache za ovog korisnika nakon promene
+    clearRoleCache(auth0UserId);
   } catch (error) {
     console.error('[Auth0 Management] Error removing role:', error);
     throw new Error(`Failed to remove role: ${error instanceof Error ? error.message : 'Unknown error'}`);

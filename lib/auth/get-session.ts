@@ -8,34 +8,33 @@ export async function getSession() {
   const user = session.user as any;
   const userId = user.sub || user.id;
   
-  // Pročitaj role iz custom claim (ubacuje Auth0 Action) - ovo je fallback
+  // Pročitaj role iz custom claim (ubacuje Auth0 Action) - ovo je PRIMARY izvor
+  // Token se osvežava na svakih 24h, tako da će role biti ažurirane nakon refresh-a
+  // Management API pozivamo samo kao fallback ako nema role u tokenu
+  // Ovo DRAMATIČNO smanjuje broj API poziva i sprečava rate limiting
   let rolesFromToken = user?.['https://mr-engines-warranty/roles'] || [];
   if (!Array.isArray(rolesFromToken)) {
     rolesFromToken = rolesFromToken ? [rolesFromToken] : [];
   }
   
-  // UVEK proveri Management API za najnovije role (source of truth)
-  // Ovo omogućava da se role promene u Dashboard-u primene odmah nakon reload-a
-  let roles: string[] = [];
-  if (userId) {
+  // Koristi role iz tokena kao primarni izvor
+  // Management API pozivamo samo ako nema role u tokenu (fallback za legacy korisnike)
+  let roles: string[] = rolesFromToken;
+  
+  // Ako nema role u tokenu, probaj Management API (samo kao fallback)
+  if (roles.length === 0 && userId) {
     try {
       roles = await getUserRoles(userId);
       if (process.env.NODE_ENV === 'development') {
-        console.log('[getSession] Roles from Management API (source of truth):', roles);
-        if (rolesFromToken.length > 0) {
-          console.log('[getSession] Roles from token (fallback):', rolesFromToken);
-        }
+        console.log('[getSession] No roles in token, fetched from Management API:', roles);
       }
     } catch (mgmtError) {
-      // Ako Management API ne radi, koristi role iz tokena
+      // Ako Management API ne radi, koristi default VIEWER
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[getSession] Could not fetch roles from Management API, using token roles:', mgmtError);
+        console.warn('[getSession] Could not fetch roles from Management API, using default VIEWER:', mgmtError);
       }
-      roles = rolesFromToken;
+      roles = ['VIEWER'];
     }
-  } else {
-    // Ako nema userId, koristi role iz tokena
-    roles = rolesFromToken;
   }
   
   // Ako i dalje nema role, dodeli default VIEWER (read-only)
