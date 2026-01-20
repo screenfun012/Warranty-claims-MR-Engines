@@ -273,10 +273,18 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     
     const currentName = claim.customer?.name || "";
     const currentCompany = claim.customer?.company || "";
-    const newName = field === 'name' ? value.trim() : currentName;
-    const newCompany = field === 'company' ? value.trim() : currentCompany;
+    const trimmedValue = value.trim();
+    const newName = field === 'name' ? trimmedValue : currentName;
+    const newCompany = field === 'company' ? trimmedValue : currentCompany;
     
-    if ((field === 'name' && newName === currentName) || (field === 'company' && newCompany === currentCompany)) {
+    // Normalize for comparison (empty string = null)
+    const normalizedCurrentName = currentName || "";
+    const normalizedCurrentCompany = currentCompany || "";
+    const normalizedNewName = newName || "";
+    const normalizedNewCompany = newCompany || "";
+    
+    if ((field === 'name' && normalizedNewName === normalizedCurrentName) || 
+        (field === 'company' && normalizedNewCompany === normalizedCurrentCompany)) {
       return;
     }
     
@@ -285,7 +293,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         const res = await fetch(`/api/customers/${claim.customer.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: newName, company: newCompany }),
+          body: JSON.stringify({ 
+            name: normalizedNewName || null, 
+            company: normalizedNewCompany || null 
+          }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -295,9 +306,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
           });
         } else {
+          const errorData = await res.json().catch(() => ({}));
+          console.error("Failed to update customer:", errorData);
           if (field === 'name') setCustomerName(currentName);
           if (field === 'company') setCustomerCompany(currentCompany);
-          alert("Failed to update customer");
+          alert("Failed to update customer: " + (errorData.error || "Unknown error"));
         }
       } catch (error) {
         console.error("Error updating customer:", error);
@@ -305,15 +318,15 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         if (field === 'company') setCustomerCompany(currentCompany);
         alert("Failed to update customer");
       }
-    } else if (newName.trim() || newCompany.trim()) {
+    } else if (normalizedNewName || normalizedNewCompany) {
       // Allow creating customer with name OR company (at least one must be provided)
       try {
         const res = await fetch("/api/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            name: newName || undefined,
-            company: newCompany || undefined,
+            name: normalizedNewName || null,
+            company: normalizedNewCompany || null,
             claimId: claim.id,
           }),
         });
@@ -325,9 +338,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
           });
         } else {
+          const errorData = await res.json().catch(() => ({}));
+          console.error("Failed to create customer:", errorData);
           setCustomerName("");
           setCustomerCompany("");
-          alert("Failed to create customer");
+          alert("Failed to create customer: " + (errorData.error || "Unknown error"));
         }
       } catch (error) {
         console.error("Error creating customer:", error);
