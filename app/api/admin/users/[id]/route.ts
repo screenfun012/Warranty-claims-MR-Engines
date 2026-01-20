@@ -59,12 +59,8 @@ export async function PATCH(
           );
         }
 
-        // Ukloni sve postojeće role
-        for (const currentRole of currentRoles) {
-          await removeRoleFromUser(auth0User.user_id, currentRole);
-        }
-        
-        // Dodeli novu role
+        // assignRoleToUser već uklanja sve postojeće role i dodeljuje novu
+        // Nema potrebe da pozivamo removeRoleFromUser u loop-u - to samo povećava broj API poziva
         await assignRoleToUser(auth0User.user_id, role);
         
         console.log(`[Update User] Updated role for ${user.email} to ${role} in Auth0`);
@@ -77,6 +73,13 @@ export async function PATCH(
           return NextResponse.json(
             { error: "Auth0 Management API nije konfigurisan. Molimo dodajte AUTH0_MANAGEMENT_CLIENT_ID i AUTH0_MANAGEMENT_CLIENT_SECRET u .env.local" },
             { status: 500 }
+          );
+        }
+        // Posebna poruka za rate limiting greške
+        if (errorMessage.includes('Rate limit') || errorMessage.includes('429') || errorMessage.includes('Too Many Requests')) {
+          return NextResponse.json(
+            { error: "Auth0 rate limit je dostignut. Molimo sačekajte nekoliko sekundi i pokušajte ponovo. Ako se problem nastavi, pokušajte kasnije." },
+            { status: 429 }
           );
         }
         return NextResponse.json(

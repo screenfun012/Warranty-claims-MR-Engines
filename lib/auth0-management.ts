@@ -25,6 +25,65 @@ let cachedAccessToken: string | null = null;
 let tokenExpiresAt: number = 0;
 
 /**
+ * Retry helper sa exponential backoff za rate limiting greške
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      
+      // Ako je 429 (Too Many Requests), pokušaj ponovo sa delay-om
+      if (response.status === 429) {
+        if (attempt < maxRetries) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = baseDelay * Math.pow(2, attempt);
+          console.log(`[Auth0 Management] Rate limit hit (429), retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        } else {
+          // Poslednji pokušaj - pročitaj Retry-After header ako postoji
+          const retryAfter = response.headers.get('Retry-After');
+          if (retryAfter) {
+            const delay = parseInt(retryAfter) * 1000;
+            console.log(`[Auth0 Management] Rate limit hit (429), waiting ${delay}ms as per Retry-After header...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            // Još jedan pokušaj nakon čekanja
+            return await fetch(url, options);
+          }
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Ako nije poslednji pokušaj, čekaj pre ponovnog pokušaja
+      if (attempt < maxRetries) {
+        const delay = baseDelay * Math.pow(2, attempt);
+        console.log(`[Auth0 Management] Request failed, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries + 1})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Failed to fetch after retries');
+}
+
+/**
+ * Delay helper za smanjenje rate limiting-a
+ */
+async function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Očisti token cache (pozovi nakon promene permisija u Auth0)
  */
 export function clearTokenCache() {
@@ -79,9 +138,9 @@ export async function getUserRoles(auth0UserId: string): Promise<string[]> {
     // Dobij access token
     const accessToken = await getManagementApiToken();
     
-    // Pozovi Management API direktno
+    // Pozovi Management API direktno (sa retry logikom)
     const rolesUrl = `https://${domain}/api/v2/users/${encodeURIComponent(auth0UserId)}/roles`;
-    const rolesResponse = await fetch(rolesUrl, {
+    const rolesResponse = await fetchWithRetry(rolesUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -121,9 +180,9 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
   try {
     const accessToken = await getManagementApiToken();
     
-    // 1. Pronađi role ID po imenu
+    // 1. Pronađi role ID po imenu (sa retry logikom)
     const rolesUrl = `https://${domain}/api/v2/roles?name_filter=${encodeURIComponent(roleName)}`;
-    const rolesResponse = await fetch(rolesUrl, {
+    const rolesResponse = await fetchWithRetry(rolesUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -131,7 +190,11 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
     });
     
     if (!rolesResponse.ok) {
-      throw new Error(`Failed to get roles: ${rolesResponse.status}`);
+      const errorData = await rolesResponse.text();
+      if (rolesResponse.status === 429) {
+        throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
+      }
+      throw new Error(`Failed to get roles: ${rolesResponse.status} ${errorData}`);
     }
     
     const roles = await rolesResponse.json();
@@ -141,9 +204,9 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
     
     const roleId = roles[0].id;
     
-    // 2. Ukloni sve postojeće role od korisnika
+    // 2. Ukloni sve postojeće role od korisnika (sa retry logikom)
     const currentRolesUrl = `https://${domain}/api/v2/users/${encodeURIComponent(auth0UserId)}/roles`;
-    const currentRolesResponse = await fetch(currentRolesUrl, {
+    const currentRolesResponse = await fetchWithRetry(currentRolesUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -153,8 +216,11 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
     if (currentRolesResponse.ok) {
       const currentRoles = await currentRolesResponse.json();
       if (currentRoles && currentRoles.length > 0) {
-        // Ukloni sve postojeće role
-        await fetch(currentRolesUrl, {
+        // Delay pre brisanja da smanjimo rate limiting
+        await delay(200);
+        
+        // Ukloni sve postojeće role (sa retry logikom)
+        const deleteResponse = await fetchWithRetry(currentRolesUrl, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${accessToken}`,
@@ -162,11 +228,22 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
           },
           body: JSON.stringify({ roles: currentRoles.map((r: { id: string }) => r.id) })
         });
+        
+        if (!deleteResponse.ok && deleteResponse.status !== 204) {
+          const errorData = await deleteResponse.text();
+          if (deleteResponse.status === 429) {
+            throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
+          }
+          console.warn(`[Auth0 Management] Failed to remove existing roles: ${deleteResponse.status} ${errorData}`);
+        }
       }
     }
     
-    // 3. Dodeli novu rolu
-    const assignResponse = await fetch(currentRolesUrl, {
+    // Delay pre dodele nove role
+    await delay(200);
+    
+    // 3. Dodeli novu rolu (sa retry logikom)
+    const assignResponse = await fetchWithRetry(currentRolesUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -177,6 +254,9 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
     
     if (!assignResponse.ok) {
       const errorData = await assignResponse.text();
+      if (assignResponse.status === 429) {
+        throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
+      }
       throw new Error(`Failed to assign role: ${assignResponse.status} ${errorData}`);
     }
     
@@ -198,9 +278,9 @@ export async function removeRoleFromUser(auth0UserId: string, roleName: string):
   try {
     const accessToken = await getManagementApiToken();
     
-    // 1. Pronađi role ID po imenu
+    // 1. Pronađi role ID po imenu (sa retry logikom)
     const rolesUrl = `https://${domain}/api/v2/roles?name_filter=${encodeURIComponent(roleName)}`;
-    const rolesResponse = await fetch(rolesUrl, {
+    const rolesResponse = await fetchWithRetry(rolesUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -208,7 +288,11 @@ export async function removeRoleFromUser(auth0UserId: string, roleName: string):
     });
     
     if (!rolesResponse.ok) {
-      throw new Error(`Failed to get roles: ${rolesResponse.status}`);
+      const errorData = await rolesResponse.text();
+      if (rolesResponse.status === 429) {
+        throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
+      }
+      throw new Error(`Failed to get roles: ${rolesResponse.status} ${errorData}`);
     }
     
     const roles = await rolesResponse.json();
@@ -219,9 +303,12 @@ export async function removeRoleFromUser(auth0UserId: string, roleName: string):
     
     const roleId = roles[0].id;
     
-    // 2. Ukloni rolu od korisnika
+    // Delay pre brisanja
+    await delay(200);
+    
+    // 2. Ukloni rolu od korisnika (sa retry logikom)
     const userRolesUrl = `https://${domain}/api/v2/users/${encodeURIComponent(auth0UserId)}/roles`;
-    const removeResponse = await fetch(userRolesUrl, {
+    const removeResponse = await fetchWithRetry(userRolesUrl, {
       method: 'DELETE',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -232,6 +319,9 @@ export async function removeRoleFromUser(auth0UserId: string, roleName: string):
     
     if (!removeResponse.ok && removeResponse.status !== 204) {
       const errorData = await removeResponse.text();
+      if (removeResponse.status === 429) {
+        throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
+      }
       throw new Error(`Failed to remove role: ${removeResponse.status} ${errorData}`);
     }
     
@@ -253,9 +343,9 @@ export async function getUserByEmail(email: string) {
   try {
     const accessToken = await getManagementApiToken();
     
-    // Koristi /api/v2/users-by-email endpoint
+    // Koristi /api/v2/users-by-email endpoint (sa retry logikom)
     const url = `https://${domain}/api/v2/users-by-email?email=${encodeURIComponent(email)}`;
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -291,7 +381,7 @@ export async function getAllRoles() {
     const accessToken = await getManagementApiToken();
     
     const rolesUrl = `https://${domain}/api/v2/roles`;
-    const response = await fetch(rolesUrl, {
+    const response = await fetchWithRetry(rolesUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
@@ -300,6 +390,9 @@ export async function getAllRoles() {
     
     if (!response.ok) {
       const errorData = await response.text();
+      if (response.status === 429) {
+        throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
+      }
       throw new Error(`Failed to get roles: ${response.status} ${errorData}`);
     }
     
