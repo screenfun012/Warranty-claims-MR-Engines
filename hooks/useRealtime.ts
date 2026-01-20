@@ -39,12 +39,20 @@ export function useRealtime(options?: {
   }, [queryClient]);
 
   useEffect(() => {
+    console.log("[useRealtime] Hook initialized");
     const pusher = getPusherClient();
     if (!pusher) {
-      console.log("[useRealtime] Pusher not available, using fallback");
+      console.log("[useRealtime] ⚠️ Pusher not available, using fallback (window events)");
+      console.log("[useRealtime] This means real-time will only work within the same browser tab");
       // Fallback: listen to custom window events for same-tab updates
-      const handleClaimUpdate = () => invalidateClaims();
-      const handleInboxUpdate = () => invalidateInbox();
+      const handleClaimUpdate = () => {
+        console.log("[useRealtime] Fallback: Claim update event received");
+        invalidateClaims();
+      };
+      const handleInboxUpdate = () => {
+        console.log("[useRealtime] Fallback: Inbox update event received");
+        invalidateInbox();
+      };
       
       window.addEventListener("claim-created", handleClaimUpdate);
       window.addEventListener("claim-updated", handleClaimUpdate);
@@ -58,6 +66,8 @@ export function useRealtime(options?: {
         window.removeEventListener("inbox-new", handleInboxUpdate);
       };
     }
+    
+    console.log("[useRealtime] ✅ Pusher client available, subscribing to channels");
 
     const channels = options?.channels || [CHANNELS.CLAIMS, CHANNELS.INBOX];
     const subscriptions: any[] = [];

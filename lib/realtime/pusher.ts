@@ -60,16 +60,43 @@ export function getPusherClient(): PusherClient | null {
     const key = process.env.NEXT_PUBLIC_PUSHER_KEY;
     const cluster = process.env.NEXT_PUBLIC_PUSHER_CLUSTER || "eu";
     
+    // Debug logging
+    console.log("[Pusher] Checking credentials:", {
+      hasKey: !!key,
+      keyLength: key?.length || 0,
+      cluster,
+      allEnvKeys: Object.keys(process.env).filter(k => k.includes("PUSHER"))
+    });
+    
     if (!key) {
-      console.warn("[Pusher] Missing key, real-time updates disabled");
+      console.warn("[Pusher] Missing NEXT_PUBLIC_PUSHER_KEY, real-time updates disabled");
+      console.warn("[Pusher] Make sure NEXT_PUBLIC_PUSHER_KEY is set in Vercel environment variables");
       return null;
     }
     
-    pusherClient = new PusherClient(key, {
-      cluster,
-    });
-    
-    console.log("[Pusher] Client initialized");
+    try {
+      pusherClient = new PusherClient(key, {
+        cluster,
+      });
+      
+      // Enable Pusher logging for debugging
+      pusherClient.connection.bind('state_change', (states: any) => {
+        console.log("[Pusher] Connection state changed:", states.previous, "->", states.current);
+      });
+      
+      pusherClient.connection.bind('error', (err: any) => {
+        console.error("[Pusher] Connection error:", err);
+      });
+      
+      pusherClient.connection.bind('connected', () => {
+        console.log("[Pusher] ✅ Connected to Pusher");
+      });
+      
+      console.log("[Pusher] ✅ Client initialized with key:", key.substring(0, 10) + "...");
+    } catch (error) {
+      console.error("[Pusher] Error initializing client:", error);
+      return null;
+    }
   }
   
   return pusherClient;
