@@ -25,6 +25,7 @@ interface ClaimMetadataProps {
   claim: {
     id: string;
     claimCodeRaw: string | null;
+    customerNumber: string | null;
     status: string;
     engineType: string | null;
     mrEngineCode: string | null;
@@ -40,7 +41,7 @@ interface ClaimMetadataProps {
     } | null;
     customer: {
       id: string;
-      name: string;
+      name: string | null;
       company: string | null;
     } | null;
     faultDepartment: {
@@ -74,6 +75,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
 
   // Local state for all editable fields
   const [claimCode, setClaimCode] = useState(claim.claimCodeRaw || "");
+  const [customerNumber, setCustomerNumber] = useState(claim.customerNumber || "");
   const [customerName, setCustomerName] = useState(claim.customer?.name || "");
   const [customerCompany, setCustomerCompany] = useState(claim.customer?.company || "");
   const [engineType, setEngineType] = useState(claim.engineType || "");
@@ -180,6 +182,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     if (prevClaimIdRef.current !== claim.id) {
       // New claim loaded, reset all local state
       setClaimCode(claim.claimCodeRaw || "");
+      setCustomerNumber(claim.customerNumber || "");
       setCustomerName(claim.customer?.name || "");
       setCustomerCompany(claim.customer?.company || "");
       setEngineType(claim.engineType || "");
@@ -196,6 +199,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     } else if (!editingField) {
       // External update, sync if not editing
       if (claim.claimCodeRaw !== claimCode) setClaimCode(claim.claimCodeRaw || "");
+      if (claim.customerNumber !== customerNumber) setCustomerNumber(claim.customerNumber || "");
       if (claim.customer?.name !== customerName) setCustomerName(claim.customer?.name || "");
       if (claim.customer?.company !== customerCompany) setCustomerCompany(claim.customer?.company || "");
       if (claim.engineType !== engineType) setEngineType(claim.engineType || "");
@@ -209,11 +213,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (!!claim.processingEmailSentAt !== notificationSent) setNotificationSent(!!claim.processingEmailSentAt);
     }
   }, [
-    claim.id, claim.claimCodeRaw, claim.customer?.name, claim.customer?.company,
+    claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.customer?.company,
     claim.engineType, claim.mrEngineCode, claim.assignedTo?.fullName,
     claim.faultDepartment?.id, claim.workerFault, claim.yearEngineDone,
     claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt,
-    editingField, claimCode, customerName, customerCompany, engineType, engineCode,
+    editingField, claimCode, customerNumber, customerName, customerCompany, engineType, engineCode,
     assignedToName, faultDepartmentId, workerFault, yearEngineDone, reason, isDomesticMarket, notificationSent
   ]);
 
@@ -225,6 +229,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     let originalValue: any = null;
     switch (field) {
       case 'claimCodeRaw': originalValue = claim.claimCodeRaw; break;
+      case 'customerNumber': originalValue = claim.customerNumber; break;
       case 'engineType': originalValue = claim.engineType; break;
       case 'mrEngineCode': originalValue = claim.mrEngineCode; break;
       case 'workerFault': originalValue = claim.workerFault; break;
@@ -382,11 +387,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         Metadata
       </h2>
       <div className="space-y-4 overflow-hidden">
-        {/* Claim Code - Required */}
+        {/* MR Number - Required */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Hash className="h-4 w-4 text-muted-foreground" />
-            Claim Code <span className="text-red-500">*</span>
+            MR Number <span className="text-red-500">*</span>
           </Label>
           <Input
             value={claimCode}
@@ -434,6 +439,23 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               </label>
             </div>
           )}
+        </div>
+
+        {/* Customer Number */}
+        <div>
+          <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <Hash className="h-4 w-4 text-muted-foreground" />
+            Customer Number
+          </Label>
+          <Input
+            value={customerNumber}
+            onChange={(e) => setCustomerNumber(e.target.value)}
+            onFocus={() => setEditingField('customerNumber')}
+            onBlur={(e) => handleFieldBlur('customerNumber', e.target.value)}
+            placeholder="Customer number"
+            disabled={isReadOnly}
+            className="h-9"
+          />
         </div>
 
         {/* Customer Name - Required */}

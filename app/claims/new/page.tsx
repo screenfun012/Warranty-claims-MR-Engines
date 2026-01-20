@@ -15,6 +15,7 @@ export default function NewClaimPage() {
   const [formData, setFormData] = useState({
     status: "NEW",
     claimCodeRaw: "",
+    customerNumber: "",
     customerName: "",
     customerCompany: "",
     yearEngineDone: "",
@@ -30,7 +31,7 @@ export default function NewClaimPage() {
     // Validate required fields
     const newErrors: Record<string, string> = {};
     if (!formData.claimCodeRaw.trim()) {
-      newErrors.claimCodeRaw = "Claim Code is required";
+      newErrors.claimCodeRaw = "MR Number is required";
     }
     if (!formData.customerCompany.trim()) {
       newErrors.customerCompany = "Customer Company is required";
@@ -60,6 +61,7 @@ export default function NewClaimPage() {
         body: JSON.stringify({
           status: formData.status,
           claimCodeRaw: formData.claimCodeRaw,
+          customerNumber: formData.customerNumber,
           customerName: formData.customerName,
           customerCompany: formData.customerCompany,
           yearEngineDone: parseInt(formData.yearEngineDone, 10),
@@ -103,7 +105,7 @@ export default function NewClaimPage() {
         <Card className="p-6">
           <div className="space-y-4">
             <div>
-              <Label>Claim Code <span className="text-red-500">*</span></Label>
+              <Label>MR Number <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.claimCodeRaw}
                 onChange={(e) => {
@@ -116,6 +118,17 @@ export default function NewClaimPage() {
               {errors.claimCodeRaw && (
                 <p className="text-sm text-red-500 mt-1">{errors.claimCodeRaw}</p>
               )}
+            </div>
+
+            <div>
+              <Label>Customer Number</Label>
+              <Input
+                value={formData.customerNumber}
+                onChange={(e) => {
+                  setFormData({ ...formData, customerNumber: e.target.value });
+                }}
+                placeholder="Customer number"
+              />
             </div>
 
             <div>

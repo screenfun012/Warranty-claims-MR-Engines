@@ -38,6 +38,7 @@ function hasMinRole(userRole: string | undefined, minRole: string): boolean {
 interface Claim {
   id: string;
   claimCodeRaw: string | null;
+  customerNumber: string | null;
   yearEngineDone: number | null;
   workerFault: string | null;
   reason: string | null;

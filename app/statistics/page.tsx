@@ -24,12 +24,13 @@ import { format } from "date-fns";
 interface Claim {
   id: string;
   claimCodeRaw: string | null;
+  customerNumber: string | null;
   status: string;
   claimAcceptanceStatus: string | null;
   createdAt: string;
   customer: {
     id: string;
-    name: string;
+    name: string | null;
     company: string | null;
   } | null;
   faultDepartment: {
@@ -172,7 +173,8 @@ export default function StatisticsPage() {
   // Export to CSV
   const handleExport = useCallback(() => {
     const headers = [
-      "Claim Code",
+      "MR Number",
+      "Customer Number",
       "Status",
       "Customer Name",
       "Customer Company",
@@ -189,6 +191,7 @@ export default function StatisticsPage() {
 
     const rows = sortedClaims.map(claim => [
       claim.claimCodeRaw || "",
+      claim.customerNumber || "",
       claim.status,
       claim.customer?.name || "",
       claim.customer?.company || "",
@@ -477,7 +480,8 @@ export default function StatisticsPage() {
         ) : (
           <ResponsiveTable
             headers={[
-              { key: "claimCode", label: "Claim Code" },
+              { key: "mrNumber", label: "MR Number" },
+              { key: "customerNumber", label: "Customer Number" },
               { key: "status", label: "Status" },
               { key: "customer", label: "Customer" },
               { key: "company", label: "Company" },
@@ -490,8 +494,11 @@ export default function StatisticsPage() {
               { key: "created", label: "Created" },
             ]}
             data={sortedClaims.map((claim) => ({
-              claimCode: (
+              mrNumber: (
                 <span className="font-medium">{claim.claimCodeRaw || "-"}</span>
+              ),
+              customerNumber: (
+                <span className="font-medium">{claim.customerNumber || "-"}</span>
               ),
               status: <Badge variant="outline">{claim.status}</Badge>,
               customer: claim.customer?.name || "-",

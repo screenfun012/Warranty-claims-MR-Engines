@@ -115,6 +115,7 @@ model Claim {
   workOrder            WorkOrder?      @relation(fields: [workOrderId], references: [id])
   engineType           String?
   mrEngineCode         String?
+  customerNumber       String?        // Customer Number
   customerReference    String?
   invoiceNumber        String?
   assignedToId         String?        // Ko je radio motor (ne ko je radio reklamaciju)

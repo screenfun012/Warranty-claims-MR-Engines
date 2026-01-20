@@ -84,7 +84,9 @@
   "claims": {
     "title": "Claims",
     "newClaim": "New Claim",
-    "claimCode": "Claim Code",
+    "claimCode": "MR Number",
+    "mrNumber": "MR Number",
+    "customerNumber": "Customer Number",
     "customer": "Customer",
     "company": "Company",
     "engineType": "Engine Type",

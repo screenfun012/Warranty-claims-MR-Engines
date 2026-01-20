@@ -170,7 +170,7 @@ export async function POST(request: NextRequest) {
     if (!body.emailThreadId) {
       if (!body.claimCodeRaw) {
         return NextResponse.json(
-          { error: "Claim Code is required" },
+          { error: "MR Number is required" },
           { status: 400 }
         );
       }
@@ -193,6 +193,7 @@ export async function POST(request: NextRequest) {
         status: body.status || "NEW",
         claimCodeRaw: body.claimCodeRaw,
         customerId: body.customerId,
+        customerNumber: body.customerNumber,
         workOrderId: body.workOrderId,
         engineType: body.engineType,
         mrEngineCode: body.mrEngineCode,

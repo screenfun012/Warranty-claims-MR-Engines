@@ -84,7 +84,9 @@
   "claims": {
     "title": "Reklamacije",
     "newClaim": "Nova reklamacija",
-    "claimCode": "Šifra reklamacije",
+    "claimCode": "MR Number",
+    "mrNumber": "MR Number",
+    "customerNumber": "Customer Number",
     "customer": "Kupac",
     "company": "Kompanija",
     "engineType": "Tip motora",
