@@ -42,6 +42,7 @@ interface Claim {
   yearEngineDone: number | null;
   dateEngineDone: string | null;
   claimArrivalDate: string | null;
+  assignedWorkerName: string | null;
   workerFault: string | null;
   reason: string | null;
   isDomesticMarket: boolean;

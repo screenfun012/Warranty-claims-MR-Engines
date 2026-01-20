@@ -39,7 +39,8 @@ interface Claim {
   isLocked: boolean | null;
   customer: {
     id: string;
-    name: string;
+    name: string | null;
+    company: string | null;
   } | null;
   engineType: string | null;
   mrEngineCode: string | null;
@@ -47,6 +48,9 @@ interface Claim {
     id: string;
     fullName: string;
   } | null;
+  assignedWorkerName: string | null; // Worker who built the engine
+  workerFault: string | null; // Worker at fault
+  claimArrivalDate: string | null;
   createdAt: string;
 }
 
@@ -122,11 +126,11 @@ const StatusBadge = ({ status, acceptanceStatus }: { status: string; acceptanceS
 };
 
 const statusLabels: Record<string, string> = {
-  NEW: "NOVO",
-  IN_ANALYSIS: "U OBRADI",
-  APPROVED: "ODOBRENO",
-  REJECTED: "ODBIJENO",
-  CLOSED: "ZATVORENO",
+  NEW: "Novo",
+  IN_ANALYSIS: "U Obradi",
+  APPROVED: "Završeno (Prihvaćeno)",
+  REJECTED: "Završeno (Odbijeno)",
+  CLOSED: "Završeno",
 };
 
 export default function ClaimsPage() {
@@ -278,13 +282,13 @@ export default function ClaimsPage() {
     // Show suggestions if there's text
     if (value.trim()) {
       setShowCustomerSuggestions(true);
-      // Generate suggestions from allClaims with Serbian Latin support
+      // Generate suggestions from allClaims with Serbian Latin support - use company instead of name
       const normalizedValue = normalizeSerbianLatin(value);
       const suggestions: string[] = Array.from(
         new Set(
           allClaims
-            .map((c: Claim) => c.customer?.name)
-            .filter((name: string | null | undefined): name is string => !!name && normalizeSerbianLatin(name).includes(normalizedValue))
+            .map((c: Claim) => c.customer?.company)
+            .filter((company: string | null | undefined): company is string => !!company && normalizeSerbianLatin(company).includes(normalizedValue))
             .slice(0, 5)
         )
       ) as string[];
@@ -318,12 +322,12 @@ export default function ClaimsPage() {
       });
     }
     
-    // Apply customerId filter in real-time with Serbian Latin support
+    // Apply customerId filter in real-time with Serbian Latin support - use company instead of name
     if (textFilters.customerId.trim()) {
       const normalizedCustomer = normalizeSerbianLatin(textFilters.customerId);
       filtered = filtered.filter(claim => {
-        const customerName = normalizeSerbianLatin(claim.customer?.name || "");
-        return customerName.includes(normalizedCustomer);
+        const customerCompany = normalizeSerbianLatin(claim.customer?.company || "");
+        return customerCompany.includes(normalizedCustomer);
       });
     }
     
@@ -785,14 +789,12 @@ export default function ClaimsPage() {
         </div>
         <ResponsiveTable
           headers={[
-            { key: "claimCode", label: "Claim Code" },
-            { key: "prefix", label: "Prefix" },
+            { key: "claimCode", label: "MR Number" },
             { key: "status", label: "Status" },
-            { key: "customer", label: "Customer" },
+            { key: "customer", label: "Customer Company" },
             { key: "engineType", label: "Engine Type" },
-            { key: "engineCode", label: "Engine Code" },
-            { key: "assignedTo", label: "Assigned To" },
-            { key: "created", label: "Created" },
+            { key: "assignedTo", label: "Assigned To (Worker)" },
+            { key: "claimArrival", label: "Claim Arrival" },
             ...(isSuperAdmin ? [{ key: "actions", label: "Akcije" }] : []),
           ]}
           data={displayClaims.map((claim, index) => ({
@@ -801,15 +803,13 @@ export default function ClaimsPage() {
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
               </span>
             ),
-            prefix: <span className="text-muted-foreground">{claim.claimPrefix || "-"}</span>,
             status: <StatusBadge status={claim.status} acceptanceStatus={claim.claimAcceptanceStatus} />,
-            customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.name || "-"}</span>,
+            customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.company || "-"}</span>,
             engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
-            engineCode: <span className="text-muted-foreground font-mono text-xs">{claim.mrEngineCode || "-"}</span>,
-            assignedTo: <span className="text-muted-foreground">{claim.assignedTo?.fullName || "-"}</span>,
-            created: (
+            assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,
+            claimArrival: (
               <span className="text-muted-foreground text-xs">
-                {new Date(claim.createdAt).toLocaleDateString()}
+                {claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : new Date(claim.createdAt).toLocaleDateString()}
               </span>
             ),
             ...(isSuperAdmin ? {

@@ -41,6 +41,7 @@ interface Claim {
     id: string;
     fullName: string;
   } | null;
+  assignedWorkerName: string | null;
   engineType: string | null;
   mrEngineCode: string | null;
   workerFault: string | null;
@@ -140,8 +141,8 @@ export default function StatisticsPage() {
         aVal = a.faultDepartment?.name || "";
         bVal = b.faultDepartment?.name || "";
       } else if (sortField === "assignedTo") {
-        aVal = a.assignedTo?.fullName || "";
-        bVal = b.assignedTo?.fullName || "";
+        aVal = a.assignedWorkerName || "";
+        bVal = b.assignedWorkerName || "";
       }
       
       if (aVal === null || aVal === undefined) return 1;
@@ -204,7 +205,7 @@ export default function StatisticsPage() {
       claim.workerFault || "",
       claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "",
       claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
-      claim.assignedTo?.fullName || "",
+      claim.assignedWorkerName || "",
       claim.reason || "",
       claim.isDomesticMarket ? "Yes" : "No",
       new Date(claim.createdAt).toLocaleDateString(),
@@ -513,7 +514,7 @@ export default function StatisticsPage() {
               faultDept: claim.faultDepartment?.name || "-",
               dateEngineDone: claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "-",
               claimArrivalDate: claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "-",
-              assignedTo: claim.assignedTo?.fullName || "-",
+              assignedTo: claim.assignedWorkerName || "-",
               market: claim.isDomesticMarket ? (
                 <Badge variant="secondary">Domestic</Badge>
               ) : (

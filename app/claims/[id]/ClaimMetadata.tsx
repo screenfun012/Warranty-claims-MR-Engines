@@ -35,7 +35,8 @@ interface ClaimMetadataProps {
     yearEngineDone: number | null;
     dateEngineDone: string | null;
     claimArrivalDate: string | null;
-    workerFault: string | null;
+    assignedWorkerName: string | null; // Worker who built the engine (simple text)
+    workerFault: string | null; // Worker at fault
     reason: string | null;
     isDomesticMarket: boolean;
     assignedTo: {
@@ -83,7 +84,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [customerCompany, setCustomerCompany] = useState(claim.customer?.company || "");
   const [engineType, setEngineType] = useState(claim.engineType || "");
   const [engineCode, setEngineCode] = useState(claim.mrEngineCode || "");
-  const [assignedToName, setAssignedToName] = useState(claim.assignedTo?.fullName || "");
+  const [assignedWorkerName, setAssignedWorkerName] = useState(claim.assignedWorkerName || "");
   const [faultDepartmentId, setFaultDepartmentId] = useState(claim.faultDepartment?.id || "");
   const [workerFault, setWorkerFault] = useState(claim.workerFault || "");
   const [yearEngineDone, setYearEngineDone] = useState(claim.yearEngineDone?.toString() || "");
@@ -192,7 +193,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setCustomerCompany(claim.customer?.company || "");
       setEngineType(claim.engineType || "");
       setEngineCode(claim.mrEngineCode || "");
-      setAssignedToName(claim.assignedTo?.fullName || "");
+      setAssignedWorkerName(claim.assignedWorkerName || "");
       setFaultDepartmentId(claim.faultDepartment?.id || "");
       setWorkerFault(claim.workerFault || "");
       setYearEngineDone(claim.yearEngineDone?.toString() || "");
@@ -211,7 +212,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (claim.customer?.company !== customerCompany) setCustomerCompany(claim.customer?.company || "");
       if (claim.engineType !== engineType) setEngineType(claim.engineType || "");
       if (claim.mrEngineCode !== engineCode) setEngineCode(claim.mrEngineCode || "");
-      if (claim.assignedTo?.fullName !== assignedToName) setAssignedToName(claim.assignedTo?.fullName || "");
+      if (claim.assignedWorkerName !== assignedWorkerName) setAssignedWorkerName(claim.assignedWorkerName || "");
       if (claim.faultDepartment?.id !== faultDepartmentId) setFaultDepartmentId(claim.faultDepartment?.id || "");
       if (claim.workerFault !== workerFault) setWorkerFault(claim.workerFault || "");
       if (claim.yearEngineDone?.toString() !== yearEngineDone) setYearEngineDone(claim.yearEngineDone?.toString() || "");
@@ -226,11 +227,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     }
   }, [
     claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.customer?.company,
-    claim.engineType, claim.mrEngineCode, claim.assignedTo?.fullName,
+    claim.engineType, claim.mrEngineCode, claim.assignedWorkerName,
     claim.faultDepartment?.id, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate,
     claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt,
     editingField, claimCode, customerNumber, customerName, customerCompany, engineType, engineCode,
-    assignedToName, faultDepartmentId, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
+    assignedWorkerName, faultDepartmentId, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
   ]);
 
   // Save field on blur
@@ -245,6 +246,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       case 'customerNumber': originalValue = claim.customerNumber; break;
       case 'engineType': originalValue = claim.engineType; break;
       case 'mrEngineCode': originalValue = claim.mrEngineCode; break;
+      case 'assignedWorkerName': originalValue = claim.assignedWorkerName; break;
       case 'workerFault': originalValue = claim.workerFault; break;
       case 'yearEngineDone': originalValue = claim.yearEngineDone; break;
       case 'reason': originalValue = claim.reason; break;
@@ -363,38 +365,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     } else {
       setCustomerName("");
       setCustomerCompany("");
-    }
-  };
-
-  // Handle assigned to update
-  const handleAssignedToUpdate = async (value: string) => {
-    setEditingField(null);
-    if (isReadOnly) return;
-    
-    const newName = value.trim();
-    const currentName = claim.assignedTo?.fullName || "";
-    
-    if (newName === currentName) return;
-    
-    try {
-      const res = await fetch(`/api/claims/${claim.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedToName: newName }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        onUpdate({ assignedTo: data.claim.assignedTo });
-        setAssignedToName(data.claim.assignedTo?.fullName || "");
-      } else {
-        const errorData = await res.json();
-        alert("Failed to update assigned to: " + (errorData.error || "Unknown error"));
-        setAssignedToName(currentName);
-      }
-    } catch (error) {
-      console.error("Error updating assignedTo:", error);
-      alert("Failed to update assigned to");
-      setAssignedToName(currentName);
     }
   };
 
@@ -557,19 +527,19 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           />
         </div>
 
-        {/* Assigned To (Worker who worked on engine) */}
+        {/* Assigned Worker (Worker who worked on engine) - simple text field */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            Assigned To (Worker)
+            Assigned Worker (Ko je radio motor)
           </Label>
           <Input
-            value={assignedToName}
-            placeholder="Worker who worked on engine"
+            value={assignedWorkerName}
+            placeholder="Ime radnika koji je radio motor"
             disabled={isReadOnly}
-            onFocus={() => setEditingField('assignedTo')}
-            onChange={(e) => setAssignedToName(e.target.value)}
-            onBlur={(e) => handleAssignedToUpdate(e.target.value)}
+            onFocus={() => setEditingField('assignedWorkerName')}
+            onChange={(e) => setAssignedWorkerName(e.target.value)}
+            onBlur={(e) => handleFieldBlur('assignedWorkerName', e.target.value)}
             className="h-9"
           />
         </div>

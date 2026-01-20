@@ -180,27 +180,42 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (!body.yearEngineDone) {
+      if (!body.engineType) {
         return NextResponse.json(
-          { error: "Year Engine Done is required" },
+          { error: "Engine Type is required" },
           { status: 400 }
         );
       }
+    }
+
+    // Create or find customer if customerCompany is provided
+    let customerId = body.customerId;
+    if (!customerId && body.customerCompany) {
+      // Create a new customer with company name
+      const customer = await prisma.customer.create({
+        data: {
+          company: body.customerCompany.trim(),
+          name: body.customerName?.trim() || null,
+        },
+      });
+      customerId = customer.id;
     }
 
     const claim = await prisma.claim.create({
       data: {
         status: body.status || "NEW",
         claimCodeRaw: body.claimCodeRaw,
-        customerId: body.customerId,
-        customerNumber: body.customerNumber,
+        customerId: customerId,
+        customerNumber: body.customerNumber || null,
         workOrderId: body.workOrderId,
         engineType: body.engineType,
-        mrEngineCode: body.mrEngineCode,
+        mrEngineCode: body.mrEngineCode || null,
         assignedToId: body.assignedToId,
         faultDepartmentId: body.faultDepartmentId,
         workerFault: body.workerFault,
         yearEngineDone: body.yearEngineDone ? parseInt(body.yearEngineDone, 10) : null,
+        dateEngineDone: body.dateEngineDone ? new Date(body.dateEngineDone) : null,
+        claimArrivalDate: new Date(), // Set claim arrival date to now
         reason: body.reason,
         isDomesticMarket: body.isDomesticMarket || false,
         summarySr: body.summarySr,
@@ -212,6 +227,19 @@ export async function POST(request: NextRequest) {
         assignedTo: true,
       },
     });
+
+    // If initialFinding is provided, create a finding/report section
+    if (body.initialFinding && body.initialFinding.trim()) {
+      await prisma.reportSection.create({
+        data: {
+          claimId: claim.id,
+          sectionType: "FINDINGS",
+          textSr: body.initialFinding.trim(),
+          orderIndex: 0,
+        },
+      });
+      console.log(`[create-claim] Created initial finding for claim ${claim.id}`);
+    }
     
     console.log(`[create-claim] Created claim with ID: ${claim.id} (type: ${typeof claim.id})`);
     

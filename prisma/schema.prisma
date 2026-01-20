@@ -118,8 +118,9 @@ model Claim {
   customerNumber       String?        // Customer Number
   customerReference    String?
   invoiceNumber        String?
-  assignedToId         String?        // Ko je radio motor (ne ko je radio reklamaciju)
+  assignedToId         String?        // Ko je obrađivao reklamaciju (User relacija - NEKORISTITI za metadata)
   assignedTo           User?           @relation("ClaimAssignedTo", fields: [assignedToId], references: [id])
+  assignedWorkerName   String?        // Ko je radio motor (obican tekst, ne User relacija)
   faultDepartmentId    String?        // Odeljenje gde je nastao problem
   faultDepartment      Department?    @relation(fields: [faultDepartmentId], references: [id])
   workerFault          String?        // Koji radnik je kriv

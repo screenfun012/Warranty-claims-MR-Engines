@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DatePicker } from "@/components/ui/date-picker";
 
 export default function NewClaimPage() {
   const router = useRouter();
@@ -16,12 +17,10 @@ export default function NewClaimPage() {
     status: "NEW",
     claimCodeRaw: "",
     customerNumber: "",
-    customerName: "",
     customerCompany: "",
-    yearEngineDone: "",
+    dateEngineDone: undefined as Date | undefined,
     engineType: "",
-    mrEngineCode: "",
-    summarySr: "",
+    initialFinding: "", // Will be saved as first finding in Findings tab
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -36,13 +35,8 @@ export default function NewClaimPage() {
     if (!formData.customerCompany.trim()) {
       newErrors.customerCompany = "Customer Company is required";
     }
-    if (!formData.yearEngineDone.trim()) {
-      newErrors.yearEngineDone = "Year Engine Done is required";
-    } else {
-      const year = parseInt(formData.yearEngineDone, 10);
-      if (isNaN(year) || year < 1900 || year > 2100) {
-        newErrors.yearEngineDone = "Please enter a valid year (1900-2100)";
-      }
+    if (!formData.engineType.trim()) {
+      newErrors.engineType = "Engine Type is required";
     }
     
     if (Object.keys(newErrors).length > 0) {
@@ -61,13 +55,11 @@ export default function NewClaimPage() {
         body: JSON.stringify({
           status: formData.status,
           claimCodeRaw: formData.claimCodeRaw,
-          customerNumber: formData.customerNumber,
-          customerName: formData.customerName,
+          customerNumber: formData.customerNumber || null,
           customerCompany: formData.customerCompany,
-          yearEngineDone: parseInt(formData.yearEngineDone, 10),
+          dateEngineDone: formData.dateEngineDone?.toISOString() || null,
           engineType: formData.engineType,
-          mrEngineCode: formData.mrEngineCode,
-          summarySr: formData.summarySr,
+          initialFinding: formData.initialFinding || null, // Will be added to Findings tab
         }),
       });
 
@@ -95,15 +87,16 @@ export default function NewClaimPage() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">New Claim</h1>
+        <h1 className="text-3xl font-bold">Nova Reklamacija</h1>
         <Button variant="outline" onClick={() => router.push("/claims")}>
-          Cancel
+          Otkaži
         </Button>
       </div>
 
       <form onSubmit={handleSubmit}>
         <Card className="p-6">
           <div className="space-y-4">
+            {/* MR Number - Required */}
             <div>
               <Label>MR Number <span className="text-red-500">*</span></Label>
               <Input
@@ -120,6 +113,7 @@ export default function NewClaimPage() {
               )}
             </div>
 
+            {/* Customer Number - Optional */}
             <div>
               <Label>Customer Number</Label>
               <Input
@@ -127,10 +121,11 @@ export default function NewClaimPage() {
                 onChange={(e) => {
                   setFormData({ ...formData, customerNumber: e.target.value });
                 }}
-                placeholder="Customer number"
+                placeholder="Broj kupca"
               />
             </div>
 
+            {/* Status */}
             <div>
               <Label>Status</Label>
               <Select
@@ -141,31 +136,15 @@ export default function NewClaimPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NEW">New</SelectItem>
-                  <SelectItem value="IN_ANALYSIS">In Analysis</SelectItem>
-                  <SelectItem value="APPROVED">Approved</SelectItem>
-                  <SelectItem value="REJECTED">Rejected</SelectItem>
-                  <SelectItem value="CLOSED">Closed</SelectItem>
+                  <SelectItem value="NEW">Novo</SelectItem>
+                  <SelectItem value="IN_ANALYSIS">U Obradi</SelectItem>
+                  <SelectItem value="APPROVED">Završeno (Prihvaćeno)</SelectItem>
+                  <SelectItem value="REJECTED">Završeno (Odbijeno)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            <div>
-              <Label>Customer Name <span className="text-red-500">*</span></Label>
-              <Input
-                value={formData.customerName}
-                onChange={(e) => {
-                  setFormData({ ...formData, customerName: e.target.value });
-                  if (errors.customerName) setErrors({ ...errors, customerName: "" });
-                }}
-                placeholder="Customer name"
-                className={errors.customerName ? "border-red-500" : ""}
-              />
-              {errors.customerName && (
-                <p className="text-sm text-red-500 mt-1">{errors.customerName}</p>
-              )}
-            </div>
-
+            {/* Customer Company - Required */}
             <div>
               <Label>Customer Company <span className="text-red-500">*</span></Label>
               <Input
@@ -174,7 +153,7 @@ export default function NewClaimPage() {
                   setFormData({ ...formData, customerCompany: e.target.value });
                   if (errors.customerCompany) setErrors({ ...errors, customerCompany: "" });
                 }}
-                placeholder="Customer company"
+                placeholder="Naziv firme"
                 className={errors.customerCompany ? "border-red-500" : ""}
               />
               {errors.customerCompany && (
@@ -182,59 +161,50 @@ export default function NewClaimPage() {
               )}
             </div>
 
+            {/* Date Engine Done - Optional */}
             <div>
-              <Label>Year Engine Done <span className="text-red-500">*</span></Label>
-              <Input
-                type="number"
-                value={formData.yearEngineDone}
-                onChange={(e) => {
-                  setFormData({ ...formData, yearEngineDone: e.target.value });
-                  if (errors.yearEngineDone) setErrors({ ...errors, yearEngineDone: "" });
-                }}
-                placeholder="YYYY"
-                min="1900"
-                max="2100"
-                className={errors.yearEngineDone ? "border-red-500" : ""}
+              <Label>Date Engine Done</Label>
+              <DatePicker
+                date={formData.dateEngineDone}
+                onSelect={(date) => setFormData({ ...formData, dateEngineDone: date })}
+                placeholder="Izaberi datum"
               />
-              {errors.yearEngineDone && (
-                <p className="text-sm text-red-500 mt-1">{errors.yearEngineDone}</p>
+            </div>
+
+            {/* Engine Type - Required */}
+            <div>
+              <Label>Engine Type <span className="text-red-500">*</span></Label>
+              <Input
+                value={formData.engineType}
+                onChange={(e) => {
+                  setFormData({ ...formData, engineType: e.target.value });
+                  if (errors.engineType) setErrors({ ...errors, engineType: "" });
+                }}
+                placeholder="Tip motora"
+                className={errors.engineType ? "border-red-500" : ""}
+              />
+              {errors.engineType && (
+                <p className="text-sm text-red-500 mt-1">{errors.engineType}</p>
               )}
             </div>
 
+            {/* Initial Finding - Optional */}
             <div>
-              <Label>Engine Type</Label>
-              <Input
-                value={formData.engineType}
-                onChange={(e) => setFormData({ ...formData, engineType: e.target.value })}
-                placeholder="Engine type"
-              />
-            </div>
-
-            <div>
-              <Label>MR Engine Code</Label>
-              <Input
-                value={formData.mrEngineCode}
-                onChange={(e) => setFormData({ ...formData, mrEngineCode: e.target.value })}
-                placeholder="MR Engine Code"
-              />
-            </div>
-
-            <div>
-              <Label>Summary (Serbian)</Label>
+              <Label>Početno Zapažanje</Label>
               <Textarea
-                value={formData.summarySr}
-                onChange={(e) => setFormData({ ...formData, summarySr: e.target.value })}
-                placeholder="Claim summary in Serbian"
+                value={formData.initialFinding}
+                onChange={(e) => setFormData({ ...formData, initialFinding: e.target.value })}
+                placeholder="Početno zapažanje o reklamaciji (opcionalno, biće sačuvano u Findings tab)"
                 rows={4}
               />
             </div>
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" disabled={loading}>
-                {loading ? "Creating..." : "Create Claim"}
+                {loading ? "Kreiranje..." : "Kreiraj Reklamaciju"}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.push("/claims")}>
-                Cancel
+                Otkaži
               </Button>
             </div>
           </div>
