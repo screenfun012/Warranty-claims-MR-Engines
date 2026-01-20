@@ -66,11 +66,19 @@ export async function DELETE(
       }
 
       // Delete the claim from database (cascade will handle related records)
-      await prisma.claim.delete({
+      // Proveri da claim još uvek postoji pre brisanja (može biti obrisan u međuvremenu)
+      const existingClaim = await prisma.claim.findUnique({
         where: { id: claim.id },
       });
       
-      console.log(`[Delete Email Thread] Deleted associated claim ${claim.id}`);
+      if (existingClaim) {
+        await prisma.claim.delete({
+          where: { id: claim.id },
+        });
+        console.log(`[Delete Email Thread] Deleted associated claim ${claim.id}`);
+      } else {
+        console.log(`[Delete Email Thread] Claim ${claim.id} already deleted, skipping`);
+      }
     }
 
     // CRITICAL: Track deleted messageIds BEFORE deletion to prevent sync from recreating them

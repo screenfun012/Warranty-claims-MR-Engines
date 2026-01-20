@@ -59,6 +59,18 @@ export async function DELETE(
     }
 
     // Delete the claim from database (cascade will handle related records)
+    // Proveri da claim još uvek postoji pre brisanja (može biti obrisan u međuvremenu)
+    const existingClaim = await prisma.claim.findUnique({
+      where: { id },
+    });
+    
+    if (!existingClaim) {
+      return NextResponse.json(
+        { error: "Claim not found or already deleted" },
+        { status: 404 }
+      );
+    }
+    
     await prisma.claim.delete({
       where: { id },
     });
