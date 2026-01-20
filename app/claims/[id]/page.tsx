@@ -129,8 +129,8 @@ const StatusBadge = ({ status }: { status: string }) => {
 const statusLabels: Record<string, string> = {
   NEW: "Novo",
   IN_ANALYSIS: "U Obradi",
-  APPROVED: "Završeno (Prihvaćeno)",
-  REJECTED: "Završeno (Odbijeno)",
+  APPROVED: "Prihvaćeno",
+  REJECTED: "Odbijeno",
 };
 
 // Fetch function for React Query

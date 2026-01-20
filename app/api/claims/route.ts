@@ -9,6 +9,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { createClaimFolder } from "@/lib/files/fileStorage";
+import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 
 export async function GET(request: NextRequest) {
   try {
@@ -175,12 +176,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (!body.customerCompany) {
-        return NextResponse.json(
-          { error: "Customer Company is required" },
-          { status: 400 }
-        );
-      }
       if (!body.engineType) {
         return NextResponse.json(
           { error: "Engine Type is required" },
@@ -189,13 +184,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create or find customer if customerCompany is provided
+    // Create customer if customerName or customerCompany is provided
     let customerId = body.customerId;
-    if (!customerId && body.customerCompany) {
-      // Create a new customer with company name
+    if (!customerId && (body.customerCompany || body.customerName)) {
       const customer = await prisma.customer.create({
         data: {
-          company: body.customerCompany.trim(),
+          company: body.customerCompany?.trim() || null,
           name: body.customerName?.trim() || null,
         },
       });
@@ -501,6 +495,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`[create-claim] Successfully created claim ${updatedClaim.id} with ${photosCreated} photos and ${documentsCreated} documents`);
+
+    // Trigger real-time event (non-blocking)
+    triggerEvent(CHANNELS.CLAIMS, EVENTS.CLAIM_CREATED, {
+      claimId: updatedClaim.id,
+      claimCode: updatedClaim.claimCodeRaw,
+      status: updatedClaim.status,
+    }).catch(console.error);
 
     return NextResponse.json({ 
       claim: updatedClaim,

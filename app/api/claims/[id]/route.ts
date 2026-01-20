@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { parseClaimCode } from "@/lib/domain/claimCode";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 
 export async function GET(
   request: NextRequest,
@@ -508,6 +509,14 @@ export async function PATCH(
 
     console.log(`[PATCH /api/claims/${id}] Final claim.claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
     console.log(`[PATCH /api/claims/${id}] Successfully updated claim. claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
+    
+    // Trigger real-time event (non-blocking)
+    triggerEvent(CHANNELS.CLAIMS, EVENTS.CLAIM_UPDATED, {
+      claimId: claim?.id,
+      claimCode: claim?.claimCodeRaw,
+      status: claim?.status,
+    }).catch(console.error);
+    
     return NextResponse.json({ claim });
   } catch (error) {
     console.error(`[PATCH /api/claims/${id}] Error updating claim:`, error);

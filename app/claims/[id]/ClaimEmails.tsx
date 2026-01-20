@@ -550,7 +550,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                 )}
               </button>
               <Label htmlFor="accepted" className="cursor-pointer font-medium text-sm text-foreground">
-                Završeno (Prihvaćeno)
+                Prihvaćeno
               </Label>
             </div>
             <div className="flex items-center gap-3">
@@ -570,7 +570,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                 )}
               </button>
               <Label htmlFor="rejected" className="cursor-pointer font-medium text-sm text-foreground">
-                Završeno (Odbijeno)
+                Odbijeno
               </Label>
             </div>
           </div>

@@ -17,6 +17,7 @@ export default function NewClaimPage() {
     status: "NEW",
     claimCodeRaw: "",
     customerNumber: "",
+    customerName: "",
     customerCompany: "",
     dateEngineDone: undefined as Date | undefined,
     engineType: "",
@@ -27,13 +28,10 @@ export default function NewClaimPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
+    // Validate required fields - only MR Number and Engine Type are required
     const newErrors: Record<string, string> = {};
     if (!formData.claimCodeRaw.trim()) {
       newErrors.claimCodeRaw = "MR Number is required";
-    }
-    if (!formData.customerCompany.trim()) {
-      newErrors.customerCompany = "Customer Company is required";
     }
     if (!formData.engineType.trim()) {
       newErrors.engineType = "Engine Type is required";
@@ -56,7 +54,8 @@ export default function NewClaimPage() {
           status: formData.status,
           claimCodeRaw: formData.claimCodeRaw,
           customerNumber: formData.customerNumber || null,
-          customerCompany: formData.customerCompany,
+          customerName: formData.customerName || null,
+          customerCompany: formData.customerCompany || null,
           dateEngineDone: formData.dateEngineDone?.toISOString() || null,
           engineType: formData.engineType,
           initialFinding: formData.initialFinding || null, // Will be added to Findings tab
@@ -138,27 +137,30 @@ export default function NewClaimPage() {
                 <SelectContent>
                   <SelectItem value="NEW">Novo</SelectItem>
                   <SelectItem value="IN_ANALYSIS">U Obradi</SelectItem>
-                  <SelectItem value="APPROVED">Završeno (Prihvaćeno)</SelectItem>
-                  <SelectItem value="REJECTED">Završeno (Odbijeno)</SelectItem>
+                  <SelectItem value="APPROVED">Prihvaćeno</SelectItem>
+                  <SelectItem value="REJECTED">Odbijeno</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Customer Company - Required */}
+            {/* Customer Name - Optional (for domestic market) */}
             <div>
-              <Label>Customer Company <span className="text-red-500">*</span></Label>
+              <Label>Customer Name</Label>
+              <Input
+                value={formData.customerName}
+                onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
+                placeholder="Ime kupca (za domaće tržište)"
+              />
+            </div>
+
+            {/* Customer Company - Optional */}
+            <div>
+              <Label>Customer Company</Label>
               <Input
                 value={formData.customerCompany}
-                onChange={(e) => {
-                  setFormData({ ...formData, customerCompany: e.target.value });
-                  if (errors.customerCompany) setErrors({ ...errors, customerCompany: "" });
-                }}
+                onChange={(e) => setFormData({ ...formData, customerCompany: e.target.value })}
                 placeholder="Naziv firme"
-                className={errors.customerCompany ? "border-red-500" : ""}
               />
-              {errors.customerCompany && (
-                <p className="text-sm text-red-500 mt-1">{errors.customerCompany}</p>
-              )}
             </div>
 
             {/* Date Engine Done - Optional */}

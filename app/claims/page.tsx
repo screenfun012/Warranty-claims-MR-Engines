@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useRealtime } from "@/hooks/useRealtime";
 
 // Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {
@@ -102,15 +103,17 @@ const StatusBadge = ({ status }: { status: string }) => {
 const statusLabels: Record<string, string> = {
   NEW: "Novo",
   IN_ANALYSIS: "U Obradi",
-  APPROVED: "Završeno (Prihvaćeno)",
-  REJECTED: "Završeno (Odbijeno)",
-  CLOSED: "Završeno",
+  APPROVED: "Prihvaćeno",
+  REJECTED: "Odbijeno",
 };
 
 export default function ClaimsPage() {
   const router = useRouter();
   const { user } = useUser();
   const queryClient = useQueryClient();
+  
+  // Subscribe to real-time updates
+  useRealtime();
   
   // Get user role
   interface Auth0User {
@@ -494,8 +497,8 @@ export default function ClaimsPage() {
               >
                 {status === "NEW" ? "Novo" : 
                  status === "IN_ANALYSIS" ? "U obradi" :
-                 status === "APPROVED" ? "Završeno (Prihvaćeno)" :
-                 status === "REJECTED" ? "Završeno (Odbijeno)" : status}
+                 status === "APPROVED" ? "Prihvaćeno" :
+                 status === "REJECTED" ? "Odbijeno" : status}
                 <button
                   onClick={() => {
                     setFilters({ ...filters, status: filters.status.filter(s => s !== status) });
@@ -569,8 +572,8 @@ export default function ClaimsPage() {
                     : filters.status.length === 1 
                       ? (filters.status[0] === "NEW" ? "Novo" : 
                          filters.status[0] === "IN_ANALYSIS" ? "U obradi" :
-                         filters.status[0] === "APPROVED" ? "Završeno (Prihvaćeno)" :
-                         filters.status[0] === "REJECTED" ? "Završeno (Odbijeno)" : filters.status[0])
+                         filters.status[0] === "APPROVED" ? "Prihvaćeno" :
+                         filters.status[0] === "REJECTED" ? "Odbijeno" : filters.status[0])
                       : `${filters.status.length} izabrano`}
                 </span>
                 <ChevronDownIcon className="h-4 w-4 opacity-50" />
@@ -581,8 +584,8 @@ export default function ClaimsPage() {
                     {[
                       { value: "NEW", label: "Novo" },
                       { value: "IN_ANALYSIS", label: "U Obradi" },
-                      { value: "APPROVED", label: "Završeno (Prihvaćeno)" },
-                      { value: "REJECTED", label: "Završeno (Odbijeno)" },
+                      { value: "APPROVED", label: "Prihvaćeno" },
+                      { value: "REJECTED", label: "Odbijeno" },
                     ].map((option) => {
                       const isSelected = filters.status.includes(option.value);
                       return (
