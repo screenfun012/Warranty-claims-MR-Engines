@@ -11,9 +11,10 @@ export async function GET(request: NextRequest) {
   try {
     const prisma = await getPrisma();
     const customers = await prisma.customer.findMany({
-      orderBy: {
-        name: "asc",
-      },
+      orderBy: [
+        { company: "asc" },
+        { name: "asc" },
+      ],
     });
 
     return NextResponse.json({ customers });
@@ -39,8 +40,8 @@ export async function POST(request: NextRequest) {
 
     const customer = await prisma.customer.create({
       data: {
-        name: name || undefined,
-        company: company || undefined,
+        name: name && name.trim() ? name.trim() : null,
+        company: company && company.trim() ? company.trim() : null,
       },
     });
 
