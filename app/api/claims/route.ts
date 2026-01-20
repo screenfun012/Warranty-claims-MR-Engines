@@ -174,12 +174,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-      if (!body.customerName) {
-        return NextResponse.json(
-          { error: "Customer Name is required" },
-          { status: 400 }
-        );
-      }
       if (!body.customerCompany) {
         return NextResponse.json(
           { error: "Customer Company is required" },

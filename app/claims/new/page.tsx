@@ -32,9 +32,6 @@ export default function NewClaimPage() {
     if (!formData.claimCodeRaw.trim()) {
       newErrors.claimCodeRaw = "Claim Code is required";
     }
-    if (!formData.customerName.trim()) {
-      newErrors.customerName = "Customer Name is required";
-    }
     if (!formData.customerCompany.trim()) {
       newErrors.customerCompany = "Customer Company is required";
     }

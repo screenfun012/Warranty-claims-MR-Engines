@@ -197,7 +197,7 @@ export async function GET() {
 
     // Get customer names for the top customers
     const customerIds = claimsByCustomer.map((c) => c.customerId).filter((id): id is string => id !== null);
-    let customers: Array<{ id: string; name: string }> = [];
+    let customers: Array<{ id: string; name: string | null }> = [];
     if (customerIds.length > 0) {
       try {
         customers = await prisma.customer.findMany({
@@ -216,13 +216,13 @@ export async function GET() {
       }
     }
 
-    const customerMap = new Map(customers.map((c) => [c.id, c.name]));
+    const customerMap = new Map(customers.map((c) => [c.id, c.name || null]));
 
     let claimsByCustomerWithNames: Array<{ customerId: string | null; customerName: string; count: number }> = [];
     try {
       claimsByCustomerWithNames = claimsByCustomer.map((item) => ({
         customerId: item.customerId,
-        customerName: item.customerId ? customerMap.get(item.customerId) || "Unknown" : "Unknown",
+        customerName: item.customerId ? (customerMap.get(item.customerId) || "Unknown") : "Unknown",
         count: item._count.id,
       }));
     } catch (error) {
@@ -262,7 +262,7 @@ export async function GET() {
       id: string;
       claimCodeRaw: string | null;
       status: string;
-      customer: { name: string } | null;
+      customer: { name: string | null } | null;
       createdAt: Date;
     }> = [];
     try {
@@ -309,7 +309,7 @@ export async function GET() {
       id: string;
       claimCodeRaw: string | null;
       status: string;
-      customer: { name: string } | null;
+      customer: { name: string | null } | null;
       createdAt: Date;
     }> = [];
     try {

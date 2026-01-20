@@ -75,7 +75,7 @@ model VerificationToken {
 
 model Customer {
   id        String   @id @default(cuid())
-  name      String
+  name      String?  // Customer name (optional)
   company   String?  // Customer company name
   email     String?
   country   String?
