@@ -123,7 +123,9 @@ model Claim {
   faultDepartmentId    String?        // Odeljenje gde je nastao problem
   faultDepartment      Department?    @relation(fields: [faultDepartmentId], references: [id])
   workerFault          String?        // Koji radnik je kriv
-  yearEngineDone       Int?           // Godina kada je motor bio sklopljen
+  yearEngineDone       Int?           // Godina kada je motor bio sklopljen (legacy - kept for backward compatibility)
+  dateEngineDone       DateTime?      // Datum kada je motor bio sklopljen
+  claimArrivalDate     DateTime?      // Datum kada je reklamacija stigla
   reason               String?        // Kratak razlog zašto je došlo do reklamacije
   isDomesticMarket     Boolean        @default(false) // Da li je domaće ili strano tržište
   serverFolderPath     String?

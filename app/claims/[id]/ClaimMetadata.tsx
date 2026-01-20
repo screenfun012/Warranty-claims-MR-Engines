@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { 
   Hash, Building2, Settings, User, FolderOpen, Mail, CheckCircle2, Loader2, 
   Calendar, AlertCircle, Wrench, FileText, Plus, X
@@ -32,6 +33,8 @@ interface ClaimMetadataProps {
     serverFolderPath: string | null;
     processingEmailSentAt: string | null;
     yearEngineDone: number | null;
+    dateEngineDone: string | null;
+    claimArrivalDate: string | null;
     workerFault: string | null;
     reason: string | null;
     isDomesticMarket: boolean;
@@ -84,6 +87,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [faultDepartmentId, setFaultDepartmentId] = useState(claim.faultDepartment?.id || "");
   const [workerFault, setWorkerFault] = useState(claim.workerFault || "");
   const [yearEngineDone, setYearEngineDone] = useState(claim.yearEngineDone?.toString() || "");
+  const [dateEngineDone, setDateEngineDone] = useState<Date | undefined>(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
+  const [claimArrivalDate, setClaimArrivalDate] = useState<Date | undefined>(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
   const [reason, setReason] = useState(claim.reason || "");
   const [isDomesticMarket, setIsDomesticMarket] = useState(claim.isDomesticMarket || false);
   
@@ -191,6 +196,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setFaultDepartmentId(claim.faultDepartment?.id || "");
       setWorkerFault(claim.workerFault || "");
       setYearEngineDone(claim.yearEngineDone?.toString() || "");
+      setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
+      setClaimArrivalDate(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
       setReason(claim.reason || "");
       setIsDomesticMarket(claim.isDomesticMarket || false);
       setEditingField(null);
@@ -208,6 +215,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (claim.faultDepartment?.id !== faultDepartmentId) setFaultDepartmentId(claim.faultDepartment?.id || "");
       if (claim.workerFault !== workerFault) setWorkerFault(claim.workerFault || "");
       if (claim.yearEngineDone?.toString() !== yearEngineDone) setYearEngineDone(claim.yearEngineDone?.toString() || "");
+      // Sync date fields
+      const newDateEngineDone = claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined;
+      if (newDateEngineDone?.toISOString() !== dateEngineDone?.toISOString()) setDateEngineDone(newDateEngineDone);
+      const newClaimArrivalDate = claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined;
+      if (newClaimArrivalDate?.toISOString() !== claimArrivalDate?.toISOString()) setClaimArrivalDate(newClaimArrivalDate);
       if (claim.reason !== reason) setReason(claim.reason || "");
       if (claim.isDomesticMarket !== isDomesticMarket) setIsDomesticMarket(claim.isDomesticMarket || false);
       if (!!claim.processingEmailSentAt !== notificationSent) setNotificationSent(!!claim.processingEmailSentAt);
@@ -215,10 +227,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   }, [
     claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.customer?.company,
     claim.engineType, claim.mrEngineCode, claim.assignedTo?.fullName,
-    claim.faultDepartment?.id, claim.workerFault, claim.yearEngineDone,
+    claim.faultDepartment?.id, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate,
     claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt,
     editingField, claimCode, customerNumber, customerName, customerCompany, engineType, engineCode,
-    assignedToName, faultDepartmentId, workerFault, yearEngineDone, reason, isDomesticMarket, notificationSent
+    assignedToName, faultDepartmentId, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
   ]);
 
   // Save field on blur
@@ -293,13 +305,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         if (field === 'company') setCustomerCompany(currentCompany);
         alert("Failed to update customer");
       }
-    } else if (newName.trim()) {
+    } else if (newName.trim() || newCompany.trim()) {
+      // Allow creating customer with name OR company (at least one must be provided)
       try {
         const res = await fetch("/api/customers", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
-            name: newName,
+            name: newName || undefined,
             company: newCompany || undefined,
             claimId: claim.id,
           }),
@@ -458,11 +471,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           />
         </div>
 
-        {/* Customer Name - Required */}
+        {/* Customer Name - Optional */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            Customer Name <span className="text-red-500">*</span>
+            Customer Name
           </Label>
           <Input
             value={customerName}
@@ -610,26 +623,47 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           />
         </div>
 
-        {/* Year Engine Done - Required */}
+        {/* Date Engine Done */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            Year Engine Done <span className="text-red-500">*</span>
+            Date Engine Done
           </Label>
-          <Input
-            type="number"
-            value={yearEngineDone}
-            onChange={(e) => setYearEngineDone(e.target.value)}
-            onFocus={() => setEditingField('yearEngineDone')}
-            onBlur={(e) => {
-              const year = e.target.value ? parseInt(e.target.value, 10) : null;
-              handleFieldBlur('yearEngineDone', year);
+          <DatePicker
+            date={dateEngineDone}
+            onSelect={(date) => {
+              setDateEngineDone(date);
+              // Auto-update when date is selected
+              const updates: Record<string, unknown> = { dateEngineDone: date?.toISOString() || null };
+              if (claim.status === "NEW") {
+                updates.status = "IN_ANALYSIS";
+              }
+              onUpdate(updates);
             }}
-            placeholder="YYYY"
-            min="1900"
-            max="2100"
+            placeholder="Select date"
             disabled={isReadOnly}
-            className="h-9"
+          />
+        </div>
+
+        {/* Claim Arrival Date */}
+        <div>
+          <Label className="text-sm font-medium flex items-center gap-2 mb-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            Claim Arrival Date
+          </Label>
+          <DatePicker
+            date={claimArrivalDate}
+            onSelect={(date) => {
+              setClaimArrivalDate(date);
+              // Auto-update when date is selected
+              const updates: Record<string, unknown> = { claimArrivalDate: date?.toISOString() || null };
+              if (claim.status === "NEW") {
+                updates.status = "IN_ANALYSIS";
+              }
+              onUpdate(updates);
+            }}
+            placeholder="Select date"
+            disabled={isReadOnly}
           />
         </div>
 

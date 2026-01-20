@@ -32,13 +32,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, company, claimId } = body;
 
-    if (!name) {
-      return NextResponse.json({ error: "Customer name is required" }, { status: 400 });
+    // At least name or company must be provided
+    if (!name && !company) {
+      return NextResponse.json({ error: "Customer name or company is required" }, { status: 400 });
     }
 
     const customer = await prisma.customer.create({
       data: {
-        name,
+        name: name || undefined,
         company: company || undefined,
       },
     });

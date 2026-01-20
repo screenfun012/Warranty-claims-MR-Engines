@@ -45,6 +45,8 @@ interface Claim {
   mrEngineCode: string | null;
   workerFault: string | null;
   yearEngineDone: number | null;
+  dateEngineDone: string | null;
+  claimArrivalDate: string | null;
   reason: string | null;
   isDomesticMarket: boolean;
 }
@@ -182,7 +184,8 @@ export default function StatisticsPage() {
       "Engine Code",
       "Fault Department",
       "Worker Fault",
-      "Year Engine Done",
+      "Date Engine Done",
+      "Claim Arrival Date",
       "Assigned To",
       "Reason",
       "Domestic Market",
@@ -199,7 +202,8 @@ export default function StatisticsPage() {
       claim.mrEngineCode || "",
       claim.faultDepartment?.name || "",
       claim.workerFault || "",
-      claim.yearEngineDone?.toString() || "",
+      claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "",
+      claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
       claim.assignedTo?.fullName || "",
       claim.reason || "",
       claim.isDomesticMarket ? "Yes" : "No",
@@ -488,7 +492,8 @@ export default function StatisticsPage() {
               { key: "engineType", label: "Engine Type" },
               { key: "engineCode", label: "Engine Code" },
               { key: "faultDept", label: "Fault Dept" },
-              { key: "year", label: "Year" },
+              { key: "dateEngineDone", label: "Date Engine Done" },
+              { key: "claimArrivalDate", label: "Claim Arrival" },
               { key: "assignedTo", label: "Assigned To" },
               { key: "market", label: "Market" },
               { key: "created", label: "Created" },
@@ -506,7 +511,8 @@ export default function StatisticsPage() {
               engineType: claim.engineType || "-",
               engineCode: claim.mrEngineCode || "-",
               faultDept: claim.faultDepartment?.name || "-",
-              year: claim.yearEngineDone?.toString() || "-",
+              dateEngineDone: claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "-",
+              claimArrivalDate: claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "-",
               assignedTo: claim.assignedTo?.fullName || "-",
               market: claim.isDomesticMarket ? (
                 <Badge variant="secondary">Domestic</Badge>

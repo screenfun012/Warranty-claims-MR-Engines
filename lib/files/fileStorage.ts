@@ -67,34 +67,34 @@ if (USE_WEBDAV) {
 
 /**
  * Get the base path/key for a claim's files
- * Returns: "<Customer Name> - <Claim Code>" format
+ * Returns: "<Company Name> - <MR Number>" format
  * If customer is not provided, will try to load it from database
  */
-async function getClaimBaseKey(claim: Claim & { customer?: { name: string | null } | null }): Promise<string> {
+async function getClaimBaseKey(claim: Claim & { customer?: { name: string | null; company?: string | null } | null }): Promise<string> {
   // Load customer if not provided
-  let customerName: string | null = null;
+  let companyName: string | null = null;
   if (claim.customer) {
-    customerName = claim.customer.name;
+    companyName = claim.customer.company || claim.customer.name; // Prefer company, fallback to name
   } else if (claim.customerId) {
     try {
       const prismaClient = await getPrisma();
       const customer = await prismaClient.customer.findUnique({
         where: { id: claim.customerId },
-        select: { name: true },
+        select: { name: true, company: true },
       });
-      customerName = customer?.name || null;
+      companyName = customer?.company || customer?.name || null;
     } catch (error) {
       console.warn(`[getClaimBaseKey] Failed to load customer for claim ${claim.id}:`, error);
     }
   }
 
-  // Format: "Customer Name - Claim Code"
-  const sanitizedCustomerName = sanitizeCustomerNameForPath(customerName);
+  // Format: "Company Name - MR Number"
+  const sanitizedCompanyName = sanitizeCustomerNameForPath(companyName);
   const sanitizedClaimCode = claim.claimCodeRaw
     ? sanitizeClaimCodeForPath(claim.claimCodeRaw)
     : claim.id;
 
-  return `${sanitizedCustomerName} - ${sanitizedClaimCode}`;
+  return `${sanitizedCompanyName} - ${sanitizedClaimCode}`;
 }
 
 /**

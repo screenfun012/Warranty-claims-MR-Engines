@@ -40,6 +40,8 @@ interface Claim {
   claimCodeRaw: string | null;
   customerNumber: string | null;
   yearEngineDone: number | null;
+  dateEngineDone: string | null;
+  claimArrivalDate: string | null;
   workerFault: string | null;
   reason: string | null;
   isDomesticMarket: boolean;
@@ -52,7 +54,7 @@ interface Claim {
   isLocked: boolean | null;
   customer: {
     id: string;
-    name: string;
+    name: string | null;
     company: string | null;
   } | null;
   faultDepartment: {
