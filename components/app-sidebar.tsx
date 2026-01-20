@@ -326,54 +326,65 @@ export function AppSidebar() {
           <SidebarMenu>
             <SidebarMenuItem>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    size="lg"
-                    className={cn(
-                      "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
-                      isCollapsed && "size-10"
-                    )}
-                  >
-                    {/* User Avatar */}
-                    <div className="relative shrink-0">
-                      <div className={cn(
-                        "rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent transition-all",
-                        isCollapsed ? "h-8 w-8" : "h-8 w-8"
-                      )}>
-                        <User className={cn(
-                          "text-primary",
-                          isCollapsed ? "h-4 w-4" : "h-4 w-4"
-                        )} />
-                      </div>
-                      {/* Role Icon Badge */}
-                      {userRole && !isCollapsed && (
-                        <div className={cn(
-                          "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background",
-                          userRole === "SUPER_ADMIN" && "bg-amber-500 dark:bg-amber-600",
-                          userRole === "ADMIN" && "bg-purple-500 dark:bg-purple-600",
-                          userRole === "OPERATOR" && "bg-blue-500 dark:bg-blue-600",
-                          userRole === "VIEWER" && "bg-gray-500 dark:bg-gray-600"
-                        )}>
-                          {userRole === "SUPER_ADMIN" && <Crown className="h-2.5 w-2.5 text-white" />}
-                          {userRole === "ADMIN" && <UserRoundCog className="h-2.5 w-2.5 text-white" />}
-                          {userRole === "OPERATOR" && <UserCheck className="h-2.5 w-2.5 text-white" />}
-                          {userRole === "VIEWER" && <Eye className="h-2.5 w-2.5 text-white" />}
-                        </div>
-                      )}
-                    </div>
-                    {!isCollapsed && (
-                      <>
-                        <div className="grid flex-1 text-left text-sm leading-tight">
-                          <span className="truncate font-semibold">{auth0User?.name || "Korisnik"}</span>
-                          {auth0User?.email && (
-                            <span className="truncate text-xs text-muted-foreground">{auth0User.email}</span>
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuButton
+                          size={isCollapsed ? "default" : "lg"}
+                          className={cn(
+                            "data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground",
+                            isCollapsed && "justify-center"
                           )}
-                        </div>
-                        <ChevronUp className="ml-auto size-4" />
-                      </>
+                        >
+                          {/* User Avatar */}
+                          <div className="relative shrink-0 flex items-center justify-center">
+                            <div className={cn(
+                              "rounded-full bg-primary/10 flex items-center justify-center ring-2 ring-sidebar-accent transition-all",
+                              isCollapsed ? "h-8 w-8" : "h-8 w-8"
+                            )}>
+                              <User className={cn(
+                                "text-primary shrink-0",
+                                isCollapsed ? "h-5 w-5" : "h-4 w-4"
+                              )} />
+                            </div>
+                            {/* Role Icon Badge */}
+                            {userRole && !isCollapsed && (
+                              <div className={cn(
+                                "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center ring-2 ring-background",
+                                userRole === "SUPER_ADMIN" && "bg-amber-500 dark:bg-amber-600",
+                                userRole === "ADMIN" && "bg-purple-500 dark:bg-purple-600",
+                                userRole === "OPERATOR" && "bg-blue-500 dark:bg-blue-600",
+                                userRole === "VIEWER" && "bg-gray-500 dark:bg-gray-600"
+                              )}>
+                                {userRole === "SUPER_ADMIN" && <Crown className="h-2.5 w-2.5 text-white" />}
+                                {userRole === "ADMIN" && <UserRoundCog className="h-2.5 w-2.5 text-white" />}
+                                {userRole === "OPERATOR" && <UserCheck className="h-2.5 w-2.5 text-white" />}
+                                {userRole === "VIEWER" && <Eye className="h-2.5 w-2.5 text-white" />}
+                              </div>
+                            )}
+                          </div>
+                          {!isCollapsed && (
+                            <>
+                              <div className="grid flex-1 text-left text-sm leading-tight">
+                                <span className="truncate font-semibold">{auth0User?.name || "Korisnik"}</span>
+                                {auth0User?.email && (
+                                  <span className="truncate text-xs text-muted-foreground">{auth0User.email}</span>
+                                )}
+                              </div>
+                              <ChevronUp className="ml-auto size-4 shrink-0" />
+                            </>
+                          )}
+                        </SidebarMenuButton>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    {isCollapsed && (
+                      <TooltipContent side="right">
+                        <span>{auth0User?.name || t('nav.profile')}</span>
+                      </TooltipContent>
                     )}
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
+                  </Tooltip>
+                </TooltipProvider>
                 <DropdownMenuContent
                   className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
                   side={isCollapsed ? "right" : "top"}
