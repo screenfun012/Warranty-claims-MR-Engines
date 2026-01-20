@@ -216,26 +216,23 @@ export async function PATCH(
       updateData.claimPrefix = body.claimPrefix;
     }
 
-    // Handle assignedToName - create or find user by name
+    // Handle assignedToName - find existing user by name ONLY (do NOT create new users)
+    // assignedTo represents the worker who built the engine, not a new application user
+    // Users are created ONLY when they log in via Auth0, not from metadata
     if (body.assignedToName !== undefined) {
       if (body.assignedToName.trim()) {
-        // Find or create user by name
-        let user = await prisma.user.findFirst({
+        // Find existing user by name - do NOT create if not found
+        const user = await prisma.user.findFirst({
           where: { fullName: body.assignedToName.trim() },
         });
         
-        if (!user) {
-          // Create new user with just the name
-          user = await prisma.user.create({
-            data: {
-              fullName: body.assignedToName.trim(),
-              email: `${body.assignedToName.trim().toLowerCase().replace(/\s+/g, '.')}@mrgroup.rs`,
-              role: "WORKER",
-            },
-          });
+        if (user) {
+          updateData.assignedToId = user.id;
+        } else {
+          // User doesn't exist - clear assignedTo (don't create fake users from metadata)
+          updateData.assignedToId = null;
+          console.warn(`[PATCH /api/claims/${id}] User with name "${body.assignedToName.trim()}" not found. assignedTo cleared. Users are created only via Auth0 login.`);
         }
-        
-        updateData.assignedToId = user.id;
       } else {
         // Clear assignedTo if name is empty
         updateData.assignedToId = null;

@@ -236,6 +236,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   // Save field on blur
   const handleFieldBlur = (field: string, value: string | number | boolean | null) => {
     setEditingField(null);
+    if (isReadOnly) return;
     
     // Get original value
     let originalValue: any = null;
@@ -248,11 +249,20 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       case 'yearEngineDone': originalValue = claim.yearEngineDone; break;
       case 'reason': originalValue = claim.reason; break;
       case 'isDomesticMarket': originalValue = claim.isDomesticMarket; break;
+      case 'dateEngineDone': originalValue = claim.dateEngineDone; break;
+      case 'claimArrivalDate': originalValue = claim.claimArrivalDate; break;
+      default: return; // Unknown field, don't save
     }
     
+    // Normalize values for comparison (empty string = null for strings)
+    const normalizedValue = typeof value === 'string' && value.trim() === '' ? null : value;
+    const normalizedOriginal = originalValue === null || originalValue === undefined 
+      ? null 
+      : (typeof originalValue === 'string' && originalValue.trim() === '' ? null : originalValue);
+    
     // Only save if value changed
-    if (value !== (originalValue ?? (typeof value === 'string' ? "" : typeof value === 'number' ? null : false))) {
-      const updates: Record<string, unknown> = { [field]: value };
+    if (normalizedValue !== normalizedOriginal) {
+      const updates: Record<string, unknown> = { [field]: normalizedValue };
       // Auto-change status to IN_ANALYSIS if currently NEW
       if (claim.status === "NEW") {
         updates.status = "IN_ANALYSIS";
