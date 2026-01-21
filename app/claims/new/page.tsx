@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Plus } from "lucide-react";
 
 // Predefined list of companies
 const COMPANY_LIST = [
@@ -23,6 +25,9 @@ const COMPANY_LIST = [
 ];
 
 export default function NewClaimPage() {
+  const [companies, setCompanies] = useState<string[]>(COMPANY_LIST);
+  const [newCompany, setNewCompany] = useState("");
+  const [showAddCompany, setShowAddCompany] = useState(false);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -170,19 +175,84 @@ export default function NewClaimPage() {
               <Label>Customer Company</Label>
               <Select
                 value={formData.customerCompany}
-                onValueChange={(value) => setFormData({ ...formData, customerCompany: value })}
+                onValueChange={(value) => {
+                  if (value === "__add_new__") {
+                    setShowAddCompany(true);
+                  } else {
+                    setFormData({ ...formData, customerCompany: value });
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select company" />
                 </SelectTrigger>
                 <SelectContent>
-                  {COMPANY_LIST.map((company) => (
+                  {companies.map((company) => (
                     <SelectItem key={company} value={company}>
                       {company}
                     </SelectItem>
                   ))}
+                  <SelectItem 
+                    value="__add_new__" 
+                    className="text-primary font-medium"
+                  >
+                    <Plus className="h-4 w-4 inline mr-2" />
+                    Dodaj novu kompaniju
+                  </SelectItem>
                 </SelectContent>
               </Select>
+              {showAddCompany && (
+                <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Dodaj novu kompaniju</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div>
+                        <Label>Naziv kompanije</Label>
+                        <Input
+                          value={newCompany}
+                          onChange={(e) => setNewCompany(e.target.value)}
+                          placeholder="Unesi naziv kompanije"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && newCompany.trim()) {
+                              const trimmed = newCompany.trim();
+                              if (!companies.includes(trimmed)) {
+                                setCompanies([...companies, trimmed]);
+                                setFormData({ ...formData, customerCompany: trimmed });
+                                setNewCompany("");
+                                setShowAddCompany(false);
+                              }
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => {
+                          setShowAddCompany(false);
+                          setNewCompany("");
+                        }}>
+                          Otkaži
+                        </Button>
+                        <Button 
+                          onClick={() => {
+                            const trimmed = newCompany.trim();
+                            if (trimmed && !companies.includes(trimmed)) {
+                              setCompanies([...companies, trimmed]);
+                              setFormData({ ...formData, customerCompany: trimmed });
+                              setNewCompany("");
+                              setShowAddCompany(false);
+                            }
+                          }}
+                          disabled={!newCompany.trim() || companies.includes(newCompany.trim())}
+                        >
+                          Dodaj
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              )}
             </div>
 
             {/* Date Engine Done - Optional */}

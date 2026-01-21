@@ -111,6 +111,27 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const auth0User = user as any;
   const userRole = auth0User?.['https://mr-engines-warranty/roles']?.[0] || auth0User?.role || "VIEWER";
   const canManageDepartments = hasMinRole(userRole, "ADMIN");
+  
+  // State for workers and companies (with ability to add new ones)
+  // Initialize with predefined lists + any existing values from claim
+  const [workers, setWorkers] = useState<string[]>(() => {
+    const baseWorkers = [...WORKER_LIST];
+    if (claim.assignedWorkerName && !baseWorkers.includes(claim.assignedWorkerName)) {
+      baseWorkers.push(claim.assignedWorkerName);
+    }
+    return baseWorkers;
+  });
+  const [companies, setCompanies] = useState<string[]>(() => {
+    const baseCompanies = [...COMPANY_LIST];
+    if (claim.customer?.company && !baseCompanies.includes(claim.customer.company)) {
+      baseCompanies.push(claim.customer.company);
+    }
+    return baseCompanies;
+  });
+  const [newWorker, setNewWorker] = useState("");
+  const [newCompany, setNewCompany] = useState("");
+  const [showAddWorker, setShowAddWorker] = useState(false);
+  const [showAddCompany, setShowAddCompany] = useState(false);
 
   // Local state for all editable fields
   const [claimCode, setClaimCode] = useState(claim.claimCodeRaw || "");
@@ -537,8 +558,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           <Select
             value={customerCompany}
             onValueChange={(value) => {
-              setCustomerCompany(value);
-              handleCustomerUpdate('company', value);
+              if (value === "__add_new__") {
+                setShowAddCompany(true);
+              } else {
+                setCustomerCompany(value);
+                handleCustomerUpdate('company', value);
+              }
             }}
             disabled={isReadOnly}
           >
@@ -546,13 +571,74 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               <SelectValue placeholder="Select company" />
             </SelectTrigger>
             <SelectContent>
-              {COMPANY_LIST.map((company) => (
+              {companies.map((company) => (
                 <SelectItem key={company} value={company}>
                   {company}
                 </SelectItem>
               ))}
+              <SelectItem 
+                value="__add_new__" 
+                className="text-primary font-medium"
+              >
+                <Plus className="h-4 w-4 inline mr-2" />
+                Dodaj novu kompaniju
+              </SelectItem>
             </SelectContent>
           </Select>
+          {showAddCompany && (
+            <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Dodaj novu kompaniju</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Naziv kompanije</Label>
+                    <Input
+                      value={newCompany}
+                      onChange={(e) => setNewCompany(e.target.value)}
+                      placeholder="Unesi naziv kompanije"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newCompany.trim()) {
+                          const trimmed = newCompany.trim();
+                          if (!companies.includes(trimmed)) {
+                            setCompanies([...companies, trimmed]);
+                            setCustomerCompany(trimmed);
+                            handleCustomerUpdate('company', trimmed);
+                            setNewCompany("");
+                            setShowAddCompany(false);
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => {
+                      setShowAddCompany(false);
+                      setNewCompany("");
+                    }}>
+                      Otkaži
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        const trimmed = newCompany.trim();
+                        if (trimmed && !companies.includes(trimmed)) {
+                          setCompanies([...companies, trimmed]);
+                          setCustomerCompany(trimmed);
+                          handleCustomerUpdate('company', trimmed);
+                          setNewCompany("");
+                          setShowAddCompany(false);
+                        }
+                      }}
+                      disabled={!newCompany.trim() || companies.includes(newCompany.trim())}
+                    >
+                      Dodaj
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {/* Engine Type */}
@@ -591,8 +677,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           <Select
             value={assignedWorkerName}
             onValueChange={(value) => {
-              setAssignedWorkerName(value);
-              handleFieldBlur('assignedWorkerName', value);
+              if (value === "__add_new__") {
+                setShowAddWorker(true);
+              } else {
+                setAssignedWorkerName(value);
+                handleFieldBlur('assignedWorkerName', value);
+              }
             }}
             disabled={isReadOnly}
           >
@@ -600,13 +690,74 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               <SelectValue placeholder="Select worker" />
             </SelectTrigger>
             <SelectContent>
-              {WORKER_LIST.map((worker) => (
+              {workers.map((worker) => (
                 <SelectItem key={worker} value={worker}>
                   {worker}
                 </SelectItem>
               ))}
+              <SelectItem 
+                value="__add_new__" 
+                className="text-primary font-medium"
+              >
+                <Plus className="h-4 w-4 inline mr-2" />
+                Dodaj novog radnika
+              </SelectItem>
             </SelectContent>
           </Select>
+          {showAddWorker && (
+            <Dialog open={showAddWorker} onOpenChange={setShowAddWorker}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Dodaj novog radnika</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Ime i prezime radnika</Label>
+                    <Input
+                      value={newWorker}
+                      onChange={(e) => setNewWorker(e.target.value)}
+                      placeholder="Unesi ime i prezime"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newWorker.trim()) {
+                          const trimmed = newWorker.trim();
+                          if (!workers.includes(trimmed)) {
+                            setWorkers([...workers, trimmed]);
+                            setAssignedWorkerName(trimmed);
+                            handleFieldBlur('assignedWorkerName', trimmed);
+                            setNewWorker("");
+                            setShowAddWorker(false);
+                          }
+                        }
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="outline" onClick={() => {
+                      setShowAddWorker(false);
+                      setNewWorker("");
+                    }}>
+                      Otkaži
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        const trimmed = newWorker.trim();
+                        if (trimmed && !workers.includes(trimmed)) {
+                          setWorkers([...workers, trimmed]);
+                          setAssignedWorkerName(trimmed);
+                          handleFieldBlur('assignedWorkerName', trimmed);
+                          setNewWorker("");
+                          setShowAddWorker(false);
+                        }
+                      }}
+                      disabled={!newWorker.trim() || workers.includes(newWorker.trim())}
+                    >
+                      Dodaj
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
 
         {/* Fault Department - Multi-select */}

@@ -314,12 +314,6 @@ export async function PATCH(
           include: {
             customer: true,
             faultDepartment: true,
-            faultDepartments: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
             workOrder: {
               include: {
                 worker: {
