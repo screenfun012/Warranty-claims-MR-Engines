@@ -20,91 +20,89 @@ export async function GET(
     await requirePermission(PERMISSIONS.CLAIMS_READ);
     
     const { id } = await params;
-    console.log(`[GET /api/claims/${id}] Fetching claim with ID: ${id} (type: ${typeof id})`);
+    console.log(`[GET /api/claims/${id}] Fetching claim with ID: ${id}`);
 
-    // First, check if claim exists at all
-    const claimExists = await prisma.claim.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    console.log(`[GET /api/claims/${id}] Claim exists check:`, claimExists ? `YES (found ID: ${claimExists.id})` : "NO");
-
-    // Also try to list all claims to see what IDs exist
-    const allClaims = await prisma.claim.findMany({
-      select: { id: true, status: true },
-      take: 10,
-      orderBy: { createdAt: "desc" },
-    });
-    console.log(`[GET /api/claims/${id}] Recent claims in DB:`, allClaims.map((c: { id: string; status: string }) => ({ id: c.id, status: c.status })));
-
-    const claim = await prisma.claim.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        faultDepartment: true,
-        faultDepartments: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        workOrder: {
-          include: {
-            worker: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
+    // Base include options (without faultDepartments)
+    const baseInclude = {
+      customer: true,
+      faultDepartment: true,
+      workOrder: {
+        include: {
+          worker: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
             },
-          },
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
-          },
-        },
-        emailThreads: {
-          include: {
-            messages: {
-              include: {
-                attachments: true,
-              },
-              orderBy: {
-                date: "asc",
-              },
-            },
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
-        },
-        attachments: true,
-        clientDocuments: {
-          include: {
-            attachment: true,
-          },
-        },
-        photos: {
-          include: {
-            attachment: true,
-          },
-          orderBy: {
-            indexNo: "asc",
-          },
-        },
-        reportSections: {
-          orderBy: {
-            orderIndex: "asc",
           },
         },
       },
-    });
+      assignedTo: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      emailThreads: {
+        include: {
+          messages: {
+            include: {
+              attachments: true,
+            },
+            orderBy: {
+              date: "asc" as const,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc" as const,
+        },
+      },
+      attachments: true,
+      clientDocuments: {
+        include: {
+          attachment: true,
+        },
+      },
+      photos: {
+        include: {
+          attachment: true,
+        },
+        orderBy: {
+          indexNo: "asc" as const,
+        },
+      },
+      reportSections: {
+        orderBy: {
+          orderIndex: "asc" as const,
+        },
+      },
+    };
 
-    if (!claim) {
-      return NextResponse.json({ error: "Claim not found" }, { status: 404 });
+    // Try to fetch claim - first with faultDepartments, fallback without
+    let claim = null;
+    
+    try {
+      claim = await prisma.claim.findUnique({
+        where: { id },
+        include: {
+          ...baseInclude,
+          faultDepartments: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+    } catch (faultDeptError) {
+      console.warn(`[GET /api/claims/${id}] faultDepartments include failed, trying without:`, faultDeptError);
+      // Fallback without faultDepartments
+      claim = await prisma.claim.findUnique({
+        where: { id },
+        include: baseInclude,
+      });
     }
 
     if (!claim) {
@@ -113,28 +111,15 @@ export async function GET(
     }
 
     // Explicitly fetch claimAcceptanceStatus from DB to ensure we get the latest value
-    // (Prisma might cache the value after raw SQL updates)
     const statusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
       `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
       id
     );
     if (statusResult && statusResult.length > 0) {
       (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
-      console.log(`[GET /api/claims/${id}] Fetched claimAcceptanceStatus from DB:`, statusResult[0].claimAcceptanceStatus);
-    }
-    
-    // Also fetch claimAcceptanceStatus in PATCH response
-    if (claim) {
-      const patchStatusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
-        `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
-        id
-      );
-      if (patchStatusResult && patchStatusResult.length > 0) {
-        (claim as any).claimAcceptanceStatus = patchStatusResult[0].claimAcceptanceStatus;
-      }
     }
 
-    console.log(`[GET /api/claims/${id}] Successfully fetched claim. claimAcceptanceStatus:`, claim.claimAcceptanceStatus);
+    console.log(`[GET /api/claims/${id}] Successfully fetched claim`);
     return NextResponse.json({ claim });
   } catch (error) {
     console.error("Error fetching claim:", error);
@@ -292,15 +277,20 @@ export async function PATCH(
     // Handle multiple fault departments update
     if (body.faultDepartmentIds !== undefined) {
       const departmentIds = Array.isArray(body.faultDepartmentIds) ? body.faultDepartmentIds : [];
-      // Connect/disconnect departments
-      await prisma.claim.update({
-        where: { id },
-        data: {
-          faultDepartments: {
-            set: departmentIds.map((deptId: string) => ({ id: deptId })),
+      // Connect/disconnect departments (wrapped in try-catch in case junction table doesn't exist)
+      try {
+        await prisma.claim.update({
+          where: { id },
+          data: {
+            faultDepartments: {
+              set: departmentIds.map((deptId: string) => ({ id: deptId })),
+            },
           },
-        },
-      });
+        });
+      } catch (faultDeptError) {
+        console.warn(`[PATCH /api/claims/${id}] Failed to update faultDepartments:`, faultDeptError);
+        // Continue without failing - the junction table might not exist yet
+      }
       delete updateData.faultDepartmentIds;
     }
 
