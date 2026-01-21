@@ -294,70 +294,88 @@ export async function PATCH(
       delete updateData.faultDepartmentIds;
     }
 
+    // Base include options for responses
+    const baseResponseInclude = {
+      customer: true,
+      faultDepartment: true,
+      workOrder: {
+        include: {
+          worker: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
+          },
+        },
+      },
+      assignedTo: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      emailThreads: {
+        include: {
+          messages: {
+            include: {
+              attachments: true,
+            },
+            orderBy: {
+              date: "asc" as const,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc" as const,
+        },
+      },
+      attachments: true,
+      clientDocuments: {
+        include: {
+          attachment: true,
+        },
+      },
+      photos: {
+        include: {
+          attachment: true,
+        },
+        orderBy: {
+          indexNo: "asc" as const,
+        },
+      },
+      reportSections: {
+        orderBy: {
+          orderIndex: "asc" as const,
+        },
+      },
+    };
+
     // Update other fields using Prisma if needed
     let claim;
     if (Object.keys(updateData).length > 0) {
       try {
-        claim = await prisma.claim.update({
-          where: { id },
-          data: updateData as any,
-          include: {
-            customer: true,
-            faultDepartment: true,
-            workOrder: {
-              include: {
-                worker: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    email: true,
-                  },
-                },
+        // Try to include faultDepartments, fallback without if table doesn't exist
+        try {
+          claim = await prisma.claim.update({
+            where: { id },
+            data: updateData as any,
+            include: {
+              ...baseResponseInclude,
+              faultDepartments: {
+                select: { id: true, name: true },
               },
             },
-            assignedTo: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
-            },
-            emailThreads: {
-              include: {
-                messages: {
-                  include: {
-                    attachments: true,
-                  },
-                  orderBy: {
-                    date: "asc",
-                  },
-                },
-              },
-              orderBy: {
-                createdAt: "desc",
-              },
-            },
-            attachments: true,
-            clientDocuments: {
-              include: {
-                attachment: true,
-              },
-            },
-            photos: {
-              include: {
-                attachment: true,
-              },
-              orderBy: {
-                indexNo: "asc",
-              },
-            },
-            reportSections: {
-              orderBy: {
-                orderIndex: "asc",
-              },
-            },
-          },
-        });
+          });
+        } catch (includeError) {
+          console.warn(`[PATCH /api/claims/${id}] faultDepartments include failed, trying without`);
+          claim = await prisma.claim.update({
+            where: { id },
+            data: updateData as any,
+            include: baseResponseInclude,
+          });
+        }
       } catch (error) {
         // If Prisma update fails (e.g., type issues), use raw SQL as fallback
         console.log(`[PATCH /api/claims/${id}] Prisma update failed, using raw SQL fallback:`, error);
@@ -375,130 +393,42 @@ export async function PATCH(
             );
           }
         }
-        // Fetch claim after raw SQL update
-        claim = await prisma.claim.findUnique({
-          where: { id },
-          include: {
-            customer: true,
-            workOrder: {
-              include: {
-                worker: {
-                  select: {
-                    id: true,
-                    fullName: true,
-                    email: true,
-                  },
-                },
-              },
+        // Fetch claim after raw SQL update - try with faultDepartments
+        try {
+          claim = await prisma.claim.findUnique({
+            where: { id },
+            include: {
+              ...baseResponseInclude,
+              faultDepartments: { select: { id: true, name: true } },
             },
-            assignedTo: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
-            },
-            emailThreads: {
-              include: {
-                messages: {
-                  include: {
-                    attachments: true,
-                  },
-                  orderBy: {
-                    date: "asc",
-                  },
-                },
-              },
-              orderBy: {
-                createdAt: "desc",
-              },
-            },
-            attachments: true,
-            clientDocuments: {
-              include: {
-                attachment: true,
-              },
-            },
-            photos: {
-              include: {
-                attachment: true,
-              },
-              orderBy: {
-                indexNo: "asc",
-              },
-            },
-            reportSections: {
-              orderBy: {
-                orderIndex: "asc",
-              },
-            },
-          },
-        });
+          });
+        } catch {
+          claim = await prisma.claim.findUnique({
+            where: { id },
+            include: baseResponseInclude,
+          });
+        }
         // Manually set claimAcceptanceStatus from raw query
         if (claim && acceptanceStatus !== undefined) {
           (claim as any).claimAcceptanceStatus = acceptanceStatus;
         }
       }
     } else {
-      // Only claimAcceptanceStatus was updated, fetch the claim and explicitly set the status
-      claim = await prisma.claim.findUnique({
-        where: { id },
-        include: {
-          customer: true,
-          workOrder: {
-            include: {
-              worker: {
-                select: {
-                  id: true,
-                  fullName: true,
-                  email: true,
-                },
-              },
-            },
+      // Only claimAcceptanceStatus was updated, fetch the claim - try with faultDepartments
+      try {
+        claim = await prisma.claim.findUnique({
+          where: { id },
+          include: {
+            ...baseResponseInclude,
+            faultDepartments: { select: { id: true, name: true } },
           },
-          assignedTo: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-            },
-          },
-          emailThreads: {
-            include: {
-              messages: {
-                include: {
-                  attachments: true,
-                },
-                orderBy: {
-                  date: "asc",
-                },
-              },
-            },
-            orderBy: {
-              createdAt: "desc",
-            },
-          },
-          attachments: true,
-          clientDocuments: {
-            include: {
-              attachment: true,
-            },
-          },
-          photos: {
-            include: {
-              attachment: true,
-            },
-            orderBy: {
-              indexNo: "asc",
-            },
-          },
-          reportSections: {
-            orderBy: {
-              orderIndex: "asc",
-            },
-          },
-        },
-      });
+        });
+      } catch {
+        claim = await prisma.claim.findUnique({
+          where: { id },
+          include: baseResponseInclude,
+        });
+      }
       
       // Explicitly set claimAcceptanceStatus from the value we just saved
       if (claim && acceptanceStatus !== undefined) {

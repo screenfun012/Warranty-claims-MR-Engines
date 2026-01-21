@@ -304,7 +304,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setEngineCode(claim.mrEngineCode || "");
       setAssignedWorkerName(claim.assignedWorkerName || "");
       setFaultDepartmentId(claim.faultDepartment?.id || "");
-      setFaultDepartmentIds(claim.faultDepartments?.map((d) => d.id) || (claim.faultDepartment?.id ? [claim.faultDepartment.id] : []));
+      // Set faultDepartmentIds - prefer faultDepartments array, fallback to single faultDepartment
+      if (claim.faultDepartments && claim.faultDepartments.length > 0) {
+        setFaultDepartmentIds(claim.faultDepartments.map((d) => d.id));
+      } else if (claim.faultDepartment?.id) {
+        setFaultDepartmentIds([claim.faultDepartment.id]);
+      } else {
+        setFaultDepartmentIds([]);
+      }
       setWorkerFault(claim.workerFault || "");
       setYearEngineDone(claim.yearEngineDone?.toString() || "");
       setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
@@ -324,10 +331,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (claim.mrEngineCode !== engineCode) setEngineCode(claim.mrEngineCode || "");
       if (claim.assignedWorkerName !== assignedWorkerName) setAssignedWorkerName(claim.assignedWorkerName || "");
       if (claim.faultDepartment?.id !== faultDepartmentId) setFaultDepartmentId(claim.faultDepartment?.id || "");
-      // Sync multiple fault departments
-      const newFaultDepartmentIds = claim.faultDepartments?.map((d) => d.id) || (claim.faultDepartment?.id ? [claim.faultDepartment.id] : []);
-      if (JSON.stringify(newFaultDepartmentIds.sort()) !== JSON.stringify(faultDepartmentIds.sort())) {
-        setFaultDepartmentIds(newFaultDepartmentIds);
+      // Sync multiple fault departments - only if API actually returned faultDepartments array
+      // Don't reset to empty if faultDepartments is undefined (API might not have returned it)
+      if (claim.faultDepartments !== undefined) {
+        const newFaultDepartmentIds = claim.faultDepartments.map((d) => d.id);
+        if (JSON.stringify(newFaultDepartmentIds.sort()) !== JSON.stringify(faultDepartmentIds.sort())) {
+          setFaultDepartmentIds(newFaultDepartmentIds);
+        }
       }
       if (claim.workerFault !== workerFault) setWorkerFault(claim.workerFault || "");
       if (claim.yearEngineDone?.toString() !== yearEngineDone) setYearEngineDone(claim.yearEngineDone?.toString() || "");
