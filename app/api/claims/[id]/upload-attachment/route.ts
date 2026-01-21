@@ -41,31 +41,10 @@ export async function POST(
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Save file to disk
-    const filePath = await saveAttachmentForClaim({
-      claim,
-      fileBuffer: buffer,
-      originalFileName: file.name,
-      mimeType: file.type || "application/octet-stream",
-      subfolder: "03_attachments",
-    });
-
-    // Create attachment record
-    const attachment = await prisma.attachment.create({
-      data: {
-        claimId: claim.id,
-        fileName: file.name,
-        mimeType: file.type || "application/octet-stream",
-        filePath,
-        isRelevant: true,
-        source: "INTERNAL_TEARDOWN",
-      },
-    });
-
-    // Determine file type - check extension first, then mimeType
-    const mimeType = file.type || "application/octet-stream";
+    // Determine file type to choose correct subfolder
     const fileName = file.name || "";
     const fileNameLower = fileName.toLowerCase();
+    const mimeType = file.type || "application/octet-stream";
     
     // Check by extension first (more reliable)
     const isImageByExt = /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$/i.test(fileName);
@@ -83,6 +62,32 @@ export async function POST(
     const isImage = isImageByExt || (isImageByMime && !isPdfByExt && !isDocxByExt);
     const isPdf = isPdfByExt || (isPdfByMime && !isImageByExt && !isDocxByExt);
     const isDocx = isDocxByExt || (isDocxByMime && !isImageByExt && !isPdfByExt);
+    
+    // Choose subfolder based on file type
+    const subfolder = isImage ? "01_photos" : (isPdf || isDocx) ? "02_documents" : "03_attachments";
+
+    // Save file to disk
+    const filePath = await saveAttachmentForClaim({
+      claim,
+      fileBuffer: buffer,
+      originalFileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      subfolder,
+    });
+
+    // Create attachment record
+    const attachment = await prisma.attachment.create({
+      data: {
+        claimId: claim.id,
+        fileName: file.name,
+        mimeType: file.type || "application/octet-stream",
+        filePath,
+        isRelevant: true,
+        source: "INTERNAL_TEARDOWN",
+      },
+    });
+
+    // File type already determined above for subfolder selection
 
     // Create Photo if it's an image (and NOT a PDF/DOCX)
     if (isImage && !isPdf && !isDocx) {

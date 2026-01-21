@@ -58,7 +58,8 @@
     "totalClaims": "Total Claims",
     "openClaims": "Open Claims",
     "closedClaims": "Closed Claims",
-    "pendingClaims": "Pending Claims"
+    "pendingClaims": "Pending Claims",
+    "urgentClaims": "Urgent Claims"
   },
   "inbox": {
     "title": "Inbox",

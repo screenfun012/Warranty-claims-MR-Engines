@@ -225,7 +225,7 @@ export async function GET() {
       id: string;
       claimCodeRaw: string | null;
       status: string;
-      customer: { name: string | null } | null;
+      customer: { name: string | null; company: string | null } | null;
       createdAt: Date;
     }> = [];
     try {
@@ -242,6 +242,7 @@ export async function GET() {
           customer: {
             select: {
               name: true,
+              company: true,
             },
           },
         },
@@ -267,52 +268,54 @@ export async function GET() {
       console.error("Error fetching unread emails count:", error);
     }
 
-    // Get urgent claims (NEW that are older than 7 days)
+    // Get urgent claims (IN_ANALYSIS status, older than 7 days)
     let urgentClaims: Array<{
       id: string;
       claimCodeRaw: string | null;
       status: string;
-      customer: { name: string | null } | null;
+      customer: { name: string | null; company: string | null } | null;
       createdAt: Date;
+      claimArrivalDate: Date | null;
     }> = [];
     try {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      // Hitne reklamacije: NEW ili IN_ANALYSIS status, starije od 7 dana
-      urgentClaims = await prisma.claim.findMany({
+      // Hitne reklamacije: samo IN_ANALYSIS status, starije od 7 dana
+      // Koristi claimArrivalDate ako postoji, inače createdAt
+      const allInAnalysis = await prisma.claim.findMany({
         where: {
-          OR: [
-            {
-              status: "NEW",
-              createdAt: {
-                lt: sevenDaysAgo,
-              },
-            },
-            {
-              status: "IN_ANALYSIS",
-              createdAt: {
-                lt: sevenDaysAgo,
-              },
-            },
-          ],
-        },
-        take: 10,
-        orderBy: {
-          createdAt: "asc",
+          status: "IN_ANALYSIS",
         },
         select: {
           id: true,
           claimCodeRaw: true,
           status: true,
           createdAt: true,
+          claimArrivalDate: true,
           customer: {
             select: {
               name: true,
+              company: true,
             },
           },
         },
       });
+      
+      // Filter claims that are older than 7 days (using claimArrivalDate if available, otherwise createdAt)
+      urgentClaims = allInAnalysis
+        .filter((claim) => {
+          const referenceDate = claim.claimArrivalDate 
+            ? new Date(claim.claimArrivalDate) 
+            : new Date(claim.createdAt);
+          return referenceDate < sevenDaysAgo;
+        })
+        .slice(0, 10)
+        .sort((a, b) => {
+          const dateA = a.claimArrivalDate ? new Date(a.claimArrivalDate) : new Date(a.createdAt);
+          const dateB = b.claimArrivalDate ? new Date(b.claimArrivalDate) : new Date(b.createdAt);
+          return dateA.getTime() - dateB.getTime(); // Oldest first
+        });
     } catch (error) {
       console.error("Error fetching urgent claims:", error);
     }
@@ -408,6 +411,7 @@ export async function GET() {
         status: c.status,
         customer: c.customer,
         createdAt: c.createdAt.toISOString(),
+        claimArrivalDate: c.claimArrivalDate ? c.claimArrivalDate.toISOString() : null,
       })),
       claimsByMonth,
     };

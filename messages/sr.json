@@ -58,7 +58,8 @@
     "totalClaims": "Ukupno reklamacija",
     "openClaims": "Otvorene reklamacije",
     "closedClaims": "Zatvorene reklamacije",
-    "pendingClaims": "Na čekanju"
+    "pendingClaims": "Na čekanju",
+    "urgentClaims": "Hitne reklamacije"
   },
   "inbox": {
     "title": "Pristiglo",

@@ -287,7 +287,7 @@ export default function DashboardPage() {
 
         <Card className="p-6 bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">{tClaims('acceptance.ACCEPTED')}</p>
+            <p className="text-sm font-medium text-muted-foreground">{tClaims('status.APPROVED')}</p>
             <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           </div>
           <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
@@ -297,7 +297,7 @@ export default function DashboardPage() {
 
         <Card className="p-6 bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20 transition-all hover:shadow-lg">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-medium text-muted-foreground">{tClaims('acceptance.REJECTED')}</p>
+            <p className="text-sm font-medium text-muted-foreground">{tClaims('status.REJECTED')}</p>
             <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
           </div>
           <p className="text-4xl font-bold text-red-600 dark:text-red-400">
@@ -333,7 +333,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <CheckCircle className="h-5 w-5 text-muted-foreground" />
-              <h3 className="font-semibold">{tClaims('acceptance.ACCEPTED')}</h3>
+              <h3 className="font-semibold">{tClaims('status.APPROVED')}</h3>
             </div>
             <span className="text-2xl font-bold">{approvalRate}%</span>
           </div>
@@ -381,7 +381,7 @@ export default function DashboardPage() {
                     </div>
                     {claim.customer && (
                       <p className="text-sm text-muted-foreground truncate">
-                        {claim.customer.name}
+                        {(claim.customer as any).company || claim.customer.name}
                       </p>
                     )}
                   </div>
@@ -399,7 +399,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-              {tDashboard('pendingClaims')}
+              {tDashboard('urgentClaims')}
             </h2>
             <Button 
               variant="ghost" 
@@ -412,9 +412,12 @@ export default function DashboardPage() {
           </div>
           {stats.urgentClaims && stats.urgentClaims.length > 0 ? (
             <div className="space-y-3">
-              {stats.urgentClaims.slice(0, 5).map((claim) => {
+              {stats.urgentClaims.slice(0, 5).map((claim: any) => {
+                const referenceDate = claim.claimArrivalDate 
+                  ? new Date(claim.claimArrivalDate) 
+                  : new Date(claim.createdAt);
                 const daysAgo = Math.floor(
-                  (new Date().getTime() - new Date(claim.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+                  (new Date().getTime() - referenceDate.getTime()) / (1000 * 60 * 60 * 24)
                 );
                 return (
                   <div
@@ -442,7 +445,7 @@ export default function DashboardPage() {
                       </div>
                       {claim.customer && (
                         <p className="text-sm text-muted-foreground truncate">
-                          {claim.customer.name}
+                          {claim.customer.company || claim.customer.name}
                         </p>
                       )}
                     </div>
