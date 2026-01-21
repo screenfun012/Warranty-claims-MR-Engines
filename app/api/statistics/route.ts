@@ -87,40 +87,57 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch claims with all necessary relations
-    const claims = await prisma.claim.findMany({
-      where,
-      include: {
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            company: true,
-          },
-        },
-        faultDepartment: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        faultDepartments: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            fullName: true,
-          },
+    // Base include without faultDepartments
+    const baseInclude = {
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          company: true,
         },
       },
-      orderBy: {
-        createdAt: "desc",
+      faultDepartment: {
+        select: {
+          id: true,
+          name: true,
+        },
       },
-    });
+      assignedTo: {
+        select: {
+          id: true,
+          fullName: true,
+        },
+      },
+    };
+
+    // Fetch claims with all necessary relations - try with faultDepartments, fallback without
+    let claims;
+    try {
+      claims = await prisma.claim.findMany({
+        where,
+        include: {
+          ...baseInclude,
+          faultDepartments: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+    } catch (faultDeptError) {
+      console.warn("[GET /api/statistics] faultDepartments include failed, trying without:", faultDeptError);
+      claims = await prisma.claim.findMany({
+        where,
+        include: baseInclude,
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+    }
 
     // Get total count
     const totalCount = await prisma.claim.count({ where });

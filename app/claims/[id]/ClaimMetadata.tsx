@@ -23,17 +23,17 @@ interface Department {
   isSystem: boolean;
 }
 
-// Predefined list of workers
-const WORKER_LIST = [
-  "IVICA STANISAVLJEVĆ",
+// Fallback lists (used if API fails)
+const FALLBACK_WORKER_LIST = [
+  "IVICA STANISAVLJEVIĆ",
   "IVAN STANISAVLJEVIĆ",
   "EMRUŠ DULJAJ",
   "ELMEDIN DULJAJ",
-  "PETAR PETROVIC",
+  "PETAR PETROVIĆ",
   "DRAGAN MILOSAVLJEVIĆ",
   "MARKO ŽIVANOVIĆ",
   "DEJAN MILOVANOVIĆ",
-  "MILOS ĆEBIĆ",
+  "MILOŠ ĆEBIĆ",
   "BOJAN TANASKOVIĆ",
   "DEJAN SIMIĆ",
   "NIKOLA MIRKOVIĆ",
@@ -41,8 +41,7 @@ const WORKER_LIST = [
   "NEBOJŠA NIKOLIĆ",
 ];
 
-// Predefined list of companies
-const COMPANY_LIST = [
+const FALLBACK_COMPANY_LIST = [
   "APPROVED GREEN",
   "VITOBELLO",
   "AUTO STANIĆ",
@@ -112,22 +111,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const userRole = auth0User?.['https://mr-engines-warranty/roles']?.[0] || auth0User?.role || "VIEWER";
   const canManageDepartments = hasMinRole(userRole, "ADMIN");
   
-  // State for workers and companies (with ability to add new ones)
-  // Initialize with predefined lists + any existing values from claim
-  const [workers, setWorkers] = useState<string[]>(() => {
-    const baseWorkers = [...WORKER_LIST];
-    if (claim.assignedWorkerName && !baseWorkers.includes(claim.assignedWorkerName)) {
-      baseWorkers.push(claim.assignedWorkerName);
-    }
-    return baseWorkers;
-  });
-  const [companies, setCompanies] = useState<string[]>(() => {
-    const baseCompanies = [...COMPANY_LIST];
-    if (claim.customer?.company && !baseCompanies.includes(claim.customer.company)) {
-      baseCompanies.push(claim.customer.company);
-    }
-    return baseCompanies;
-  });
+  // State for workers and companies (fetched from API with ability to add new ones)
+  const [workers, setWorkers] = useState<string[]>([]);
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(true);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [newWorker, setNewWorker] = useState("");
   const [newCompany, setNewCompany] = useState("");
   const [showAddWorker, setShowAddWorker] = useState(false);
@@ -166,9 +154,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   
   const prevClaimIdRef = useRef(claim.id);
 
-  // Load departments
+  // Load departments, workers, and companies from API
   useEffect(() => {
-    const loadDepartments = async () => {
+    const loadData = async () => {
+      // Load departments
       try {
         const res = await fetch("/api/admin/departments");
         if (res.ok) {
@@ -180,9 +169,69 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       } finally {
         setLoadingDepartments(false);
       }
+
+      // Load workers from API
+      try {
+        const res = await fetch("/api/admin/workers");
+        if (res.ok) {
+          const data = await res.json();
+          const workerNames = (data.workers || []).map((w: { name: string }) => w.name);
+          // Add current claim's worker if not in list
+          if (claim.assignedWorkerName && !workerNames.includes(claim.assignedWorkerName)) {
+            workerNames.push(claim.assignedWorkerName);
+          }
+          setWorkers(workerNames);
+        } else {
+          // Fallback to hardcoded list
+          const fallback = [...FALLBACK_WORKER_LIST];
+          if (claim.assignedWorkerName && !fallback.includes(claim.assignedWorkerName)) {
+            fallback.push(claim.assignedWorkerName);
+          }
+          setWorkers(fallback);
+        }
+      } catch (error) {
+        console.error("Error loading workers:", error);
+        const fallback = [...FALLBACK_WORKER_LIST];
+        if (claim.assignedWorkerName && !fallback.includes(claim.assignedWorkerName)) {
+          fallback.push(claim.assignedWorkerName);
+        }
+        setWorkers(fallback);
+      } finally {
+        setLoadingWorkers(false);
+      }
+
+      // Load companies from API
+      try {
+        const res = await fetch("/api/admin/companies");
+        if (res.ok) {
+          const data = await res.json();
+          const companyNames = (data.companies || []).map((c: { name: string }) => c.name);
+          // Add current claim's company if not in list
+          if (claim.customer?.company && !companyNames.includes(claim.customer.company)) {
+            companyNames.push(claim.customer.company);
+          }
+          setCompanies(companyNames);
+        } else {
+          // Fallback to hardcoded list
+          const fallback = [...FALLBACK_COMPANY_LIST];
+          if (claim.customer?.company && !fallback.includes(claim.customer.company)) {
+            fallback.push(claim.customer.company);
+          }
+          setCompanies(fallback);
+        }
+      } catch (error) {
+        console.error("Error loading companies:", error);
+        const fallback = [...FALLBACK_COMPANY_LIST];
+        if (claim.customer?.company && !fallback.includes(claim.customer.company)) {
+          fallback.push(claim.customer.company);
+        }
+        setCompanies(fallback);
+      } finally {
+        setLoadingCompanies(false);
+      }
     };
-    loadDepartments();
-  }, []);
+    loadData();
+  }, [claim.assignedWorkerName, claim.customer?.company]);
 
   // Add new department
   const handleAddDepartment = async () => {

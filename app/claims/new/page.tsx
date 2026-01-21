@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,8 +12,8 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
 
-// Predefined list of companies
-const COMPANY_LIST = [
+// Fallback list of companies (used if API fails)
+const FALLBACK_COMPANY_LIST = [
   "APPROVED GREEN",
   "VITOBELLO",
   "AUTO STANIĆ",
@@ -25,11 +25,34 @@ const COMPANY_LIST = [
 ];
 
 export default function NewClaimPage() {
-  const [companies, setCompanies] = useState<string[]>(COMPANY_LIST);
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [newCompany, setNewCompany] = useState("");
   const [showAddCompany, setShowAddCompany] = useState(false);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+
+  // Load companies from API
+  useEffect(() => {
+    const loadCompanies = async () => {
+      try {
+        const res = await fetch("/api/admin/companies");
+        if (res.ok) {
+          const data = await res.json();
+          const companyNames = (data.companies || []).map((c: { name: string }) => c.name);
+          setCompanies(companyNames);
+        } else {
+          setCompanies(FALLBACK_COMPANY_LIST);
+        }
+      } catch (error) {
+        console.error("Error loading companies:", error);
+        setCompanies(FALLBACK_COMPANY_LIST);
+      } finally {
+        setLoadingCompanies(false);
+      }
+    };
+    loadCompanies();
+  }, []);
   const [formData, setFormData] = useState({
     status: "NEW",
     claimCodeRaw: "",

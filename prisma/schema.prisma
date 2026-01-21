@@ -272,3 +272,19 @@ model Department {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
+
+// Predefined workers for dropdown lists
+model PredefinedWorker {
+  id        String   @id @default(cuid())
+  name      String   @unique // Worker name
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Predefined companies for dropdown lists
+model PredefinedCompany {
+  id        String   @id @default(cuid())
+  name      String   @unique // Company name
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

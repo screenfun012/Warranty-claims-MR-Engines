@@ -129,6 +129,14 @@ export default function AdminDashboardPage() {
       bgColor: "bg-blue-500/10 border-blue-500/20",
     },
     {
+      title: "Radnici i Firme",
+      description: "Upravljaj listama radnika i firmi za padajuće menije",
+      icon: Database,
+      href: "/admin/lists",
+      color: "text-orange-600 dark:text-orange-400",
+      bgColor: "bg-orange-500/10 border-orange-500/20",
+    },
+    {
       title: "Email status",
       description: "Pregled i upravljanje email sinchronizacijom",
       icon: Mail,
