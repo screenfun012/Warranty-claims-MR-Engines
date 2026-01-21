@@ -208,25 +208,38 @@ export function AppSidebar() {
   }, [queryClient]);
 
   return (
-    <Sidebar>
-      <SidebarHeader className="flex items-center justify-center border-b px-3 py-3 bg-background transition-all duration-200">
+    <Sidebar collapsible={isMobile ? "offcanvas" : "icon"}>
+      <SidebarHeader className={cn(
+        "flex items-center justify-center border-b bg-background transition-all duration-200",
+        isCollapsed && !isMobile ? "px-2 py-2 min-h-[64px]" : "px-3 py-3 min-h-[80px]"
+      )}>
         <Link 
           href="/" 
-          className="flex items-center justify-center w-full h-full min-h-[80px] group/logo transition-all duration-200 hover:opacity-80"
+          className="flex items-center justify-center w-full h-full group/logo transition-all duration-200 hover:opacity-80"
         >
-          <Image
-            src={theme === "dark" ? "/images/mr-engines-logo-light.png" : "/images/mr-engines-logo-dark.png"}
-            alt="MR Engines"
-            width={200}
-            height={200}
-            className={cn(
-              "h-auto max-h-[80px] object-contain transition-all duration-300",
-              isCollapsed ? "w-12 max-h-[48px]" : "w-[80%]"
-            )}
-            quality={100}
-            priority
-            unoptimized={false}
-          />
+          {isCollapsed && !isMobile ? (
+            <Image
+              src="/images/mr-engines-logo-icon.png"
+              alt="MR Engines"
+              width={48}
+              height={48}
+              className="h-12 w-12 object-contain transition-all duration-300"
+              quality={100}
+              priority
+              unoptimized={false}
+            />
+          ) : (
+            <Image
+              src={theme === "dark" ? "/images/mr-engines-logo-light.png" : "/images/mr-engines-logo-dark.png"}
+              alt="MR Engines"
+              width={200}
+              height={200}
+              className="h-auto max-h-[80px] w-[80%] object-contain transition-all duration-300"
+              quality={100}
+              priority
+              unoptimized={false}
+            />
+          )}
         </Link>
       </SidebarHeader>
       <SidebarContent>
@@ -252,11 +265,21 @@ export function AppSidebar() {
                   };
 
                   const menuButton = (
-                    <SidebarMenuButton asChild isActive={isActive} className="transition-all duration-200 hover:bg-sidebar-accent/80">
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={isActive} 
+                      className={cn(
+                        "transition-all duration-200 hover:bg-sidebar-accent/80",
+                        isCollapsed && !isMobile && "justify-center"
+                      )}
+                    >
                       <Link 
                         href={item.href}
                         onClick={handleLinkClick}
-                        className="flex items-center gap-3 group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit hover:text-inherit visited:text-inherit active:text-inherit"
+                        className={cn(
+                          "flex items-center group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit hover:text-inherit visited:text-inherit active:text-inherit",
+                          isCollapsed && !isMobile ? "justify-center" : "gap-3"
+                        )}
                         style={{ 
                           textDecoration: 'none',
                           color: 'inherit',
@@ -271,17 +294,14 @@ export function AppSidebar() {
                         )} />
                         <span className={cn(
                           "transition-all duration-200",
-                          isCollapsed && "opacity-0 w-0 overflow-hidden"
+                          isCollapsed && !isMobile && "hidden"
                         )}>
                           {t(item.translationKey)}
                         </span>
-                        {showBadge && (
+                        {showBadge && !isCollapsed && (
                           <Badge 
                             variant="destructive" 
-                            className={cn(
-                              "ml-auto h-5 min-w-5 px-1.5 text-xs transition-all duration-200 animate-in fade-in zoom-in",
-                              isCollapsed && "opacity-0 w-0 overflow-hidden"
-                            )}
+                            className="ml-auto h-5 min-w-5 px-1.5 text-xs transition-all duration-200 animate-in fade-in zoom-in"
                           >
                             {unreadCount > 99 ? "99+" : unreadCount}
                           </Badge>
@@ -290,7 +310,8 @@ export function AppSidebar() {
                     </SidebarMenuButton>
                   );
 
-                  if (isCollapsed) {
+                  // On desktop, when collapsed, show tooltips. On mobile, always show without tooltips
+                  if (isCollapsed && !isMobile) {
                     return (
                       <Tooltip key={item.name}>
                         <TooltipTrigger asChild>
