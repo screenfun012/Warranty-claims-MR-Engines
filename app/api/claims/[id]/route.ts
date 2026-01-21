@@ -42,6 +42,12 @@ export async function GET(
       include: {
         customer: true,
         faultDepartment: true,
+        faultDepartments: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         workOrder: {
           include: {
             worker: {
@@ -283,6 +289,21 @@ export async function PATCH(
       console.log(`[PATCH /api/claims/${id}] Verified claimAcceptanceStatus saved:`, verifyResult[0]?.claimAcceptanceStatus);
     }
 
+    // Handle multiple fault departments update
+    if (body.faultDepartmentIds !== undefined) {
+      const departmentIds = Array.isArray(body.faultDepartmentIds) ? body.faultDepartmentIds : [];
+      // Connect/disconnect departments
+      await prisma.claim.update({
+        where: { id },
+        data: {
+          faultDepartments: {
+            set: departmentIds.map((deptId: string) => ({ id: deptId })),
+          },
+        },
+      });
+      delete updateData.faultDepartmentIds;
+    }
+
     // Update other fields using Prisma if needed
     let claim;
     if (Object.keys(updateData).length > 0) {
@@ -293,6 +314,12 @@ export async function PATCH(
           include: {
             customer: true,
             faultDepartment: true,
+            faultDepartments: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
             workOrder: {
               include: {
                 worker: {

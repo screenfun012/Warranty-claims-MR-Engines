@@ -61,6 +61,10 @@ interface Claim {
     id: string;
     name: string;
   } | null;
+  faultDepartments?: {
+    id: string;
+    name: string;
+  }[];
   workOrder: any;
   engineType: string | null;
   mrEngineCode: string | null;

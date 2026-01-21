@@ -51,9 +51,12 @@ export async function GET(request: NextRequest) {
       where.customer = customerConditions;
     }
 
-    // Fault department filter
+    // Fault department filter - support both single and multiple departments
     if (faultDepartmentId.length > 0) {
-      where.faultDepartmentId = { in: faultDepartmentId };
+      where.OR = [
+        { faultDepartmentId: { in: faultDepartmentId } }, // Legacy single department
+        { faultDepartments: { some: { id: { in: faultDepartmentId } } } }, // Multiple departments
+      ];
     }
 
     // Year engine done filter
@@ -96,6 +99,12 @@ export async function GET(request: NextRequest) {
           },
         },
         faultDepartment: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        faultDepartments: {
           select: {
             id: true,
             name: true,

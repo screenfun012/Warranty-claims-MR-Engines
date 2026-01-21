@@ -10,6 +10,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 
+// Predefined list of companies
+const COMPANY_LIST = [
+  "APPROVED GREEN",
+  "VITOBELLO",
+  "AUTO STANIĆ",
+  "SELMAN",
+  "TVH",
+  "CRD",
+  "RETTIFICHE 3G",
+  "BOLS MOTOREN",
+];
+
 export default function NewClaimPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -156,11 +168,21 @@ export default function NewClaimPage() {
             {/* Customer Company - Optional */}
             <div>
               <Label>Customer Company</Label>
-              <Input
+              <Select
                 value={formData.customerCompany}
-                onChange={(e) => setFormData({ ...formData, customerCompany: e.target.value })}
-                placeholder="Naziv firme"
-              />
+                onValueChange={(value) => setFormData({ ...formData, customerCompany: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select company" />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMPANY_LIST.map((company) => (
+                    <SelectItem key={company} value={company}>
+                      {company}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Date Engine Done - Optional */}

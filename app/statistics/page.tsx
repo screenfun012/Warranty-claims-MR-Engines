@@ -16,10 +16,18 @@ import {
   Filter, 
   X,
   CalendarIcon,
+  Info,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface Claim {
   id: string;
@@ -36,6 +44,10 @@ interface Claim {
     id: string;
     name: string;
   } | null;
+  faultDepartments?: {
+    id: string;
+    name: string;
+  }[];
   assignedTo: {
     id: string;
     fullName: string;
@@ -371,30 +383,23 @@ export default function StatisticsPage() {
                 />
               </div>
 
-              {/* Fault Department */}
+              {/* Fault Department - Multi-select */}
               <div>
                 <Label>Fault Department</Label>
-                <Select
-                  value={filters.faultDepartmentId.length > 0 ? filters.faultDepartmentId.join(",") : "all"}
-                  onValueChange={(value) => {
+                <MultiSelect
+                  options={departmentsData?.departments?.map((dept: any) => ({
+                    value: dept.id,
+                    label: dept.name,
+                  })) || []}
+                  selected={filters.faultDepartmentId}
+                  onChange={(selected) => {
                     setFilters(prev => ({
                       ...prev,
-                      faultDepartmentId: value === "all" ? [] : value.split(","),
+                      faultDepartmentId: selected,
                     }));
                   }}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="All departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All departments</SelectItem>
-                    {departmentsData?.departments?.map((dept: any) => (
-                      <SelectItem key={dept.id} value={dept.id}>
-                        {dept.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="Select departments..."
+                />
               </div>
 
               {/* Year Engine Done */}
@@ -497,6 +502,7 @@ export default function StatisticsPage() {
               { key: "assignedTo", label: "Assigned To" },
               { key: "market", label: "Market" },
               { key: "created", label: "Created" },
+              { key: "reason", label: "" },
             ]}
             data={sortedClaims.map((claim) => ({
               mrNumber: (
@@ -510,7 +516,9 @@ export default function StatisticsPage() {
               company: claim.customer?.company || "-",
               engineType: claim.engineType || "-",
               engineCode: claim.mrEngineCode || "-",
-              faultDept: claim.faultDepartment?.name || "-",
+              faultDept: claim.faultDepartments && claim.faultDepartments.length > 0
+                ? claim.faultDepartments.map((d) => d.name).join(", ")
+                : claim.faultDepartment?.name || "-",
               dateEngineDone: claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "-",
               claimArrivalDate: claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "-",
               assignedTo: claim.assignedWorkerName || "-",
@@ -520,6 +528,19 @@ export default function StatisticsPage() {
                 <Badge variant="outline">International</Badge>
               ),
               created: new Date(claim.createdAt).toLocaleDateString(),
+              reason: claim.reason ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-md">
+                      <p className="font-semibold mb-1">Reason:</p>
+                      <p>{claim.reason}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : "-",
             }))}
             emptyMessage={
               <div className="text-center py-12">

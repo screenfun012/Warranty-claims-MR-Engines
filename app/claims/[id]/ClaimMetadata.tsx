@@ -15,12 +15,43 @@ import {
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface Department {
   id: string;
   name: string;
   isSystem: boolean;
 }
+
+// Predefined list of workers
+const WORKER_LIST = [
+  "IVICA STANISAVLJEVĆ",
+  "IVAN STANISAVLJEVIĆ",
+  "EMRUŠ DULJAJ",
+  "ELMEDIN DULJAJ",
+  "PETAR PETROVIC",
+  "DRAGAN MILOSAVLJEVIĆ",
+  "MARKO ŽIVANOVIĆ",
+  "DEJAN MILOVANOVIĆ",
+  "MILOS ĆEBIĆ",
+  "BOJAN TANASKOVIĆ",
+  "DEJAN SIMIĆ",
+  "NIKOLA MIRKOVIĆ",
+  "STEFAN NOVAKOVIĆ",
+  "NEBOJŠA NIKOLIĆ",
+];
+
+// Predefined list of companies
+const COMPANY_LIST = [
+  "APPROVED GREEN",
+  "VITOBELLO",
+  "AUTO STANIĆ",
+  "SELMAN",
+  "TVH",
+  "CRD",
+  "RETTIFICHE 3G",
+  "BOLS MOTOREN",
+];
 
 interface ClaimMetadataProps {
   claim: {
@@ -52,6 +83,10 @@ interface ClaimMetadataProps {
       id: string;
       name: string;
     } | null;
+    faultDepartments?: {
+      id: string;
+      name: string;
+    }[];
   };
   onUpdate: (updates: Record<string, unknown>) => void;
   isReadOnly?: boolean;
@@ -86,6 +121,9 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [engineCode, setEngineCode] = useState(claim.mrEngineCode || "");
   const [assignedWorkerName, setAssignedWorkerName] = useState(claim.assignedWorkerName || "");
   const [faultDepartmentId, setFaultDepartmentId] = useState(claim.faultDepartment?.id || "");
+  const [faultDepartmentIds, setFaultDepartmentIds] = useState<string[]>(
+    claim.faultDepartments?.map((d) => d.id) || (claim.faultDepartment?.id ? [claim.faultDepartment.id] : [])
+  );
   const [workerFault, setWorkerFault] = useState(claim.workerFault || "");
   const [yearEngineDone, setYearEngineDone] = useState(claim.yearEngineDone?.toString() || "");
   const [dateEngineDone, setDateEngineDone] = useState<Date | undefined>(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
@@ -140,11 +178,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (res.ok) {
         const data = await res.json();
         setDepartments([...departments, data.department]);
-        setFaultDepartmentId(data.department.id);
+        const newIds = [...faultDepartmentIds, data.department.id];
+        setFaultDepartmentIds(newIds);
         setNewDepartmentName("");
         setShowAddDepartment(false);
-        // Update claim
-        onUpdate({ faultDepartmentId: data.department.id });
+        // Update claim with multiple departments
+        onUpdate({ faultDepartmentIds: newIds });
       } else {
         const errorData = await res.json();
         alert("Failed to add department: " + (errorData.error || "Unknown error"));
@@ -195,6 +234,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setEngineCode(claim.mrEngineCode || "");
       setAssignedWorkerName(claim.assignedWorkerName || "");
       setFaultDepartmentId(claim.faultDepartment?.id || "");
+      setFaultDepartmentIds(claim.faultDepartments?.map((d) => d.id) || (claim.faultDepartment?.id ? [claim.faultDepartment.id] : []));
       setWorkerFault(claim.workerFault || "");
       setYearEngineDone(claim.yearEngineDone?.toString() || "");
       setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
@@ -214,6 +254,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (claim.mrEngineCode !== engineCode) setEngineCode(claim.mrEngineCode || "");
       if (claim.assignedWorkerName !== assignedWorkerName) setAssignedWorkerName(claim.assignedWorkerName || "");
       if (claim.faultDepartment?.id !== faultDepartmentId) setFaultDepartmentId(claim.faultDepartment?.id || "");
+      // Sync multiple fault departments
+      const newFaultDepartmentIds = claim.faultDepartments?.map((d) => d.id) || (claim.faultDepartment?.id ? [claim.faultDepartment.id] : []);
+      if (JSON.stringify(newFaultDepartmentIds.sort()) !== JSON.stringify(faultDepartmentIds.sort())) {
+        setFaultDepartmentIds(newFaultDepartmentIds);
+      }
       if (claim.workerFault !== workerFault) setWorkerFault(claim.workerFault || "");
       if (claim.yearEngineDone?.toString() !== yearEngineDone) setYearEngineDone(claim.yearEngineDone?.toString() || "");
       // Sync date fields
@@ -228,10 +273,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   }, [
     claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.customer?.company,
     claim.engineType, claim.mrEngineCode, claim.assignedWorkerName,
-    claim.faultDepartment?.id, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate,
+    claim.faultDepartment?.id, claim.faultDepartments, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate,
     claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt,
     editingField, claimCode, customerNumber, customerName, customerCompany, engineType, engineCode,
-    assignedWorkerName, faultDepartmentId, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
+    assignedWorkerName, faultDepartmentId, faultDepartmentIds, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
   ]);
 
   // Save field on blur
@@ -489,15 +534,25 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             <Building2 className="h-4 w-4 text-muted-foreground" />
             Customer Company <span className="text-red-500">*</span>
           </Label>
-          <Input
+          <Select
             value={customerCompany}
-            placeholder="Customer company"
+            onValueChange={(value) => {
+              setCustomerCompany(value);
+              handleCustomerUpdate('company', value);
+            }}
             disabled={isReadOnly}
-            onFocus={() => setEditingField('customerCompany')}
-            onChange={(e) => setCustomerCompany(e.target.value)}
-            onBlur={(e) => handleCustomerUpdate('company', e.target.value)}
-            className="h-9"
-          />
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Select company" />
+            </SelectTrigger>
+            <SelectContent>
+              {COMPANY_LIST.map((company) => (
+                <SelectItem key={company} value={company}>
+                  {company}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Engine Type */}
@@ -527,43 +582,49 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           />
         </div>
 
-        {/* Assigned Worker (Worker who worked on engine) - simple text field */}
+        {/* Assigned Worker (Worker who worked on engine) - Select dropdown */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <User className="h-4 w-4 text-muted-foreground" />
             Assigned Worker (Ko je radio motor)
           </Label>
-          <Input
+          <Select
             value={assignedWorkerName}
-            placeholder="Ime radnika koji je radio motor"
+            onValueChange={(value) => {
+              setAssignedWorkerName(value);
+              handleFieldBlur('assignedWorkerName', value);
+            }}
             disabled={isReadOnly}
-            onFocus={() => setEditingField('assignedWorkerName')}
-            onChange={(e) => setAssignedWorkerName(e.target.value)}
-            onBlur={(e) => handleFieldBlur('assignedWorkerName', e.target.value)}
-            className="h-9"
-          />
+          >
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Select worker" />
+            </SelectTrigger>
+            <SelectContent>
+              {WORKER_LIST.map((worker) => (
+                <SelectItem key={worker} value={worker}>
+                  {worker}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Fault Department */}
+        {/* Fault Department - Multi-select */}
         <div>
           <Label className="text-sm font-medium mb-2">Fault Department</Label>
           <div className="flex gap-2 min-w-0">
-            <Select
-              value={faultDepartmentId}
-              onValueChange={handleFaultDepartmentChange}
+            <MultiSelect
+              options={departments.map((dept) => ({ value: dept.id, label: dept.name }))}
+              selected={faultDepartmentIds}
+              onChange={(selected) => {
+                setFaultDepartmentIds(selected);
+                // Update claim with multiple departments
+                onUpdate({ faultDepartmentIds: selected });
+              }}
+              placeholder="Select departments..."
               disabled={isReadOnly || loadingDepartments}
-            >
-              <SelectTrigger className="h-9 flex-1 min-w-0">
-                <SelectValue placeholder="Select department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map((dept) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              className="flex-1 min-w-0"
+            />
             {canManageDepartments && (
               <Dialog open={showAddDepartment} onOpenChange={setShowAddDepartment}>
                 <DialogTrigger asChild>
