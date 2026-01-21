@@ -126,94 +126,66 @@ export async function GET() {
       console.error("Error calculating in-process count:", error);
     }
 
-    // Get claims by customer (top 10) - handle SQLite limitations
-    let claimsByCustomer: Array<{ customerId: string | null; _count: { id: number } }> = [];
-    try {
-      try {
-        const customerResult = await prisma.claim.groupBy({
-          by: ["customerId"],
-          _count: {
-            id: true,
-          },
-          where: {
-            customerId: {
-              not: null,
-            },
-          },
-          orderBy: {
-            _count: {
-              id: "desc",
-            },
-          },
-          take: 10,
-        });
-        claimsByCustomer = customerResult as Array<{ customerId: string | null; _count: { id: number } }>;
-      } catch (groupByError) {
-        // Fallback for SQLite if groupBy fails
-        console.warn("groupBy for customers failed, using fallback:", groupByError);
-        const allClaimsWithCustomer = await prisma.claim.findMany({
-          where: {
-            customerId: {
-              not: null,
-            },
-          },
-          select: { customerId: true },
-        });
-        const customerMap = new Map<string | null, number>();
-        allClaimsWithCustomer.forEach((claim) => {
-          customerMap.set(claim.customerId, (customerMap.get(claim.customerId) || 0) + 1);
-        });
-        claimsByCustomer = Array.from(customerMap.entries())
-          .map(([customerId, count]) => ({
-            customerId,
-            _count: { id: count },
-          }))
-          .sort((a, b) => b._count.id - a._count.id)
-          .slice(0, 10);
-      }
-    } catch (error) {
-      console.error("Error fetching claims by customer:", error);
-    }
-
-    // Get customer names for the top customers
-    const customerIds = claimsByCustomer.map((c) => c.customerId).filter((id): id is string => id !== null);
-    let customers: Array<{ id: string; name: string | null; company: string | null }> = [];
-    if (customerIds.length > 0) {
-      try {
-        customers = await prisma.customer.findMany({
-          where: {
-            id: {
-              in: customerIds,
-            },
-          },
-          select: {
-            id: true,
-            name: true,
-            company: true,
-          },
-        });
-      } catch (error) {
-        console.warn("Error fetching customer names:", error);
-      }
-    }
-
-    const customerMap = new Map(customers.map((c) => [c.id, { name: c.name, company: c.company }]));
-
+    // Get claims by customer - group by company/name (not customerId)
+    // This groups customers with the same company/name together
     let claimsByCustomerWithNames: Array<{ customerId: string | null; customerName: string; count: number }> = [];
     try {
-      claimsByCustomerWithNames = claimsByCustomer.map((item) => {
-        const customer = item.customerId ? customerMap.get(item.customerId) : null;
-        const displayName = customer 
-          ? (customer.company || customer.name || "Unknown")
-          : "Unknown";
-        return {
-          customerId: item.customerId,
-          customerName: displayName,
-          count: item._count.id,
-        };
+      // Get all claims with customers
+      const allClaimsWithCustomer = await prisma.claim.findMany({
+        where: {
+          customerId: {
+            not: null,
+          },
+        },
+        select: { 
+          customerId: true,
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              company: true,
+            },
+          },
+        },
       });
+
+      // Group by company/name (normalized)
+      const customerGroupMap = new Map<string, { customerName: string; count: number; customerIds: string[] }>();
+      
+      allClaimsWithCustomer.forEach((claim) => {
+        if (!claim.customer) return;
+        
+        // Use company if available, otherwise name, otherwise "Unknown"
+        const displayName = claim.customer.company?.trim() || claim.customer.name?.trim() || "Unknown";
+        // Normalize: lowercase and trim for grouping
+        const normalizedKey = displayName.toLowerCase().trim();
+        
+        const existing = customerGroupMap.get(normalizedKey);
+        if (existing) {
+          existing.count++;
+          if (!existing.customerIds.includes(claim.customer.id)) {
+            existing.customerIds.push(claim.customer.id);
+          }
+        } else {
+          customerGroupMap.set(normalizedKey, {
+            customerName: displayName,
+            count: 1,
+            customerIds: [claim.customer.id],
+          });
+        }
+      });
+
+      // Convert to array and sort by count (descending)
+      claimsByCustomerWithNames = Array.from(customerGroupMap.values())
+        .map((group) => ({
+          customerId: group.customerIds[0], // Use first customerId for reference
+          customerName: group.customerName,
+          count: group.count,
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // Top 10
     } catch (error) {
-      console.error("Error mapping claims by customer:", error);
+      console.error("Error fetching claims by customer:", error);
     }
 
     // Get claims by final status (APPROVED/REJECTED) - unified status system
