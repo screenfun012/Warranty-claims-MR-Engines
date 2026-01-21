@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Check, ChevronsUpDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,11 +42,11 @@ export function MultiSelect({
     onChange(selected.filter((s) => s !== item));
   };
 
-  const handleSelect = (item: string) => {
-    if (selected.includes(item)) {
-      onChange(selected.filter((s) => s !== item));
+  const toggleOption = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((s) => s !== value));
     } else {
-      onChange([...selected, item]);
+      onChange([...selected, value]);
     }
   };
 
@@ -63,8 +63,9 @@ export function MultiSelect({
             className
           )}
           disabled={disabled}
+          type="button"
         >
-          <div className="flex gap-1 flex-wrap flex-1">
+          <div className="flex gap-1 flex-wrap flex-1 text-left">
             {selected.length === 0 ? (
               <span className="text-muted-foreground">{placeholder}</span>
             ) : (
@@ -75,20 +76,11 @@ export function MultiSelect({
                     variant="secondary"
                     key={item}
                     className="mr-1 mb-1"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleUnselect(item);
-                    }}
                   >
                     {option?.label || item}
                     <button
+                      type="button"
                       className="ml-1 ring-offset-background rounded-full outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          handleUnselect(item);
-                        }
-                      }}
                       onMouseDown={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
@@ -106,43 +98,38 @@ export function MultiSelect({
               })
             )}
           </div>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
+      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start" style={{ zIndex: 100 }}>
         <Command>
           <CommandInput placeholder="Search..." />
-          <CommandList>
+          <CommandList className="max-h-64">
             <CommandEmpty>No results found.</CommandEmpty>
             <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  onSelect={() => handleSelect(option.value)}
-                >
-                  <div
-                    className={cn(
-                      "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                      selected.includes(option.value)
-                        ? "bg-primary text-primary-foreground"
-                        : "opacity-50 [&_svg]:invisible"
-                    )}
+              {options.map((option) => {
+                const isSelected = selected.includes(option.value);
+                return (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => toggleOption(option.value)}
+                    className="cursor-pointer"
                   >
-                    <svg
-                      className="h-4 w-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                    <div
+                      className={cn(
+                        "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                        isSelected
+                          ? "bg-primary text-primary-foreground"
+                          : "opacity-50"
+                      )}
                     >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </div>
-                  <span>{option.label}</span>
-                </CommandItem>
-              ))}
+                      {isSelected && <Check className="h-3 w-3" />}
+                    </div>
+                    <span>{option.label}</span>
+                  </CommandItem>
+                );
+              })}
             </CommandGroup>
           </CommandList>
         </Command>
