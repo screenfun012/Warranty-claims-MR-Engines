@@ -15,6 +15,7 @@ import { QueryProvider } from "@/lib/providers/query-provider";
 import { SessionProvider } from "@/lib/providers/session-provider";
 import { IntlProvider } from "@/lib/providers/intl-provider";
 import { defaultLocale, locales, type Locale } from "@/i18n/config";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "MR Engines – Warranty Claims",
@@ -72,6 +73,7 @@ export default async function RootLayout({
             <IntlProvider locale={locale} messages={messages}>
               <IdleSyncStarter />
               <MainLayout>{children}</MainLayout>
+              <Toaster position="top-right" richColors />
             </IntlProvider>
           </QueryProvider>
         </SessionProvider>

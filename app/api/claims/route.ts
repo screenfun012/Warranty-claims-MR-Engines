@@ -238,28 +238,23 @@ export async function POST(request: NextRequest) {
     
     console.log(`[create-claim] Created claim with ID: ${claim.id} (type: ${typeof claim.id})`);
     
-    // Immediately verify the claim exists in the database
-    const verifyClaim = await prisma.claim.findUnique({
-      where: { id: claim.id },
-      select: { id: true, status: true },
-    });
-    console.log(`[create-claim] Verification query result:`, verifyClaim ? `Found claim ${verifyClaim.id}` : "Claim NOT found in database!");
-
-    // Create folder structure on Synology/NAS
-    try {
-      const folderPath = await createClaimFolder(claim);
-      if (folderPath) {
-        console.log(`[create-claim] Created Synology folder: ${folderPath}`);
-        // Update claim with server folder path
-        await prisma.claim.update({
-          where: { id: claim.id },
-          data: { serverFolderPath: folderPath },
-        });
-      }
-    } catch (folderError) {
-      console.error(`[create-claim] Error creating Synology folder:`, folderError);
-      // Don't fail the claim creation if folder creation fails
-    }
+    // Create folder structure on Synology/NAS asynchronously (don't block response)
+    // This will be done in the background after we return the claim
+    createClaimFolder(claim)
+      .then((folderPath) => {
+        if (folderPath) {
+          console.log(`[create-claim] Created Synology folder: ${folderPath}`);
+          // Update claim with server folder path
+          return prisma.claim.update({
+            where: { id: claim.id },
+            data: { serverFolderPath: folderPath },
+          });
+        }
+      })
+      .catch((folderError) => {
+        console.error(`[create-claim] Error creating Synology folder:`, folderError);
+        // Don't fail the claim creation if folder creation fails
+      });
 
     // Link email thread to claim if provided and process attachments
     let photosCreated = 0;

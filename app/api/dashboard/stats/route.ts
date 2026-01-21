@@ -72,14 +72,6 @@ export async function GET() {
       console.error("Error fetching claims by status:", error);
     }
 
-    // Get resolved claims (CLOSED)
-    let resolvedCount = 0;
-    try {
-      resolvedCount = claimsByStatus.find((s) => s.status === "CLOSED")?._count.id || 0;
-    } catch (error) {
-      console.error("Error calculating resolved count:", error);
-    }
-
     // Get approved claims - based on status = 'APPROVED' (unified status system)
     let approvedCount = 0;
     try {
@@ -102,6 +94,14 @@ export async function GET() {
       });
     } catch (error) {
       console.warn("Error counting rejected claims:", error);
+    }
+
+    // Get resolved claims (APPROVED + REJECTED) - završene reklamacije
+    let resolvedCount = 0;
+    try {
+      resolvedCount = approvedCount + rejectedCount;
+    } catch (error) {
+      console.error("Error calculating resolved count:", error);
     }
 
     // Get in process claims (NEW, IN_ANALYSIS) - exclude CLOSED
@@ -177,7 +177,7 @@ export async function GET() {
 
     // Get customer names for the top customers
     const customerIds = claimsByCustomer.map((c) => c.customerId).filter((id): id is string => id !== null);
-    let customers: Array<{ id: string; name: string | null }> = [];
+    let customers: Array<{ id: string; name: string | null; company: string | null }> = [];
     if (customerIds.length > 0) {
       try {
         customers = await prisma.customer.findMany({
@@ -189,6 +189,7 @@ export async function GET() {
           select: {
             id: true,
             name: true,
+            company: true,
           },
         });
       } catch (error) {
@@ -196,15 +197,21 @@ export async function GET() {
       }
     }
 
-    const customerMap = new Map(customers.map((c) => [c.id, c.name || null]));
+    const customerMap = new Map(customers.map((c) => [c.id, { name: c.name, company: c.company }]));
 
     let claimsByCustomerWithNames: Array<{ customerId: string | null; customerName: string; count: number }> = [];
     try {
-      claimsByCustomerWithNames = claimsByCustomer.map((item) => ({
-        customerId: item.customerId,
-        customerName: item.customerId ? (customerMap.get(item.customerId) || "Unknown") : "Unknown",
-        count: item._count.id,
-      }));
+      claimsByCustomerWithNames = claimsByCustomer.map((item) => {
+        const customer = item.customerId ? customerMap.get(item.customerId) : null;
+        const displayName = customer 
+          ? (customer.company || customer.name || "Unknown")
+          : "Unknown";
+        return {
+          customerId: item.customerId,
+          customerName: displayName,
+          count: item._count.id,
+        };
+      });
     } catch (error) {
       console.error("Error mapping claims by customer:", error);
     }

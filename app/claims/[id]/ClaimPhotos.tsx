@@ -11,6 +11,8 @@ import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { FileViewerModal } from "@/components/file-viewer-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 interface ClaimPhotosProps {
   claim: any;
@@ -32,6 +34,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
   const [viewerIndex, setViewerIndex] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
@@ -81,24 +84,35 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
     if (!files || files.length === 0) return;
 
     setUploading(true);
+    setUploadProgress({});
     let successCount = 0;
     let errorCount = 0;
+    const totalFiles = files.length;
     
     try {
-      // Upload all files in parallel for better performance
-      const uploadPromises = Array.from(files).map(async (file) => {
+      // Upload all files with progress tracking
+      const uploadPromises = Array.from(files).map(async (file, index) => {
+        const fileId = `${file.name}-${index}`;
         try {
+          // Simulate progress for better UX
+          setUploadProgress(prev => ({ ...prev, [fileId]: 10 }));
+          
           const formData = new FormData();
           formData.append("file", file);
+
+          setUploadProgress(prev => ({ ...prev, [fileId]: 50 }));
 
           const res = await fetch(`/api/claims/${claim.id}/upload-attachment`, {
             method: "POST",
             body: formData,
           });
 
+          setUploadProgress(prev => ({ ...prev, [fileId]: 90 }));
+
           if (res.ok) {
+            setUploadProgress(prev => ({ ...prev, [fileId]: 100 }));
             successCount++;
-            return { success: true, fileName: file.name };
+            return { success: true, fileName: file.name, fileId };
           } else {
             const errorText = await res.text();
             let errorData;
@@ -108,49 +122,58 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
               errorData = { error: errorText || "Unknown error" };
             }
             errorCount++;
-            return { success: false, fileName: file.name, error: errorData.error || "Unknown error" };
+            return { success: false, fileName: file.name, error: errorData.error || "Unknown error", fileId };
           }
         } catch (fileError) {
           errorCount++;
           return { 
             success: false, 
             fileName: file.name, 
-            error: fileError instanceof Error ? fileError.message : "Unknown error" 
+            error: fileError instanceof Error ? fileError.message : "Unknown error",
+            fileId
           };
         }
       });
 
       const results = await Promise.all(uploadPromises);
       
+      // Clear progress after a short delay
+      setTimeout(() => {
+        setUploadProgress({});
+      }, 1000);
+      
       // Show errors if any
       const errors = results.filter(r => !r.success);
       if (errors.length > 0) {
-        const errorMessages = errors.map(e => `${e.fileName}: ${e.error}`).join('\n');
-        alert(`Neuspešno učitavanje:\n${errorMessages}`);
+        const errorMessages = errors.map(e => `${e.fileName}: ${e.error}`).join(', ');
+        toast.error(`Neuspešno učitavanje ${errors.length} fajlova`, {
+          description: errorMessages,
+        });
       }
       
       // Refresh if at least one file was uploaded successfully
       if (successCount > 0) {
-        alert(`Uspešno učitano ${successCount} fajlova!`);
+        toast.success(`Uspešno učitano ${successCount} fajlova`, {
+          description: totalFiles > successCount ? `${errorCount} fajlova nije uspelo` : undefined,
+        });
         
         // Small delay to ensure backend has processed the upload
         await new Promise(resolve => setTimeout(resolve, 500));
         
         // Refresh the claim data
-        // Use onRefresh callback if available to update UI without page reload
         if (onRefresh) {
           try {
             await onRefresh();
           } catch (refreshError) {
             console.error("Error refreshing claim data:", refreshError);
-            // If refresh fails, try to refetch manually but don't reload page
           }
         }
-        // No need to reload - onRefresh will update the UI
       }
     } catch (error) {
       console.error("Error in upload handler:", error);
-      alert("Neuspešno učitavanje fajla: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error("Neuspešno učitavanje fajlova", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
     } finally {
       setUploading(false);
       // Reset input
@@ -179,6 +202,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       });
 
       if (res.ok) {
+        toast.success("Fajl uspešno obrisan");
         // Use onRefresh callback if available, otherwise just close dialog
         if (onRefresh) {
           await onRefresh();
@@ -186,11 +210,15 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
         // No need to reload - onRefresh will update the UI
       } else {
         const errorData = await res.json();
-        alert(`Neuspešno brisanje: ${errorData.error || "Unknown error"}`);
+        toast.error("Neuspešno brisanje", {
+          description: errorData.error || "Unknown error",
+        });
       }
     } catch (error) {
       console.error("Error deleting attachment:", error);
-      alert("Neuspešno brisanje fajla: " + (error instanceof Error ? error.message : "Unknown error"));
+      toast.error("Neuspešno brisanje fajla", {
+        description: error instanceof Error ? error.message : "Unknown error",
+      });
     } finally {
       setDeleting(null);
       setAttachmentToDelete(null);
@@ -303,24 +331,20 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                   <Upload className="h-4 w-4 mr-2" />
                   {uploading ? "Učitava se..." : "Izaberi fajlove"}
                 </Button>
-                {uploadedFiles.length > 0 && (
+                {uploading && Object.keys(uploadProgress).length > 0 && (
                   <div className="mt-3 space-y-2">
-                    {uploadedFiles.map((uploaded) => (
-                      <div
-                        key={uploaded.id}
-                        className="flex items-center justify-between p-2 bg-muted rounded"
-                      >
-                        <span className="text-sm">{uploaded.file.name}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveFile(uploaded.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
+                    {Object.entries(uploadProgress).map(([fileId, progress]) => {
+                      const fileName = fileId.split('-').slice(0, -1).join('-');
+                      return (
+                        <div key={fileId} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="truncate flex-1">{fileName}</span>
+                            <span className="text-muted-foreground ml-2">{Math.round(progress)}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

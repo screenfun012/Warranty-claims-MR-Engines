@@ -546,7 +546,7 @@ export default function DashboardPage() {
                   dataKey="accepted" 
                   stroke="#22c55e" 
                   strokeWidth={2}
-                  name={tClaims('acceptance.ACCEPTED')}
+                  name={tClaims('status.APPROVED')}
                   dot={{ r: 4, fill: "#22c55e" }}
                 />
                 <Line 
@@ -554,7 +554,7 @@ export default function DashboardPage() {
                   dataKey="rejected" 
                   stroke="#ef4444" 
                   strokeWidth={2}
-                  name={tClaims('acceptance.REJECTED')}
+                  name={tClaims('status.REJECTED')}
                   dot={{ r: 4, fill: "#ef4444" }}
                 />
               </LineChart>
