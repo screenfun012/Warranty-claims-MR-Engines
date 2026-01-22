@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useTranslations } from "next-intl";
 import { Languages, Upload, X, Trash2, FileText, Image as ImageIcon } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
@@ -27,6 +28,7 @@ interface UploadedFile {
 
 export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhotosProps) {
   const router = useRouter();
+  const t = useTranslations();
   const [translating, setTranslating] = useState<string | null>(null);
   const [sourceLang, setSourceLang] = useState<Record<string, string>>({});
   const [targetLang, setTargetLang] = useState<Record<string, string>>({});
@@ -44,7 +46,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
     const tgtLang = targetLang[photoId] || "EN";
     
     if (srcLang === tgtLang) {
-      alert("Source and target languages must be different");
+      alert(t("claims.photos.translate.sameLanguage"));
       return;
     }
 
@@ -62,18 +64,18 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       });
       const data = await res.json();
       if (data.translated) {
-        alert("Translation completed");
+        alert(t("claims.photos.translate.success"));
         if (onRefresh) {
           onRefresh();
         } else {
           router.refresh();
         }
       } else {
-        alert("Translation failed: " + (data.error || "Unknown error"));
+        alert(t("claims.photos.translate.error") + ": " + (data.error || t("common.error")));
       }
     } catch (error) {
       console.error("Translation error:", error);
-      alert("Translation failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      alert(t("claims.photos.translate.error") + ": " + (error instanceof Error ? error.message : t("common.error")));
     } finally {
       setTranslating(null);
     }
@@ -146,15 +148,15 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       const errors = results.filter(r => !r.success);
       if (errors.length > 0) {
         const errorMessages = errors.map(e => `${e.fileName}: ${e.error}`).join(', ');
-        toast.error(`Neuspešno učitavanje ${errors.length} fajlova`, {
+        toast.error(t("claims.photos.upload.error", { count: errors.length }), {
           description: errorMessages,
         });
       }
       
       // Refresh if at least one file was uploaded successfully
       if (successCount > 0) {
-        toast.success(`Uspešno učitano ${successCount} fajlova`, {
-          description: totalFiles > successCount ? `${errorCount} fajlova nije uspelo` : undefined,
+        toast.success(t("claims.photos.upload.success", { count: successCount }), {
+          description: totalFiles > successCount ? t("claims.photos.upload.partialError", { count: errorCount }) : undefined,
         });
         
         // Small delay to ensure backend has processed the upload
@@ -171,8 +173,8 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       }
     } catch (error) {
       console.error("Error in upload handler:", error);
-      toast.error("Neuspešno učitavanje fajlova", {
-        description: error instanceof Error ? error.message : "Unknown error",
+      toast.error(t("claims.photos.upload.errorGeneral"), {
+        description: error instanceof Error ? error.message : t("common.error"),
       });
     } finally {
       setUploading(false);
@@ -202,7 +204,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       });
 
       if (res.ok) {
-        toast.success("Fajl uspešno obrisan");
+        toast.success(t("claims.photos.deleteSuccess"));
         // Use onRefresh callback if available, otherwise just close dialog
         if (onRefresh) {
           await onRefresh();
@@ -210,14 +212,14 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
         // No need to reload - onRefresh will update the UI
       } else {
         const errorData = await res.json();
-        toast.error("Neuspešno brisanje", {
-          description: errorData.error || "Unknown error",
+        toast.error(t("claims.photos.deleteError"), {
+          description: errorData.error || t("common.error"),
         });
       }
     } catch (error) {
       console.error("Error deleting attachment:", error);
-      toast.error("Neuspešno brisanje fajla", {
-        description: error instanceof Error ? error.message : "Unknown error",
+      toast.error(t("claims.photos.deleteError"), {
+        description: error instanceof Error ? error.message : t("common.error"),
       });
     } finally {
       setDeleting(null);
@@ -307,10 +309,10 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       {/* Upload Section */}
       {!isReadOnly && (
         <Card className="p-6 mb-6">
-          <h3 className="text-lg font-semibold mb-4">Upload internih slika i dokumenata</h3>
+          <h3 className="text-lg font-semibold mb-4">{t("claims.photos.upload.title")}</h3>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="photo-upload">Fajlovi</Label>
+              <Label htmlFor="photo-upload">{t("claims.photos.files")}</Label>
               <div className="mt-2">
                 <Input
                   type="file"
@@ -329,7 +331,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                   onClick={() => document.getElementById("photo-upload")?.click()}
                 >
                   <Upload className="h-4 w-4 mr-2" />
-                  {uploading ? "Učitava se..." : "Izaberi fajlove"}
+                  {uploading ? t("claims.photos.upload.uploading") : t("claims.photos.upload.selectFiles")}
                 </Button>
                 {uploading && Object.keys(uploadProgress).length > 0 && (
                   <div className="mt-3 space-y-2">
@@ -356,7 +358,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
       {/* Internal Files Display */}
       {internalFiles.length === 0 && uploadedFiles.length === 0 ? (
         <Card className="p-6">
-          <p className="text-muted-foreground">Nema internih fajlova za ovu reklamaciju.</p>
+          <p className="text-muted-foreground">{t("claims.photos.noPhotos")}</p>
         </Card>
       ) : (
         <div className="space-y-6">
@@ -365,7 +367,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <ImageIcon className="h-5 w-5" />
-                Slike ({images.length})
+                {t("claims.photos.images")} ({images.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {images.map((file: any, index: number) => (
@@ -381,7 +383,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                       </AspectRatio>
                     </div>
                     <p className="text-sm font-medium mb-2 truncate" title={file.fileName}>
-                      {file.fileName || `Slika ${index + 1}`}
+                      {file.fileName || t("claims.photos.imageNumber", { number: index + 1 })}
                     </p>
                     {!isReadOnly && (
                       <div className="mt-2">
@@ -400,12 +402,12 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                           {deleting === file.id ? (
                             <>
                               <X className="h-4 w-4 mr-2 animate-spin" />
-                              Brisanje...
+                              {t("common.loading")}
                             </>
                           ) : (
                             <>
                               <Trash2 className="h-4 w-4 mr-2" />
-                              Obriši
+                              {t("common.delete")}
                             </>
                           )}
                         </Button>
@@ -422,14 +424,14 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
             <div>
               <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                 <FileText className="h-5 w-5" />
-                Dokumenti ({documents.length})
+                {t("claims.photos.documents")} ({documents.length})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {documents.map((file: any) => (
                   <Card key={file.id} className="p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{file.fileName || "Document"}</p>
+                        <p className="font-medium truncate">{file.fileName || t("claims.photos.document")}</p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {new Date(file.createdAt || Date.now()).toLocaleDateString('sr-RS')}
                         </p>
@@ -441,7 +443,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                           onClick={() => handleDocumentClick(file)}
                         >
                           <FileText className="h-4 w-4 mr-2" />
-                          Otvori
+                          {t("common.open")}
                         </Button>
                         {!isReadOnly && (
                           <Button
@@ -473,7 +475,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
         files={internalFiles.map((file: any) => ({
           id: file.id,
           url: `/api/files/${file.id}`,
-          fileName: file.fileName || `File ${file.id}`,
+          fileName: file.fileName || t("claims.photos.fileNumber", { id: file.id }),
           mimeType: file.mimeType,
         }))}
         initialIndex={viewerIndex}
@@ -483,10 +485,10 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteConfirm}
-        title="Brisanje fajla"
-        description="Da li ste sigurni da želite da obrišete ovaj fajl? Ova akcija je nepovratna."
-        confirmText="Obriši"
-        cancelText="Otkaži"
+        title={t("claims.photos.delete.title")}
+        description={t("claims.photos.deleteConfirm")}
+        confirmText={t("common.delete")}
+        cancelText={t("common.cancel")}
         variant="destructive"
       />
     </>

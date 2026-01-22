@@ -272,12 +272,36 @@
     },
     "photos": {
       "title": "Naši fajlovi",
-      "upload": "Otpremi fajlove",
-      "noPhotos": "Nema fajlova",
+      "uploadButton": "Otpremi fajlove",
+      "noPhotos": "Nema internih fajlova za ovu reklamaciju.",
+      "images": "Slike",
+      "documents": "Dokumenti",
+      "files": "Fajlovi",
+      "document": "Dokument",
+      "imageNumber": "Slika {number}",
+      "fileNumber": "Fajl {id}",
       "uploadSuccess": "Fajl uspešno otpremljen",
       "uploadError": "Greška pri otpremanju fajla",
       "deleteSuccess": "Fajl uspešno obrisan",
-      "deleteConfirm": "Da li ste sigurni da želite da obrišete ovaj fajl?"
+      "deleteError": "Neuspešno brisanje fajla",
+      "deleteConfirm": "Da li ste sigurni da želite da obrišete ovaj fajl? Ova akcija je nepovratna.",
+      "delete": {
+        "title": "Brisanje fajla"
+      },
+      "upload": {
+        "title": "Upload internih slika i dokumenata",
+        "selectFiles": "Izaberi fajlove",
+        "uploading": "Učitava se...",
+        "success": "Uspešno učitano {count} fajlova",
+        "error": "Neuspešno učitavanje {count} fajlova",
+        "partialError": "{count} fajlova nije uspelo",
+        "errorGeneral": "Neuspešno učitavanje fajlova"
+      },
+      "translate": {
+        "sameLanguage": "Izvorni i ciljni jezik moraju biti različiti",
+        "success": "Prevod završen",
+        "error": "Greška pri prevodu"
+      }
     },
     "findings": {
       "title": "Nalazi",

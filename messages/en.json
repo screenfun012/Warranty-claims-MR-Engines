@@ -274,12 +274,36 @@
     },
     "photos": {
       "title": "Our Files",
-      "upload": "Upload Files",
-      "noPhotos": "No files",
+      "uploadButton": "Upload Files",
+      "noPhotos": "No internal files for this claim.",
+      "images": "Images",
+      "documents": "Documents",
+      "files": "Files",
+      "document": "Document",
+      "imageNumber": "Image {number}",
+      "fileNumber": "File {id}",
       "uploadSuccess": "File uploaded successfully",
       "uploadError": "Error uploading file",
       "deleteSuccess": "File deleted successfully",
-      "deleteConfirm": "Are you sure you want to delete this file?"
+      "deleteError": "Error deleting file",
+      "deleteConfirm": "Are you sure you want to delete this file? This action is irreversible.",
+      "delete": {
+        "title": "Delete File"
+      },
+      "upload": {
+        "title": "Upload internal images and documents",
+        "selectFiles": "Select files",
+        "uploading": "Uploading...",
+        "success": "Successfully uploaded {count} files",
+        "error": "Failed to upload {count} files",
+        "partialError": "{count} files failed",
+        "errorGeneral": "Failed to upload files"
+      },
+      "translate": {
+        "sameLanguage": "Source and target languages must be different",
+        "success": "Translation completed",
+        "error": "Translation failed"
+      }
     },
     "findings": {
       "title": "Findings",
