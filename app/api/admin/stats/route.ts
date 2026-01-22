@@ -57,8 +57,12 @@ export async function GET(request: NextRequest) {
         claimCodeRaw: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
         customer: {
           select: { company: true, name: true },
+        },
+        assignedTo: {
+          select: { fullName: true, email: true },
         },
       },
     });
@@ -104,7 +108,9 @@ export async function GET(request: NextRequest) {
         code: c.claimCodeRaw,
         status: c.status,
         customer: c.customer?.company || c.customer?.name || "N/A",
+        assignedTo: c.assignedTo?.fullName || c.assignedTo?.email || null,
         createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
       })),
       
       // System status

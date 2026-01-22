@@ -29,9 +29,6 @@ import {
   ExternalLink,
   Circle
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { sr } from "date-fns/locale";
-
 interface SystemStats {
   totalUsers: number;
   activeUsers: number;
@@ -53,10 +50,40 @@ interface SystemStats {
     code: string | null;
     status: string;
     customer: string;
+    assignedTo: string | null;
     createdAt: string;
+    updatedAt: string;
   }[];
   emailConfigured: boolean;
   databaseStatus: string;
+}
+
+// Custom function for Latin Serbian time formatting
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+  const diffWeek = Math.floor(diffDay / 7);
+  const diffMonth = Math.floor(diffDay / 30);
+
+  if (diffSec < 60) return "upravo sada";
+  if (diffMin === 1) return "pre 1 minut";
+  if (diffMin < 5) return `pre ${diffMin} minuta`;
+  if (diffMin < 60) return `pre ${diffMin} minuta`;
+  if (diffHour === 1) return "pre 1 sat";
+  if (diffHour < 5) return `pre ${diffHour} sata`;
+  if (diffHour < 24) return `pre ${diffHour} sati`;
+  if (diffDay === 1) return "pre 1 dan";
+  if (diffDay < 5) return `pre ${diffDay} dana`;
+  if (diffDay < 7) return `pre ${diffDay} dana`;
+  if (diffWeek === 1) return "pre 1 nedelju";
+  if (diffWeek < 5) return `pre ${diffWeek} nedelje`;
+  if (diffMonth === 1) return "pre 1 mesec";
+  if (diffMonth < 12) return `pre ${diffMonth} meseci`;
+  return `pre više od godinu dana`;
 }
 
 interface Auth0User {
@@ -306,6 +333,11 @@ export default function AdminDashboardPage() {
                         <p className="text-sm text-muted-foreground truncate">
                           {activity.customer}
                         </p>
+                        {activity.assignedTo && (
+                          <p className="text-xs text-blue-500 truncate">
+                            Zadužen: {activity.assignedTo}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="text-right shrink-0 ml-2">
@@ -313,10 +345,7 @@ export default function AdminDashboardPage() {
                         {statusLabels[activity.status] || activity.status}
                       </Badge>
                       <p className="text-xs text-muted-foreground mt-1">
-                        {formatDistanceToNow(new Date(activity.createdAt), { 
-                          addSuffix: true, 
-                          locale: sr 
-                        })}
+                        {formatTimeAgo(new Date(activity.createdAt))}
                       </p>
                     </div>
                   </div>
