@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
     
     // Filter parameters
     const status = searchParams.getAll("status");
-    const customerId = searchParams.get("customerId");
-    const customerCompany = searchParams.get("customerCompany");
+    const customerNames = searchParams.getAll("customerName");
+    const customerCompanies = searchParams.getAll("customerCompany");
     const faultDepartmentId = searchParams.getAll("faultDepartmentId");
     const yearEngineDone = searchParams.get("yearEngineDone");
     const isDomesticMarket = searchParams.get("isDomesticMarket");
@@ -39,14 +39,14 @@ export async function GET(request: NextRequest) {
       where.status = { in: mappedStatuses };
     }
 
-    // Customer filters (combine name and company if both provided)
-    if (customerId || customerCompany) {
+    // Customer filters - support multi-select for names and companies
+    if (customerNames.length > 0 || customerCompanies.length > 0) {
       const customerConditions: any = {};
-      if (customerId) {
-        customerConditions.name = { contains: customerId };
+      if (customerNames.length > 0) {
+        customerConditions.name = { in: customerNames };
       }
-      if (customerCompany) {
-        customerConditions.company = { contains: customerCompany };
+      if (customerCompanies.length > 0) {
+        customerConditions.company = { in: customerCompanies };
       }
       where.customer = customerConditions;
     }

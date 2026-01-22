@@ -65,8 +65,8 @@ interface Claim {
 
 interface Filters {
   status: string[];
-  customerId: string;
-  customerCompany: string;
+  customerNames: string[];
+  customerCompanies: string[];
   faultDepartmentId: string[];
   yearEngineDone: string;
   isDomesticMarket: string;
@@ -79,8 +79,8 @@ export default function StatisticsPage() {
   const router = useRouter();
   const [filters, setFilters] = useState<Filters>({
     status: [],
-    customerId: "",
-    customerCompany: "",
+    customerNames: [],
+    customerCompanies: [],
     faultDepartmentId: [],
     yearEngineDone: "",
     isDomesticMarket: "",
@@ -112,6 +112,25 @@ export default function StatisticsPage() {
     },
   });
 
+  // Get unique customer names and companies for multi-select filters
+  const uniqueCustomerNames = useMemo(() => {
+    const customers = customersData?.customers || [];
+    const names = new Set<string>();
+    customers.forEach((c: any) => {
+      if (c.name && c.name.trim()) names.add(c.name.trim());
+    });
+    return Array.from(names).sort().map(name => ({ value: name, label: name }));
+  }, [customersData]);
+
+  const uniqueCustomerCompanies = useMemo(() => {
+    const customers = customersData?.customers || [];
+    const companies = new Set<string>();
+    customers.forEach((c: any) => {
+      if (c.company && c.company.trim()) companies.add(c.company.trim());
+    });
+    return Array.from(companies).sort().map(company => ({ value: company, label: company }));
+  }, [customersData]);
+
   // Fetch statistics with filters
   const { data: statisticsData, isLoading } = useQuery({
     queryKey: ["statistics", filters],
@@ -119,8 +138,8 @@ export default function StatisticsPage() {
       const params = new URLSearchParams();
       
       filters.status.forEach(s => params.append("status", s));
-      if (filters.customerId) params.append("customerId", filters.customerId);
-      if (filters.customerCompany) params.append("customerCompany", filters.customerCompany);
+      filters.customerNames.forEach(n => params.append("customerName", n));
+      filters.customerCompanies.forEach(c => params.append("customerCompany", c));
       filters.faultDepartmentId.forEach(d => params.append("faultDepartmentId", d));
       if (filters.yearEngineDone) params.append("yearEngineDone", filters.yearEngineDone);
       if (filters.isDomesticMarket !== "") params.append("isDomesticMarket", filters.isDomesticMarket);
@@ -242,8 +261,8 @@ export default function StatisticsPage() {
   const clearFilters = () => {
     setFilters({
       status: [],
-      customerId: "",
-      customerCompany: "",
+      customerNames: [],
+      customerCompanies: [],
       faultDepartmentId: [],
       yearEngineDone: "",
       isDomesticMarket: "",
@@ -256,8 +275,8 @@ export default function StatisticsPage() {
   const hasActiveFilters = useMemo(() => {
     return (
       filters.status.length > 0 ||
-      filters.customerId !== "" ||
-      filters.customerCompany !== "" ||
+      filters.customerNames.length > 0 ||
+      filters.customerCompanies.length > 0 ||
       filters.faultDepartmentId.length > 0 ||
       filters.yearEngineDone !== "" ||
       filters.isDomesticMarket !== "" ||
@@ -363,23 +382,25 @@ export default function StatisticsPage() {
                 </Select>
               </div>
 
-              {/* Customer Name */}
+              {/* Customer Name - Multi-select */}
               <div>
                 <Label>Customer Name</Label>
-                <Input
-                  value={filters.customerId}
-                  onChange={(e) => setFilters(prev => ({ ...prev, customerId: e.target.value }))}
-                  placeholder="Filter by customer name"
+                <MultiSelect
+                  options={uniqueCustomerNames}
+                  selected={filters.customerNames}
+                  onChange={(selected) => setFilters(prev => ({ ...prev, customerNames: selected }))}
+                  placeholder="Select customers..."
                 />
               </div>
 
-              {/* Customer Company */}
+              {/* Customer Company - Multi-select */}
               <div>
                 <Label>Customer Company</Label>
-                <Input
-                  value={filters.customerCompany}
-                  onChange={(e) => setFilters(prev => ({ ...prev, customerCompany: e.target.value }))}
-                  placeholder="Filter by company"
+                <MultiSelect
+                  options={uniqueCustomerCompanies}
+                  selected={filters.customerCompanies}
+                  onChange={(selected) => setFilters(prev => ({ ...prev, customerCompanies: selected }))}
+                  placeholder="Select companies..."
                 />
               </div>
 

@@ -239,6 +239,12 @@ export async function PATCH(
       }
     });
 
+    // Auto-lock claim when status becomes APPROVED or REJECTED
+    if (updateData.status === "APPROVED" || updateData.status === "REJECTED") {
+      updateData.isLocked = true;
+      console.log(`[PATCH /api/claims/${id}] Auto-locking claim due to status change to ${updateData.status}`);
+    }
+
     // Ensure claimAcceptanceStatus is properly handled (can be null to clear it)
     if (body.claimAcceptanceStatus === null || body.claimAcceptanceStatus === "") {
       updateData.claimAcceptanceStatus = null;
