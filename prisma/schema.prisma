@@ -288,3 +288,23 @@ model PredefinedCompany {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Activity Log for tracking user actions
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?  // User who performed the action (null if system action)
+  userEmail   String?  // Email of user (denormalized for display)
+  userName    String?  // Name of user (denormalized for display)
+  action      String   // CREATE, UPDATE, DELETE, VIEW, LOGIN, LOGOUT, etc.
+  entityType  String   // CLAIM, EMAIL, USER, CUSTOMER, ATTACHMENT, etc.
+  entityId    String?  // ID of the affected entity
+  entityName  String?  // Name/code of entity (e.g., claim code) for display
+  details     String?  // JSON string with additional details
+  ipAddress   String?  // IP address of the user
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}

@@ -9,6 +9,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { parseClaimCode } from "@/lib/domain/claimCode";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
+import { logActivityFromRequest } from "@/lib/activity-log";
 
 export async function GET(
   request: NextRequest,
@@ -462,6 +463,18 @@ export async function PATCH(
       claimId: claim?.id,
       claimCode: claim?.claimCodeRaw,
       status: claim?.status,
+    }).catch(console.error);
+    
+    // Log activity (non-blocking)
+    logActivityFromRequest(request, {
+      action: "UPDATE",
+      entityType: "CLAIM",
+      entityId: claim?.id || id,
+      entityName: claim?.claimCodeRaw || "Reklamacija",
+      details: {
+        updatedFields: Object.keys(body),
+        newStatus: claim?.status,
+      },
     }).catch(console.error);
     
     return NextResponse.json({ claim });

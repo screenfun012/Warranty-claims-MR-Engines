@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { logActivityFromRequest } from "@/lib/activity-log";
 
 export async function DELETE(
   request: NextRequest,
@@ -18,12 +19,13 @@ export async function DELETE(
     
     const { id } = await params;
 
-    // Verify claim exists
+    // Verify claim exists and get info for logging
     const claim = await prisma.claim.findUnique({
       where: { id },
       include: {
         attachments: true,
         emailThreads: true,
+        customer: true,
       },
     });
 
@@ -96,6 +98,19 @@ export async function DELETE(
         }
       }
     }
+
+    // Log activity (non-blocking)
+    logActivityFromRequest(request, {
+      action: "DELETE",
+      entityType: "CLAIM",
+      entityId: id,
+      entityName: claim.claimCodeRaw || "Reklamacija",
+      details: {
+        customer: claim.customer?.company || claim.customer?.name,
+        status: claim.status,
+        attachmentsDeleted: claim.attachments.length,
+      },
+    }).catch(console.error);
 
     return NextResponse.json({ 
       success: true,

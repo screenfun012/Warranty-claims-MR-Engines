@@ -10,6 +10,7 @@ import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { createClaimFolder } from "@/lib/files/fileStorage";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
+import { logActivityFromRequest } from "@/lib/activity-log";
 
 export async function GET(request: NextRequest) {
   try {
@@ -496,6 +497,21 @@ export async function POST(request: NextRequest) {
       claimId: updatedClaim.id,
       claimCode: updatedClaim.claimCodeRaw,
       status: updatedClaim.status,
+    }).catch(console.error);
+
+    // Log activity (non-blocking)
+    logActivityFromRequest(request, {
+      action: "CREATE",
+      entityType: "CLAIM",
+      entityId: updatedClaim.id,
+      entityName: updatedClaim.claimCodeRaw || "Nova reklamacija",
+      details: {
+        status: updatedClaim.status,
+        customer: updatedClaim.customer?.company || updatedClaim.customer?.name,
+        engineType: updatedClaim.engineType,
+        photosCreated,
+        documentsCreated,
+      },
     }).catch(console.error);
 
     return NextResponse.json({ 

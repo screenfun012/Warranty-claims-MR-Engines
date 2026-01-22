@@ -8,6 +8,12 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Users, 
   Shield, 
@@ -21,14 +27,23 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  TrendingUp,
   Building2,
   FolderOpen,
   Layers,
   RefreshCw,
   ExternalLink,
-  Circle
+  Circle,
+  Plus,
+  Trash2,
+  Edit,
+  Eye,
+  Upload,
+  LogIn,
+  Lock,
+  Unlock,
+  User
 } from "lucide-react";
+
 interface SystemStats {
   totalUsers: number;
   activeUsers: number;
@@ -56,6 +71,20 @@ interface SystemStats {
   }[];
   emailConfigured: boolean;
   databaseStatus: string;
+}
+
+interface ActivityLogEntry {
+  id: string;
+  userId: string | null;
+  userEmail: string | null;
+  userName: string | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  entityName: string | null;
+  details: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string;
 }
 
 // Custom function for Latin Serbian time formatting
@@ -107,11 +136,53 @@ const statusLabels: Record<string, string> = {
   REJECTED: "Odbijeno",
 };
 
+// Action labels for display
+const actionLabels: Record<string, string> = {
+  CREATE: "Kreirao",
+  UPDATE: "Ažurirao",
+  DELETE: "Obrisao",
+  VIEW: "Pogledao",
+  LOGIN: "Prijavljen",
+  LOGOUT: "Odjavljen",
+  UPLOAD: "Uploadovao",
+  DOWNLOAD: "Preuzeo",
+  APPROVE: "Odobrio",
+  REJECT: "Odbio",
+  LOCK: "Zaključao",
+  UNLOCK: "Otključao",
+};
+
+const entityLabels: Record<string, string> = {
+  CLAIM: "reklamaciju",
+  EMAIL: "email",
+  USER: "korisnika",
+  CUSTOMER: "kupca",
+  ATTACHMENT: "prilog",
+  DEPARTMENT: "odeljenje",
+  WORKER: "radnika",
+  COMPANY: "firmu",
+  SYSTEM: "sistem",
+};
+
+const actionIcons: Record<string, React.ReactNode> = {
+  CREATE: <Plus className="h-4 w-4 text-green-500" />,
+  UPDATE: <Edit className="h-4 w-4 text-blue-500" />,
+  DELETE: <Trash2 className="h-4 w-4 text-red-500" />,
+  VIEW: <Eye className="h-4 w-4 text-gray-500" />,
+  LOGIN: <LogIn className="h-4 w-4 text-emerald-500" />,
+  UPLOAD: <Upload className="h-4 w-4 text-purple-500" />,
+  LOCK: <Lock className="h-4 w-4 text-amber-500" />,
+  UNLOCK: <Unlock className="h-4 w-4 text-amber-500" />,
+};
+
 export default function AdminDashboardPage() {
   const { user, isLoading } = useUser();
   const router = useRouter();
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
+  const [loadingActivity, setLoadingActivity] = useState(true);
+  const [selectedActivity, setSelectedActivity] = useState<ActivityLogEntry | null>(null);
 
   const auth0User = user as Auth0User | undefined;
   const userRoles = auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
@@ -131,6 +202,7 @@ export default function AdminDashboardPage() {
     }
     
     fetchStats();
+    fetchActivityLog();
   }, [isLoading, user, isSuperAdmin, router]);
 
   const fetchStats = async () => {
@@ -145,6 +217,27 @@ export default function AdminDashboardPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchActivityLog = async () => {
+    try {
+      const res = await fetch("/api/admin/activity?limit=20");
+      if (res.ok) {
+        const data = await res.json();
+        setActivityLog(data.activities || []);
+      }
+    } catch (error) {
+      console.error("Error fetching activity log:", error);
+    } finally {
+      setLoadingActivity(false);
+    }
+  };
+
+  const refreshAll = () => {
+    setLoading(true);
+    setLoadingActivity(true);
+    fetchStats();
+    fetchActivityLog();
   };
 
   if (isLoading || loading) {
@@ -233,7 +326,7 @@ export default function AdminDashboardPage() {
             Upravljanje sistemom i korisnicima
           </p>
         </div>
-        <Button variant="outline" onClick={fetchStats} className="gap-2">
+        <Button variant="outline" onClick={refreshAll} className="gap-2">
           <RefreshCw className="h-4 w-4" />
           Osveži
         </Button>
@@ -303,56 +396,80 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      {/* Middle Section - Activity & Stats */}
+      {/* Middle Section - Activity Log & Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Activity */}
+        {/* Activity Log */}
         <Card className="p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Poslednja aktivnost
+              <Activity className="h-5 w-5" />
+              Evidencija aktivnosti
             </h2>
-            <Link href="/claims">
-              <Button variant="ghost" size="sm" className="gap-1">
-                Sve reklamacije
-                <ExternalLink className="h-3 w-3" />
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" onClick={fetchActivityLog} className="gap-1">
+              <RefreshCw className="h-3 w-3" />
+              Osveži
+            </Button>
           </div>
-          <div className="space-y-3">
-            {stats?.recentActivity && stats.recentActivity.length > 0 ? (
-              stats.recentActivity.slice(0, 6).map((activity) => (
-                <Link key={activity.id} href={`/claims/${activity.id}`}>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`w-2 h-2 rounded-full ${statusColors[activity.status] || 'bg-gray-500'}`} />
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">
-                          {activity.code || "Nova reklamacija"}
-                        </p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {activity.customer}
-                        </p>
-                        {activity.assignedTo && (
-                          <p className="text-xs text-blue-500 truncate">
-                            Zadužen: {activity.assignedTo}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0 ml-2">
-                      <Badge variant="outline" className="text-xs">
-                        {statusLabels[activity.status] || activity.status}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatTimeAgo(new Date(activity.createdAt))}
-                      </p>
-                    </div>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
+            {loadingActivity ? (
+              [...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))
+            ) : activityLog.length > 0 ? (
+              activityLog.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
+                  onClick={() => setSelectedActivity(entry)}
+                >
+                  <div className="mt-0.5">
+                    {actionIcons[entry.action] || <Circle className="h-4 w-4" />}
                   </div>
-                </Link>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm">
+                      <span className="font-medium text-primary">
+                        {entry.userName || entry.userEmail?.split("@")[0] || "Sistem"}
+                      </span>
+                      {" "}
+                      <span className="text-muted-foreground">
+                        {actionLabels[entry.action]?.toLowerCase() || entry.action.toLowerCase()}
+                      </span>
+                      {" "}
+                      <span className="text-muted-foreground">
+                        {entityLabels[entry.entityType] || entry.entityType.toLowerCase()}
+                      </span>
+                      {entry.entityName && (
+                        <>
+                          {" "}
+                          <span className="font-medium">{entry.entityName}</span>
+                        </>
+                      )}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatTimeAgo(new Date(entry.createdAt))}
+                      {entry.ipAddress && (
+                        <span className="ml-2">• IP: {entry.ipAddress}</span>
+                      )}
+                    </p>
+                  </div>
+                  {entry.entityType === "CLAIM" && entry.entityId && (
+                    <Link 
+                      href={`/claims/${entry.entityId}`}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               ))
             ) : (
-              <p className="text-muted-foreground text-center py-4">Nema nedavne aktivnosti</p>
+              <div className="text-center py-8 text-muted-foreground">
+                <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p>Nema zabeleženih aktivnosti</p>
+                <p className="text-xs mt-1">Aktivnosti će se pojaviti kada korisnici počnu da koriste aplikaciju</p>
+              </div>
             )}
           </div>
         </Card>
@@ -501,6 +618,109 @@ export default function AdminDashboardPage() {
           </div>
         </Card>
       )}
+
+      {/* Activity Detail Dialog */}
+      <Dialog open={!!selectedActivity} onOpenChange={() => setSelectedActivity(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {selectedActivity && actionIcons[selectedActivity.action]}
+              Detalji aktivnosti
+            </DialogTitle>
+          </DialogHeader>
+          {selectedActivity && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Korisnik</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <p className="font-medium">
+                      {selectedActivity.userName || selectedActivity.userEmail || "Sistem"}
+                    </p>
+                  </div>
+                  {selectedActivity.userEmail && selectedActivity.userName && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {selectedActivity.userEmail}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Akcija</p>
+                  <Badge variant="outline" className="mt-1">
+                    {actionLabels[selectedActivity.action] || selectedActivity.action}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Tip entiteta</p>
+                  <p className="font-medium capitalize">
+                    {entityLabels[selectedActivity.entityType] || selectedActivity.entityType}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Naziv</p>
+                  <p className="font-medium">
+                    {selectedActivity.entityName || "-"}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-sm text-muted-foreground">Vreme</p>
+                <p className="font-medium">
+                  {new Date(selectedActivity.createdAt).toLocaleString("sr-Latn-RS", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}
+                </p>
+              </div>
+
+              {selectedActivity.ipAddress && (
+                <div>
+                  <p className="text-sm text-muted-foreground">IP Adresa</p>
+                  <p className="font-medium font-mono text-sm">
+                    {selectedActivity.ipAddress}
+                  </p>
+                </div>
+              )}
+
+              {selectedActivity.details && Object.keys(selectedActivity.details).length > 0 && (
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Dodatni detalji</p>
+                  <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
+                    {Object.entries(selectedActivity.details).map(([key, value]) => (
+                      <div key={key} className="flex justify-between">
+                        <span className="text-muted-foreground capitalize">
+                          {key.replace(/([A-Z])/g, " $1").trim()}:
+                        </span>
+                        <span className="font-medium">
+                          {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedActivity.entityType === "CLAIM" && selectedActivity.entityId && (
+                <Link href={`/claims/${selectedActivity.entityId}`}>
+                  <Button className="w-full gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Otvori reklamaciju
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
