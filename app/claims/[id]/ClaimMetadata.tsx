@@ -449,13 +449,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           console.error("Failed to update customer:", errorData);
           if (field === 'name') setCustomerName(currentName);
           if (field === 'company') setCustomerCompany(currentCompany);
-          alert("Failed to update customer: " + (errorData.error || "Unknown error"));
+          alert(t("claims.metadata.customer.updateError") + ": " + (errorData.error || t("common.error")));
         }
       } catch (error) {
         console.error("Error updating customer:", error);
         if (field === 'name') setCustomerName(currentName);
         if (field === 'company') setCustomerCompany(currentCompany);
-        alert("Failed to update customer");
+        alert(t("claims.metadata.customer.updateError"));
       }
     } else if (normalizedNewName || normalizedNewCompany) {
       // Allow creating customer with name OR company (at least one must be provided)
@@ -481,13 +481,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           console.error("Failed to create customer:", errorData);
           setCustomerName("");
           setCustomerCompany("");
-          alert("Failed to create customer: " + (errorData.error || "Unknown error"));
+          alert(t("claims.metadata.customer.createError") + ": " + (errorData.error || t("common.error")));
         }
       } catch (error) {
         console.error("Error creating customer:", error);
         setCustomerName("");
         setCustomerCompany("");
-        alert("Failed to create customer");
+        alert(t("claims.metadata.customer.createError"));
       }
     } else {
       setCustomerName("");

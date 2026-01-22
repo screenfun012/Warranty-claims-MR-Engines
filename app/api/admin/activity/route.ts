@@ -27,6 +27,14 @@ export async function GET(request: NextRequest) {
     const entityType = searchParams.get("entityType");
     const userId = searchParams.get("userId");
 
+    console.log("[ActivityAPI] Fetching activities with params:", {
+      limit,
+      offset,
+      action,
+      entityType,
+      userId,
+    });
+
     // Build where clause
     const where: Record<string, unknown> = {};
     if (action) where.action = action;
@@ -44,6 +52,19 @@ export async function GET(request: NextRequest) {
       prisma.activityLog.count({ where }),
     ]);
 
+    console.log("[ActivityAPI] Found activities:", {
+      count: activities.length,
+      total,
+      activities: activities.map(a => ({
+        id: a.id,
+        action: a.action,
+        entityType: a.entityType,
+        entityName: a.entityName,
+        userName: a.userName,
+        createdAt: a.createdAt,
+      })),
+    });
+
     // Parse details JSON for each activity
     const activitiesWithDetails = activities.map((activity) => ({
       ...activity,
@@ -57,10 +78,23 @@ export async function GET(request: NextRequest) {
       offset,
     });
   } catch (error) {
-    console.error("Error fetching activity logs:", error);
+    console.error("[ActivityAPI] Error fetching activity logs:", error);
+    
+    if (error instanceof Error) {
+      console.error("[ActivityAPI] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+    }
     
     // If table doesn't exist yet, return empty array
-    if (error instanceof Error && error.message.includes("no such table")) {
+    if (error instanceof Error && (
+      error.message.includes("no such table") ||
+      error.message.includes("does not exist") ||
+      error.message.includes("Unknown table")
+    )) {
+      console.log("[ActivityAPI] ActivityLog table does not exist, returning empty array");
       return NextResponse.json({
         activities: [],
         total: 0,

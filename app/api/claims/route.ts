@@ -500,6 +500,11 @@ export async function POST(request: NextRequest) {
     }).catch(console.error);
 
     // Log activity (non-blocking)
+    console.log("[CreateClaim] Logging activity for claim:", {
+      claimId: updatedClaim.id,
+      claimCode: updatedClaim.claimCodeRaw,
+    });
+    
     logActivityFromRequest(request, {
       action: "CREATE",
       entityType: "CLAIM",
@@ -512,7 +517,15 @@ export async function POST(request: NextRequest) {
         photosCreated,
         documentsCreated,
       },
-    }).catch(console.error);
+    }).catch((error) => {
+      console.error("[CreateClaim] Failed to log activity:", error);
+      if (error instanceof Error) {
+        console.error("[CreateClaim] Error details:", {
+          message: error.message,
+          stack: error.stack,
+        });
+      }
+    });
 
     return NextResponse.json({ 
       claim: updatedClaim,

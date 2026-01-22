@@ -47,7 +47,17 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
   try {
     const prisma = await getPrisma();
     
-    await prisma.activityLog.create({
+    console.log("[ActivityLog] Attempting to log activity:", {
+      action: params.action,
+      entityType: params.entityType,
+      entityId: params.entityId,
+      entityName: params.entityName,
+      userId: params.userId,
+      userEmail: params.userEmail,
+      userName: params.userName,
+    });
+    
+    const result = await prisma.activityLog.create({
       data: {
         userId: params.userId || null,
         userEmail: params.userEmail || null,
@@ -60,9 +70,18 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
         ipAddress: params.ipAddress || null,
       },
     });
+    
+    console.log("[ActivityLog] Successfully logged activity:", result.id);
   } catch (error) {
     // Log error but don't throw - activity logging should never break main functionality
-    console.error("Failed to log activity:", error);
+    console.error("[ActivityLog] Failed to log activity:", error);
+    if (error instanceof Error) {
+      console.error("[ActivityLog] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      });
+    }
   }
 }
 
@@ -83,15 +102,26 @@ export async function getUserFromSession(request: NextRequest): Promise<{
     const realIp = request.headers.get("x-real-ip");
     const ipAddress = forwardedFor?.split(",")[0]?.trim() || realIp || null;
     
+    console.log("[ActivityLog] Getting user from session:", {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userEmail: session?.user?.email,
+      userName: session?.user?.name,
+      userId: session?.user?.sub,
+    });
+    
     if (session?.user) {
-      return {
+      const userInfo = {
         userId: session.user.sub || null,
         userEmail: session.user.email || null,
         userName: session.user.name || session.user.email?.split("@")[0] || null,
         ipAddress,
       };
+      console.log("[ActivityLog] User info extracted:", userInfo);
+      return userInfo;
     }
     
+    console.log("[ActivityLog] No user session found");
     return {
       userId: null,
       userEmail: null,
@@ -99,7 +129,13 @@ export async function getUserFromSession(request: NextRequest): Promise<{
       ipAddress,
     };
   } catch (error) {
-    console.error("Error getting user from session for activity log:", error);
+    console.error("[ActivityLog] Error getting user from session:", error);
+    if (error instanceof Error) {
+      console.error("[ActivityLog] Error details:", {
+        message: error.message,
+        stack: error.stack,
+      });
+    }
     return {
       userId: null,
       userEmail: null,

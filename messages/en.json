@@ -43,7 +43,9 @@
     "download": "Download",
     "details": "Details",
     "open": "Open",
-    "system": "System"
+    "system": "System",
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar"
   },
   "time": {
     "justNow": "just now",
@@ -252,6 +254,10 @@
         "sending": "Sending...",
         "sent": "Notification sent",
         "sendNotification": "Confirm and send notification to client"
+      },
+      "customer": {
+        "updateError": "Failed to update customer",
+        "createError": "Failed to create customer"
       }
     },
     "delete": {
@@ -375,6 +381,51 @@
       "initialFindingPlaceholder": "Initial finding about the claim (optional, will be saved in Findings tab)",
       "creating": "Creating...",
       "createButton": "Create Claim"
+    },
+    "workOrder": {
+      "noWorkOrder": "No work order linked to this claim",
+      "title": "Work Order",
+      "engineType": "Engine Type",
+      "mrEngineCode": "MR Engine Code",
+      "worker": "Worker",
+      "assemblyDate": "Assembly Date",
+      "openWorkOrder": "Open Work Order Page"
+    },
+    "documents": {
+      "noDocuments": "No client documents and images.",
+      "images": "Images",
+      "documents": "Documents",
+      "from": "From",
+      "view": "View",
+      "extractText": "Extract Text",
+      "extracting": "Extracting...",
+      "extractSuccess": "Text extracted successfully",
+      "extractError": "Failed to extract text",
+      "delete": "Delete Document",
+      "deleting": "Deleting...",
+      "originalText": "Original Text",
+      "serbianTranslation": "Serbian Translation",
+      "englishTranslation": "English Translation",
+      "auto": "Auto",
+      "translateToSR": "Translate to SR",
+      "translateToEN": "Translate to EN",
+      "translating": "Translating...",
+      "translate": {
+        "sameLanguage": "Source and target languages must be different",
+        "success": "Translation completed",
+        "error": "Translation failed"
+      },
+      "otherDocuments": "Other Documents",
+      "previewNotAvailable": "Preview not available for this file type.",
+      "downloadInstead": "Download instead",
+      "delete": {
+        "title": "Delete Document",
+        "confirm": "Are you sure you want to delete this document? This action is irreversible."
+      },
+      "deleteFile": {
+        "title": "Delete File",
+        "confirm": "Are you sure you want to delete this file? This action is irreversible."
+      }
     }
   },
   "statistics": {
@@ -430,7 +481,12 @@
       "noUsers": "No users in the system",
       "pendingUsers": "Users pending approval ({count})",
       "registeredOn": "Registered on",
-      "waitingCount": "{count} waiting"
+      "waitingCount": "{count} waiting",
+      "error": {
+        "updateRole": "Error updating role",
+        "updateStatus": "Error updating status",
+        "approveUser": "Error approving user"
+      }
     },
     "lists": {
       "title": "Workers & Companies",
@@ -445,6 +501,19 @@
       "deleteCompany": "Delete Company",
       "noWorkers": "No workers",
       "noCompanies": "No companies",
+      "workerNamePlaceholder": "New worker name...",
+      "companyNamePlaceholder": "New company name...",
+      "workerAdded": "Worker added",
+      "companyAdded": "Company added",
+      "workerDeleted": "Worker deleted",
+      "companyDeleted": "Company deleted",
+      "error": {
+        "loadData": "Error loading data",
+        "addWorker": "Error adding worker",
+        "addCompany": "Error adding company",
+        "delete": "Error deleting",
+        "cleanup": "Error cleaning up"
+      },
       "cleanup": {
         "title": "Data Cleanup",
         "orphanedCustomers": "Orphaned Customers",
@@ -452,7 +521,21 @@
         "cleanupDesc": "These customers have no linked claims and can be deleted.",
         "cleanupButton": "Clean Up",
         "cleanupConfirm": "Are you sure you want to delete {count} orphaned customers?",
-        "cleanupSuccess": "Successfully deleted {count} customers"
+        "cleanupSuccess": "Successfully deleted {count} customers",
+        "found": "Orphaned data found",
+        "foundDesc": "{count} customer(s) without claims (test data or deleted claims)",
+        "confirmTitle": "Confirm Cleanup",
+        "confirmDesc": "Are you sure you want to delete {count} orphaned customers from the database?",
+        "confirmWarning": "This action is irreversible. Customers without claims will be permanently deleted.",
+        "cleaning": "Cleaning...",
+        "deleteOrphaned": "Delete Orphaned"
+      },
+      "delete": {
+        "title": "Confirm Deletion",
+        "confirm": "Are you sure you want to delete {name}?",
+        "warning": "This action is irreversible. {type} will be removed from the list.",
+        "deleting": "Deleting...",
+        "delete": "Delete"
       }
     },
     "email": {
@@ -537,8 +620,31 @@
   },
   "settings": {
     "title": "Settings",
+    "loading": "Loading...",
     "email": {
-      "title": "Email Settings",
+      "title": "Email Configuration",
+      "configured": "Configured",
+      "notConfigured": "Not configured",
+      "credentialsNote": "Email credentials are defined in the .env file and cannot be changed through the interface.",
+      "imap": {
+        "title": "IMAP (Receiving emails)",
+        "server": "IMAP Server",
+        "port": "IMAP Port",
+        "email": "Email address",
+        "password": "Password",
+        "tls": "TLS/SSL"
+      },
+      "smtp": {
+        "title": "SMTP (Sending emails)",
+        "server": "SMTP Server",
+        "port": "SMTP Port",
+        "email": "Email address",
+        "password": "Password",
+        "tls": "TLS/SSL"
+      },
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "envVariables": "Environment variables for .env file:",
       "imapHost": "IMAP Host",
       "imapPort": "IMAP Port",
       "smtpHost": "SMTP Host",
@@ -551,12 +657,29 @@
   },
   "profile": {
     "title": "My Profile",
+    "subtitle": "View and manage your personal settings",
     "personalInfo": "Personal Information",
     "fullName": "Full Name",
     "emailAddress": "Email Address",
     "currentRole": "Current Role",
     "accountStatus": "Account Status",
-    "memberSince": "Member Since"
+    "memberSince": "Member Since",
+    "loading": "Loading...",
+    "notLoggedIn": "You are not logged in",
+    "user": "User",
+    "userId": "User ID",
+    "accountCreatedDate": "Account Created Date",
+    "preferences": "Preferences",
+    "theme": "Theme",
+    "themeDescription": "Switch between light and dark theme",
+    "security": "About Security",
+    "securityDescription": "Your data is protected by Auth0 authentication. To change your email address or password, contact the system administrator.",
+    "roles": {
+      "SUPER_ADMIN": "Super Admin",
+      "ADMIN": "Admin",
+      "OPERATOR": "Operator",
+      "VIEWER": "Viewer"
+    }
   },
   "pendingApproval": {
     "title": "Pending Approval",

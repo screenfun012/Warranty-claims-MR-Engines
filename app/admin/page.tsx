@@ -190,13 +190,30 @@ export default function AdminDashboardPage() {
 
   const fetchActivityLog = async () => {
     try {
+      setLoadingActivity(true);
       const res = await fetch("/api/admin/activity?limit=20");
+      console.log("[Admin] Activity log fetch response:", {
+        status: res.status,
+        ok: res.ok,
+      });
+      
       if (res.ok) {
         const data = await res.json();
+        console.log("[Admin] Activity log data:", {
+          activitiesCount: data.activities?.length || 0,
+          total: data.total,
+          activities: data.activities,
+        });
         setActivityLog(data.activities || []);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        console.error("[Admin] Activity log fetch error:", {
+          status: res.status,
+          error: errorData,
+        });
       }
     } catch (error) {
-      console.error("Error fetching activity log:", error);
+      console.error("[Admin] Error fetching activity log:", error);
     } finally {
       setLoadingActivity(false);
     }

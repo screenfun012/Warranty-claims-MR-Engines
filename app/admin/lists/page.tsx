@@ -25,6 +25,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 
 interface Worker {
   id: string;
@@ -46,6 +48,8 @@ interface Auth0User {
 export default function AdminListsPage() {
   const { user, isLoading } = useUser();
   const router = useRouter();
+  const t = useTranslations('admin.lists');
+  const tCommon = useTranslations('common');
   
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -113,7 +117,7 @@ export default function AdminListsPage() {
       }
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Greška pri učitavanju podataka");
+      toast.error(t('error.loadData'));
     } finally {
       setLoading(false);
     }
@@ -125,15 +129,15 @@ export default function AdminListsPage() {
       const res = await fetch("/api/admin/cleanup", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        toast.success(`Obrisano ${data.deletedCustomers} zastarelih kupaca`);
+        toast.success(t('cleanup.cleanupSuccess', { count: data.deletedCustomers }));
         setOrphanedCount(0);
         setShowCleanupDialog(false);
       } else {
         const error = await res.json();
-        toast.error(error.error || "Greška pri čišćenju");
+        toast.error(error.error || t('error.cleanup'));
       }
     } catch (error) {
-      toast.error("Greška pri čišćenju podataka");
+      toast.error(t('error.cleanup'));
     } finally {
       setCleaning(false);
     }
@@ -154,13 +158,13 @@ export default function AdminListsPage() {
         const data = await res.json();
         setWorkers([...workers, data.worker].sort((a, b) => a.name.localeCompare(b.name)));
         setNewWorkerName("");
-        toast.success("Radnik dodat");
+        toast.success(t('workerAdded'));
       } else {
         const error = await res.json();
-        toast.error(error.error || "Greška pri dodavanju radnika");
+        toast.error(error.error || t('error.addWorker'));
       }
     } catch (error) {
-      toast.error("Greška pri dodavanju radnika");
+      toast.error(t('error.addWorker'));
     } finally {
       setAddingWorker(false);
     }
@@ -181,13 +185,13 @@ export default function AdminListsPage() {
         const data = await res.json();
         setCompanies([...companies, data.company].sort((a, b) => a.name.localeCompare(b.name)));
         setNewCompanyName("");
-        toast.success("Firma dodata");
+        toast.success(t('companyAdded'));
       } else {
         const error = await res.json();
-        toast.error(error.error || "Greška pri dodavanju firme");
+        toast.error(error.error || t('error.addCompany'));
       }
     } catch (error) {
-      toast.error("Greška pri dodavanju firme");
+      toast.error(t('error.addCompany'));
     } finally {
       setAddingCompany(false);
     }
@@ -207,17 +211,18 @@ export default function AdminListsPage() {
       if (res.ok) {
         if (deleteDialog.type === "worker") {
           setWorkers(workers.filter(w => w.id !== deleteDialog.id));
+          toast.success(t('workerDeleted'));
         } else {
           setCompanies(companies.filter(c => c.id !== deleteDialog.id));
+          toast.success(t('companyDeleted'));
         }
-        toast.success(`${deleteDialog.type === "worker" ? "Radnik" : "Firma"} obrisana`);
         setDeleteDialog({ open: false, type: "worker", id: "", name: "" });
       } else {
         const error = await res.json();
-        toast.error(error.error || "Greška pri brisanju");
+        toast.error(error.error || t('error.delete'));
       }
     } catch (error) {
-      toast.error("Greška pri brisanju");
+      toast.error(t('error.delete'));
     } finally {
       setDeleting(false);
     }
@@ -259,10 +264,10 @@ export default function AdminListsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
             <Shield className="w-8 h-8 text-primary" />
-            Upravljanje Listama
+            {t('title')}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Dodaj ili ukloni radnike i firme iz padajućih lista
+            {t('description')}
           </p>
         </div>
       </div>
@@ -272,13 +277,13 @@ export default function AdminListsPage() {
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Users className="h-5 w-5 text-blue-600" />
-            <h2 className="text-xl font-semibold">Radnici ({workers.length})</h2>
+            <h2 className="text-xl font-semibold">{t('workers')} ({workers.length})</h2>
           </div>
 
           {/* Add new worker */}
           <div className="flex gap-2 mb-4">
             <Input
-              placeholder="Ime novog radnika..."
+              placeholder={t('workerNamePlaceholder')}
               value={newWorkerName}
               onChange={(e) => setNewWorkerName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddWorker()}
@@ -295,7 +300,7 @@ export default function AdminListsPage() {
           {/* Workers list */}
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {workers.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Nema radnika</p>
+              <p className="text-muted-foreground text-center py-4">{t('noWorkers')}</p>
             ) : (
               workers.map((worker) => (
                 <div 
@@ -326,13 +331,13 @@ export default function AdminListsPage() {
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Building2 className="h-5 w-5 text-green-600" />
-            <h2 className="text-xl font-semibold">Firme ({companies.length})</h2>
+            <h2 className="text-xl font-semibold">{t('companies')} ({companies.length})</h2>
           </div>
 
           {/* Add new company */}
           <div className="flex gap-2 mb-4">
             <Input
-              placeholder="Ime nove firme..."
+              placeholder={t('companyNamePlaceholder')}
               value={newCompanyName}
               onChange={(e) => setNewCompanyName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAddCompany()}
@@ -349,7 +354,7 @@ export default function AdminListsPage() {
           {/* Companies list */}
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {companies.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">Nema firmi</p>
+              <p className="text-muted-foreground text-center py-4">{t('noCompanies')}</p>
             ) : (
               companies.map((company) => (
                 <div 
@@ -385,10 +390,10 @@ export default function AdminListsPage() {
               <AlertTriangle className="h-5 w-5 text-amber-600" />
               <div>
                 <h3 className="font-semibold text-amber-800 dark:text-amber-200">
-                  Zastareli podaci pronađeni
+                  {t('cleanup.found')}
                 </h3>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  {orphanedCount} kupac/kupaca bez reklamacija (test podaci ili obrisane reklamacije)
+                  {t('cleanup.foundDesc', { count: orphanedCount })}
                 </p>
               </div>
             </div>
@@ -398,7 +403,7 @@ export default function AdminListsPage() {
               className="border-amber-500 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
             >
               <RefreshCw className="h-4 w-4 mr-2" />
-              Očisti
+              {t('cleanup.cleanupButton')}
             </Button>
           </div>
         </Card>
@@ -408,14 +413,13 @@ export default function AdminListsPage() {
       <Dialog open={deleteDialog.open} onOpenChange={(open) => !deleting && setDeleteDialog({ ...deleteDialog, open })}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Potvrdi brisanje</DialogTitle>
+            <DialogTitle>{t('delete.title')}</DialogTitle>
           </DialogHeader>
           <p>
-            Da li ste sigurni da želite da obrišete{" "}
-            <strong>{deleteDialog.name}</strong>?
+            {t('delete.confirm', { name: deleteDialog.name })}
           </p>
           <p className="text-sm text-muted-foreground">
-            Ova akcija je nepovratna. {deleteDialog.type === "worker" ? "Radnik" : "Firma"} će biti uklonjen/a iz liste.
+            {t('delete.warning', { type: deleteDialog.type === "worker" ? t('workers') : t('companies') })}
           </p>
           <DialogFooter>
             <Button
@@ -423,14 +427,14 @@ export default function AdminListsPage() {
               onClick={() => setDeleteDialog({ ...deleteDialog, open: false })}
               disabled={deleting}
             >
-              Otkaži
+              {tCommon('cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
               disabled={deleting}
             >
-              {deleting ? "Brisanje..." : "Obriši"}
+              {deleting ? t('delete.deleting') : t('delete.delete')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -440,14 +444,13 @@ export default function AdminListsPage() {
       <Dialog open={showCleanupDialog} onOpenChange={(open) => !cleaning && setShowCleanupDialog(open)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Potvrdi čišćenje</DialogTitle>
+            <DialogTitle>{t('cleanup.confirmTitle')}</DialogTitle>
           </DialogHeader>
           <p>
-            Da li ste sigurni da želite da obrišete{" "}
-            <strong>{orphanedCount}</strong> zastarelih kupaca iz baze?
+            {t('cleanup.confirmDesc', { count: orphanedCount })}
           </p>
           <p className="text-sm text-muted-foreground">
-            Ova akcija je nepovratna. Kupci bez reklamacija će biti trajno obrisani.
+            {t('cleanup.confirmWarning')}
           </p>
           <DialogFooter>
             <Button
@@ -455,14 +458,14 @@ export default function AdminListsPage() {
               onClick={() => setShowCleanupDialog(false)}
               disabled={cleaning}
             >
-              Otkaži
+              {tCommon('cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleCleanup}
               disabled={cleaning}
             >
-              {cleaning ? "Čišćenje..." : "Obriši zastarele"}
+              {cleaning ? t('cleanup.cleaning') : t('cleanup.deleteOrphaned')}
             </Button>
           </DialogFooter>
         </DialogContent>

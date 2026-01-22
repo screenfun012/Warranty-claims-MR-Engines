@@ -16,6 +16,7 @@ import {
   Calendar
 } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { useTranslations } from "next-intl";
 
 interface Auth0User {
   name?: string;
@@ -34,6 +35,7 @@ interface Auth0User {
 export default function ProfilePage() {
   const { user, isLoading } = useUser();
   const [profile, setProfile] = useState<Auth0User | null>(null);
+  const t = useTranslations();
 
   useEffect(() => {
     if (user) {
@@ -45,7 +47,7 @@ export default function ProfilePage() {
   if (isLoading) {
     return (
       <div className="p-8">
-        <p>Učitavanje...</p>
+        <p>{t("profile.loading")}</p>
       </div>
     );
   }
@@ -53,7 +55,7 @@ export default function ProfilePage() {
   if (!user || !profile) {
     return (
       <div className="p-8">
-        <p>Niste prijavljeni</p>
+        <p>{t("profile.notLoggedIn")}</p>
       </div>
     );
   }
@@ -63,17 +65,17 @@ export default function ProfilePage() {
   const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
 
   const roleConfig: Record<string, { icon: typeof User; color: string; label: string }> = {
-    SUPER_ADMIN: { icon: Crown, color: "bg-amber-500 dark:bg-amber-600", label: "Super Admin" },
-    ADMIN: { icon: UserRoundCog, color: "bg-purple-500 dark:bg-purple-600", label: "Admin" },
-    OPERATOR: { icon: UserCheck, color: "bg-blue-500 dark:bg-blue-600", label: "Operator" },
-    VIEWER: { icon: Eye, color: "bg-gray-500 dark:bg-gray-600", label: "Viewer" },
+    SUPER_ADMIN: { icon: Crown, color: "bg-amber-500 dark:bg-amber-600", label: t("profile.roles.SUPER_ADMIN") },
+    ADMIN: { icon: UserRoundCog, color: "bg-purple-500 dark:bg-purple-600", label: t("profile.roles.ADMIN") },
+    OPERATOR: { icon: UserCheck, color: "bg-blue-500 dark:bg-blue-600", label: t("profile.roles.OPERATOR") },
+    VIEWER: { icon: Eye, color: "bg-gray-500 dark:bg-gray-600", label: t("profile.roles.VIEWER") },
   };
 
   const currentRole = roleConfig[userRole as string] || roleConfig.VIEWER;
   const RoleIcon = currentRole.icon;
 
   const formatDate = (dateString?: string) => {
-    if (!dateString) return "N/A";
+    if (!dateString) return t("common.noData");
     try {
       return new Date(dateString).toLocaleDateString("sr-RS", {
         year: "numeric",
@@ -81,7 +83,7 @@ export default function ProfilePage() {
         day: "numeric",
       });
     } catch {
-      return "N/A";
+      return t("common.noData");
     }
   };
 
@@ -91,10 +93,10 @@ export default function ProfilePage() {
       <div>
         <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
           <User className="w-10 h-10 text-primary" />
-          Moj Profil
+          {t("profile.title")}
         </h1>
         <p className="text-muted-foreground mt-2">
-          Pregled i upravljanje ličnim postavkama
+          {t("profile.subtitle")}
         </p>
       </div>
 
@@ -123,7 +125,7 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-0 space-y-4">
             <div>
               <h2 className="text-2xl font-semibold mb-2">
-                {profile.name || "Korisnik"}
+                {profile.name || t("profile.user")}
               </h2>
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge
@@ -154,16 +156,16 @@ export default function ProfilePage() {
               <div className="flex items-start gap-3">
                 <Mail className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground mb-1">Email adresa</p>
-                  <p className="font-medium break-all">{profile.email || "N/A"}</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("profile.emailAddress")}</p>
+                  <p className="font-medium break-all">{profile.email || t("common.noData")}</p>
                 </div>
               </div>
 
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
                 <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground mb-1">User ID</p>
-                  <p className="font-mono text-sm break-all">{profile.sub || "N/A"}</p>
+                  <p className="text-sm text-muted-foreground mb-1">{t("profile.userId")}</p>
+                  <p className="font-mono text-sm break-all">{profile.sub || t("common.noData")}</p>
                 </div>
               </div>
 
@@ -171,7 +173,7 @@ export default function ProfilePage() {
                 <div className="flex items-start gap-3">
                   <Calendar className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
                   <div className="min-w-0">
-                    <p className="text-sm text-muted-foreground mb-1">Datum kreiranja naloga</p>
+                    <p className="text-sm text-muted-foreground mb-1">{t("profile.accountCreatedDate")}</p>
                     <p className="font-medium">{formatDate(profile.created_at)}</p>
                   </div>
                 </div>
@@ -183,13 +185,13 @@ export default function ProfilePage() {
 
       {/* Preferences */}
       <Card className="p-6">
-        <h2 className="text-xl font-semibold mb-4">Postavke</h2>
+        <h2 className="text-xl font-semibold mb-4">{t("profile.preferences")}</h2>
         <div className="space-y-4">
           <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
             <div>
-              <p className="font-medium mb-1">Tema</p>
+              <p className="font-medium mb-1">{t("profile.theme")}</p>
               <p className="text-sm text-muted-foreground">
-                Promeni između svetle i tamne teme
+                {t("profile.themeDescription")}
               </p>
             </div>
             <ThemeToggle />
@@ -203,11 +205,10 @@ export default function ProfilePage() {
           <Shield className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
           <div>
             <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
-              O bezbednosti
+              {t("profile.security")}
             </p>
             <p className="text-sm text-blue-800 dark:text-blue-200">
-              Vaši podaci su zaštićeni Auth0 autentifikacijom. Za promenu email adrese ili 
-              lozinke, kontaktirajte administratora sistema.
+              {t("profile.securityDescription")}
             </p>
           </div>
         </div>

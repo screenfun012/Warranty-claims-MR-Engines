@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +19,7 @@ interface ClaimClientDocumentsProps {
 }
 
 export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: ClaimClientDocumentsProps) {
+  const t = useTranslations();
   const [extracting, setExtracting] = useState<string | null>(null);
   const [translating, setTranslating] = useState<{ docId: string; lang: string; sourceLang: string } | null>(null);
   const [sourceLang, setSourceLang] = useState<Record<string, string>>({});
@@ -75,17 +77,17 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
       });
       const data = await res.json();
       if (data.success) {
-        alert("Text extracted successfully");
+        alert(t("claims.documents.extractSuccess"));
         // Refresh claim data if onRefresh callback is available
         if (onRefresh) {
           await onRefresh();
         }
       } else {
-        alert("Failed to extract text: " + data.error);
+        alert(t("claims.documents.extractError") + ": " + data.error);
       }
     } catch (error) {
       console.error("Error extracting PDF:", error);
-      alert("Failed to extract text");
+      alert(t("claims.documents.extractError"));
     } finally {
       setExtracting(null);
     }
@@ -96,7 +98,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
     const tgtLang = targetLang[docId] || "EN";
     
     if (srcLang === tgtLang) {
-      alert("Source and target languages must be different");
+      alert(t("claims.documents.translate.sameLanguage"));
       return;
     }
 
@@ -114,17 +116,17 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
       });
       const data = await res.json();
       if (data.translated) {
-        alert("Translation completed");
+        alert(t("claims.documents.translate.success"));
         // Refresh claim data if onRefresh callback is available
         if (onRefresh) {
           await onRefresh();
         }
       } else {
-        alert("Translation failed: " + (data.error || "Unknown error"));
+        alert(t("claims.documents.translate.error") + ": " + (data.error || t("common.error")));
       }
     } catch (error) {
       console.error("Translation error:", error);
-      alert("Translation failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      alert(t("claims.documents.translate.error") + ": " + (error instanceof Error ? error.message : t("common.error")));
     } finally {
       setTranslating(null);
     }
@@ -133,7 +135,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
   if (clientAttachments.length === 0) {
     return (
       <Card className="p-6 hover:shadow-md transition-shadow">
-        <p className="text-muted-foreground">Nema dokumenata i slika od klijenta.</p>
+        <p className="text-muted-foreground">{t("claims.documents.noDocuments")}</p>
       </Card>
     );
   }
@@ -180,11 +182,11 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
         // No need to reload - onRefresh will update the UI
       } else {
         const errorData = await res.json();
-        alert(`Neuspešno brisanje: ${errorData.error || "Unknown error"}`);
+        alert(t("claims.documents.deleteError") + ": " + (errorData.error || t("common.error")));
       }
     } catch (error) {
       console.error("Error deleting attachment:", error);
-      alert("Neuspešno brisanje fajla: " + (error instanceof Error ? error.message : "Unknown error"));
+      alert(t("claims.documents.deleteError") + ": " + (error instanceof Error ? error.message : t("common.error")));
     } finally {
       setDeleting(null);
       setAttachmentToDelete(null);
@@ -203,7 +205,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
         <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <ImageIcon className="h-5 w-5" />
-            Slike ({images.length})
+            {t("claims.documents.images")} ({images.length})
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {images.map((attachment: any, index: number) => (
@@ -214,12 +216,12 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                 <div className="aspect-square bg-muted/30 rounded-lg overflow-hidden mb-2">
                   <img
                     src={`/api/files/${attachment.id}`}
-                    alt={attachment.fileName || "Image"}
+                    alt={attachment.fileName || t("claims.documents.image")}
                     className="w-full h-full object-cover"
                   />
                 </div>
                 <p className="text-xs text-muted-foreground truncate" title={attachment.fileName}>
-                  {attachment.fileName || `Slika ${index + 1}`}
+                  {attachment.fileName || t("claims.photos.imageNumber", { number: index + 1 })}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {new Date(attachment.messageDate).toLocaleDateString('sr-RS')}
@@ -235,7 +237,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
         <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            PDF Dokumenti ({pdfs.length})
+            {t("claims.documents.pdfDocuments")} ({pdfs.length})
           </h3>
           <div className="space-y-4">
             {pdfs.map((attachment: any) => {
@@ -244,14 +246,14 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                 <Card key={attachment.id} className="p-6 hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-base font-semibold mb-1 truncate">{attachment.fileName || "Document"}</h4>
+                      <h4 className="text-base font-semibold mb-1 truncate">{attachment.fileName || t("claims.documents.document")}</h4>
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant="outline" className="text-xs">
                           {new Date(attachment.messageDate).toLocaleDateString('sr-RS')}
                         </Badge>
                         {attachment.messageFrom && (
                           <span className="text-xs text-muted-foreground truncate">
-                            Od: {attachment.messageFrom}
+                            {t("claims.emails.from")}: {attachment.messageFrom}
                           </span>
                         )}
                       </div>
@@ -267,7 +269,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                         }}
                       >
                         <FileText className="h-4 w-4 mr-2" />
-                        Pregledaj
+                        {t("common.view")}
                       </Button>
                       {!clientDoc?.textOriginal && (
                         <Button
@@ -276,7 +278,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                           onClick={() => handleExtractPdf(attachment.id)}
                           disabled={extracting === attachment.id}
                         >
-                          {extracting === attachment.id ? "Ekstraktuje..." : "Ekstraktuj tekst"}
+                          {extracting === attachment.id ? t("claims.documents.extracting") : t("claims.documents.extractText")}
                         </Button>
                       )}
                     </div>
@@ -294,12 +296,12 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                         {deleting === attachment.id ? (
                           <>
                             <X className="h-4 w-4 mr-2 animate-spin" />
-                            Brisanje...
+                            {t("common.loading")}
                           </>
                         ) : (
                           <>
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Obriši dokument
+                            {t("claims.documents.deleteDocument")}
                           </>
                         )}
                       </Button>
@@ -309,12 +311,12 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                   {clientDoc?.textOriginal && (
                     <div className="space-y-4 mt-4">
                       <div>
-                        <Label>Originalni tekst</Label>
+                        <Label>{t("inbox.originalText")}</Label>
                         <Textarea value={clientDoc.textOriginal} rows={6} readOnly className="font-mono text-sm" />
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <Label>Srpski prevod</Label>
+                          <Label>{t("inbox.serbianTranslation")}</Label>
                           <div className="flex items-center gap-2">
                             <Select 
                               value={sourceLang[clientDoc.id] || "auto"} 
@@ -325,7 +327,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="auto">Auto</SelectItem>
+                                <SelectItem value="auto">{t("claims.documents.auto")}</SelectItem>
                                 <SelectItem value="SR">SR</SelectItem>
                                 <SelectItem value="EN">EN</SelectItem>
                               </SelectContent>
@@ -351,7 +353,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                               disabled={translating?.docId === clientDoc.id || (sourceLang[clientDoc.id] || "auto") === (targetLang[clientDoc.id] || "SR")}
                             >
                               <Languages className="h-4 w-4 mr-2" />
-                              {translating?.docId === clientDoc.id && translating?.lang === "SR" ? "Prevodi..." : "Prevedi na SR"}
+                              {translating?.docId === clientDoc.id && translating?.lang === "SR" ? t("inbox.translating") : t("inbox.translateToSR")}
                             </Button>
                           </div>
                         </div>
@@ -359,12 +361,12 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                           value={clientDoc.textSr || ""}
                           rows={6}
                           readOnly
-                          placeholder="Srpski prevod će se pojaviti ovde..."
+                          placeholder={t("inbox.serbianTranslationPlaceholder")}
                         />
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <Label>Engleski prevod</Label>
+                          <Label>{t("inbox.englishTranslation")}</Label>
                           <div className="flex items-center gap-2">
                             <Select 
                               value={sourceLang[clientDoc.id] || "auto"} 
@@ -375,7 +377,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="auto">Auto</SelectItem>
+                                <SelectItem value="auto">{t("claims.documents.auto")}</SelectItem>
                                 <SelectItem value="SR">SR</SelectItem>
                                 <SelectItem value="EN">EN</SelectItem>
                               </SelectContent>
@@ -401,7 +403,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                               disabled={translating?.docId === clientDoc.id || (sourceLang[clientDoc.id] || "auto") === (targetLang[clientDoc.id] || "EN")}
                             >
                               <Languages className="h-4 w-4 mr-2" />
-                              {translating?.docId === clientDoc.id && translating?.lang === "EN" ? "Prevodi..." : "Prevedi na EN"}
+                              {translating?.docId === clientDoc.id && translating?.lang === "EN" ? t("inbox.translating") : t("inbox.translateToEN")}
                             </Button>
                           </div>
                         </div>
@@ -409,7 +411,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                           value={clientDoc.textEn || ""}
                           rows={6}
                           readOnly
-                          placeholder="Engleski prevod će se pojaviti ovde..."
+                          placeholder={t("inbox.englishTranslationPlaceholder")}
                         />
                       </div>
                     </div>
@@ -426,14 +428,14 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
         <div>
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <Paperclip className="h-5 w-5" />
-            Ostali dokumenti ({documents.length})
+            {t("claims.documents.otherDocuments")} ({documents.length})
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {documents.map((attachment: any) => (
               <Card key={attachment.id} className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{attachment.fileName || "Document"}</p>
+                    <p className="font-medium truncate">{attachment.fileName || t("claims.documents.document")}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <Badge variant="outline" className="text-xs">
                         {new Date(attachment.messageDate).toLocaleDateString('sr-RS')}
@@ -503,8 +505,8 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
         onConfirm={handleDeleteConfirm}
-        title="Brisanje fajla"
-        description="Da li ste sigurni da želite da obrišete ovaj fajl? Ova akcija je nepovratna."
+        title={t("claims.documents.deleteFile.title")}
+        description={t("claims.documents.deleteFile.confirm")}
         confirmText="Obriši"
         cancelText="Otkaži"
         variant="destructive"

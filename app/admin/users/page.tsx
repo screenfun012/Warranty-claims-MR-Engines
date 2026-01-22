@@ -84,11 +84,11 @@ export default function AdminUsersPage() {
         setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
       } else {
         const data = await res.json();
-        alert(data.error || "Greška pri ažuriranju role");
+        alert(data.error || t('error.updateRole'));
       }
     } catch (error) {
       console.error("Error updating role:", error);
-      alert("Greška pri ažuriranju role");
+      alert(t('error.updateRole'));
     } finally {
       setUpdating(null);
     }
@@ -107,11 +107,11 @@ export default function AdminUsersPage() {
         setUsers(users.map(u => u.id === userId ? { ...u, active: !currentActive } : u));
       } else {
         const data = await res.json();
-        alert(data.error || "Greška pri ažuriranju statusa");
+        alert(data.error || t('error.updateStatus'));
       }
     } catch (error) {
       console.error("Error updating status:", error);
-      alert("Greška pri ažuriranju statusa");
+      alert(t('error.updateStatus'));
     } finally {
       setUpdating(null);
     }
@@ -130,11 +130,11 @@ export default function AdminUsersPage() {
         setUsers(users.map(u => u.id === userId ? { ...u, approved: !currentApproved } : u));
       } else {
         const data = await res.json();
-        alert(data.error || "Greška pri odobravanju korisnika");
+        alert(data.error || t('error.approveUser'));
       }
     } catch (error) {
       console.error("Error approving user:", error);
-      alert("Greška pri odobravanju korisnika");
+      alert(t('error.approveUser'));
     } finally {
       setUpdating(null);
     }

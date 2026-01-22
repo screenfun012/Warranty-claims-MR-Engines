@@ -20,14 +20,17 @@ import { cn } from "@/lib/utils";
 import { Home, ChevronRight } from "lucide-react";
 import { ApprovalGuard } from "@/components/approval-guard";
 import { useRealtime } from "@/hooks/useRealtime";
+import { useTranslations } from "next-intl";
 
 function PageTitle({ pathname }: { pathname: string | null }) {
+  const t = useTranslations();
+  
   if (!pathname) return null;
 
   // Get breadcrumbs from pathname
   const getBreadcrumbs = (path: string): Array<{ label: string; href: string }> => {
     const parts = path.split("/").filter(Boolean);
-    const breadcrumbs: Array<{ label: string; href: string }> = [{ label: "Dashboard", href: "/" }];
+    const breadcrumbs: Array<{ label: string; href: string }> = [{ label: t("nav.dashboard"), href: "/" }];
     
     if (parts.length === 0) return breadcrumbs;
     
@@ -38,31 +41,31 @@ function PageTitle({ pathname }: { pathname: string | null }) {
       // Handle specific routes
       if (part === "claims") {
         if (parts[index + 1] === "new") {
-          breadcrumbs.push({ label: "Claims", href: "/claims" });
-          breadcrumbs.push({ label: "New Claim", href: currentPath + "/new" });
+          breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
+          breadcrumbs.push({ label: t("claims.new.createButton"), href: currentPath + "/new" });
           return;
         } else if (parts[index + 1]) {
-          breadcrumbs.push({ label: "Claims", href: "/claims" });
-          breadcrumbs.push({ label: `Claim ${parts[index + 1].slice(0, 8)}...`, href: currentPath + "/" + parts[index + 1] });
+          breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
+          breadcrumbs.push({ label: `${t("nav.claims")} ${parts[index + 1].slice(0, 8)}...`, href: currentPath + "/" + parts[index + 1] });
           return;
         } else {
-          breadcrumbs.push({ label: "Claims", href: "/claims" });
+          breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
         }
       } else if (part === "inbox") {
-        breadcrumbs.push({ label: "Inbox", href: "/inbox" });
+        breadcrumbs.push({ label: t("nav.inbox"), href: "/inbox" });
       } else if (part === "settings") {
-        breadcrumbs.push({ label: "Settings", href: "/settings" });
+        breadcrumbs.push({ label: t("nav.settings"), href: "/settings" });
       } else if (part === "admin" && parts[index + 1] === "users") {
-        breadcrumbs.push({ label: "Admin", href: "/admin" });
-        breadcrumbs.push({ label: "User Management", href: currentPath + "/users" });
+        breadcrumbs.push({ label: t("nav.admin"), href: "/admin" });
+        breadcrumbs.push({ label: t("admin.users.title"), href: currentPath + "/users" });
         return;
       } else if (part === "work-orders") {
         if (parts[index + 1]) {
-          breadcrumbs.push({ label: "Work Orders", href: "/work-orders" });
-          breadcrumbs.push({ label: "Details", href: currentPath + "/" + parts[index + 1] });
+          breadcrumbs.push({ label: t("nav.workOrders"), href: "/work-orders" });
+          breadcrumbs.push({ label: t("common.details"), href: currentPath + "/" + parts[index + 1] });
           return;
         } else {
-          breadcrumbs.push({ label: "Work Orders", href: "/work-orders" });
+          breadcrumbs.push({ label: t("nav.workOrders"), href: "/work-orders" });
         }
       } else {
         // Generic handling
@@ -112,7 +115,7 @@ function PageTitle({ pathname }: { pathname: string | null }) {
       ) : (
         <div className="flex items-center gap-2">
           <Home className="h-4 w-4 text-muted-foreground" />
-          <h1 className="text-lg font-semibold text-foreground">Dashboard</h1>
+          <h1 className="text-lg font-semibold text-foreground">{t("nav.dashboard")}</h1>
         </div>
       )}
     </div>
@@ -121,6 +124,7 @@ function PageTitle({ pathname }: { pathname: string | null }) {
 
 function SidebarTriggerWithTooltip() {
   const { state, toggleSidebar } = useSidebar();
+  const t = useTranslations();
   const isCollapsed = state === "collapsed";
 
   return (
@@ -135,7 +139,7 @@ function SidebarTriggerWithTooltip() {
           />
         </TooltipTrigger>
         <TooltipContent side="right">
-          <span>{isCollapsed ? "Proširi sidebar" : "Sakrij sidebar"}</span>
+          <span>{isCollapsed ? t("common.expand") : t("common.collapse")}</span>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
