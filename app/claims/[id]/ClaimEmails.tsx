@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +57,7 @@ const getOriginalSenderEmail = (claim: any): string => {
 
 export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmailsProps) {
   const router = useRouter();
+  const t = useTranslations();
   const [sending, setSending] = useState(false);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
   
@@ -65,7 +67,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
   const [replyForm, setReplyForm] = useState({
     to: originalSenderEmail,
     cc: "",
-    subject: `Re: ${claim.emailThreads?.[0]?.subjectOriginal || "Claim"}`,
+    subject: `${t("claims.emails.re")}: ${claim.emailThreads?.[0]?.subjectOriginal || t("claims.title")}`,
     text: "",
   });
   // Use main status for acceptance (APPROVED/REJECTED)
@@ -138,7 +140,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         if (onUpdate) {
           onUpdate({ ...claim, status: claim.status });
         }
-        alert(`Failed to update: ${errorText}`);
+        alert(t("claims.emails.updateError") + ": " + errorText);
         return;
       }
       
@@ -160,7 +162,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       if (onUpdate) {
         onUpdate({ ...claim, status: claim.status });
       }
-      alert("Failed to update acceptance status");
+      alert(t("claims.emails.updateError"));
     }
   };
 
@@ -220,7 +222,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     try {
       // Only send email if acceptance status is set
       if (!acceptanceStatus || (acceptanceStatus !== "ACCEPTED" && acceptanceStatus !== "REJECTED")) {
-        alert("Please select Claim Acceptance Status (Accepted or Rejected) before sending email");
+        alert(t("claims.emails.selectStatus"));
         setSending(false);
         return;
       }
@@ -229,12 +231,12 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       let emailBody = replyForm.text;
       if (acceptanceStatus === "ACCEPTED") {
         emailBody = emailBody 
-          ? `${emailBody}\n\nYour warranty claim has been processed and We accept your claim.`
-          : `Your warranty claim has been processed and We accept your claim.`;
+          ? `${emailBody}\n\n${t("claims.emails.acceptedMessage")}`
+          : t("claims.emails.acceptedMessage");
       } else if (acceptanceStatus === "REJECTED") {
         emailBody = emailBody 
-          ? `${emailBody}\n\nYour warranty claim has been processed and We reject your claim.`
-          : `Your warranty claim has been processed and We reject your claim.`;
+          ? `${emailBody}\n\n${t("claims.emails.rejectedMessage")}`
+          : t("claims.emails.rejectedMessage");
       }
 
       // Get attachment IDs from selected internal files
@@ -255,9 +257,9 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       
       if (data.success) {
         if (data.warning) {
-          alert(`Email sent successfully!\n\nWarning: ${data.warning}`);
+          alert(t("claims.emails.sendSuccess") + "\n\n" + t("common.warning") + ": " + data.warning);
         } else {
-          alert("Email sent successfully! Claim has been closed.");
+          alert(t("claims.emails.sendSuccessClosed"));
         }
         
         // Reset form
@@ -267,11 +269,11 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         // Navigate back to claims list (table view)
         router.push("/claims");
       } else {
-        alert("Failed to send email: " + (data.error || "Unknown error"));
+        alert(t("claims.emails.sendError") + ": " + (data.error || t("common.error")));
       }
     } catch (error) {
       console.error("Error sending email:", error);
-      alert("Failed to send email");
+      alert(t("claims.emails.sendError"));
     } finally {
       setSending(false);
     }
@@ -295,9 +297,9 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
     <div className="space-y-4">
       {/* Timeline Header */}
       <Card className="p-4 bg-muted/50">
-        <h3 className="font-semibold text-lg mb-1">Email Timeline</h3>
+        <h3 className="font-semibold text-lg mb-1">{t("claims.emails.timeline")}</h3>
         <p className="text-sm text-muted-foreground">
-          Komunikacija između operatera i klijenta
+          {t("claims.emails.timelineDesc")}
         </p>
       </Card>
 
@@ -338,16 +340,16 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                           variant={isInbound ? "default" : "secondary"} 
                           className={`text-xs ${isInbound ? 'bg-blue-500' : 'bg-green-500'}`}
                         >
-                          {isInbound ? "Od klijenta" : "Aplikacija → Klijent"}
+                          {isInbound ? t("claims.emails.fromClient") : t("claims.emails.toClient")}
                         </Badge>
                         {isFirstInbound && (
                           <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                            Početna poruka
+                            {t("claims.emails.initialMessage")}
                           </Badge>
                         )}
                         {!isInbound && message.threadSubject && (
                           <Badge variant="outline" className="text-xs">
-                            Status: U obradi
+                            {t("common.status")}: {t("claims.status.IN_ANALYSIS")}
                           </Badge>
                         )}
                       </div>
@@ -377,14 +379,14 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                           bodyText: message.bodyText,
                           bodyHtml: message.bodyHtml,
                         });
-                        return cleanText || "(Nema teksta)";
+                        return cleanText || t("claims.emails.noText");
                       })()}
                     </div>
 
                     {message.attachments && message.attachments.length > 0 && (
                       <div className="mt-3 space-y-1">
                         <p className="text-xs font-medium text-muted-foreground mb-2">
-                          {message.attachments.length} attachment(s):
+                          {message.attachments.length} {t("claims.emails.attachments")}:
                         </p>
                         <div className="flex flex-wrap gap-1.5 sm:gap-2">
                           {message.attachments.map((attachment: any, attIndex: number) => {
@@ -437,7 +439,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         </div>
       ) : (
         <Card className="p-4">
-          <p className="text-muted-foreground">Nema email poruka za ovu reklamaciju.</p>
+          <p className="text-muted-foreground">{t("claims.emails.noEmails")}</p>
         </Card>
       )}
 
@@ -445,32 +447,32 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       <Card className="p-6">
         <h3 className="text-lg font-semibold mb-6 flex items-center gap-2">
           <Mail className="h-5 w-5 text-primary" />
-          Send Reply
+          {t("claims.emails.sendReply")}
         </h3>
         <div className="space-y-3 sm:space-y-4">
           <div>
-            <Label>To</Label>
+            <Label>{t("inbox.to")}</Label>
             <Input
               value={replyForm.to}
               onChange={(e) => setReplyForm({ ...replyForm, to: e.target.value })}
             />
           </div>
           <div>
-            <Label>CC</Label>
+            <Label>{t("inbox.cc")}</Label>
             <Input
               value={replyForm.cc}
               onChange={(e) => setReplyForm({ ...replyForm, cc: e.target.value })}
             />
           </div>
           <div>
-            <Label>Subject</Label>
+            <Label>{t("inbox.subject")}</Label>
             <Input
               value={replyForm.subject}
               onChange={(e) => setReplyForm({ ...replyForm, subject: e.target.value })}
             />
           </div>
           <div>
-            <Label>Message</Label>
+            <Label>{t("claims.emails.message")}</Label>
             <Textarea
               value={replyForm.text}
               onChange={(e) => setReplyForm({ ...replyForm, text: e.target.value })}
@@ -479,7 +481,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           </div>
 
           <div>
-            <Label>Prilozi (iz &quot;Naši fajlovi&quot;)</Label>
+            <Label>{t("claims.emails.attachmentsFromFiles")}</Label>
             {internalFiles.length > 0 ? (
               <div className="mt-2 space-y-2 max-h-60 overflow-y-auto border rounded-md p-3">
                 {internalFiles.map((file: any) => {
@@ -514,7 +516,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                         ) : (
                           <Paperclip className="h-4 w-4 text-gray-500 shrink-0" />
                         )}
-                        <span className="text-sm truncate">{file.fileName || `File ${file.id}`}</span>
+                        <span className="text-sm truncate">{file.fileName || t("claims.photos.fileNumber", { id: file.id })}</span>
                       </div>
                     </div>
                   );
@@ -522,12 +524,12 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
               </div>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Nema internih fajlova za priložiti. Dodajte fajlove u tabu &quot;Naši fajlovi&quot;.
+                {t("claims.emails.noFilesToAttach")}
               </p>
             )}
             {selectedAttachmentIds.length > 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
-                Odabrano: {selectedAttachmentIds.length} fajlova
+                {t("claims.emails.selected")}: {selectedAttachmentIds.length} {t("claims.photos.files")}
               </p>
             )}
           </div>
@@ -543,14 +545,14 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                     ? "border-green-500 bg-green-500 dark:border-green-400 dark:bg-green-400"
                     : "border-muted-foreground/40 hover:border-green-500/50 dark:border-muted-foreground/60 dark:hover:border-green-400/50"
                 )}
-                aria-label="Prihvaćeno"
+                aria-label={t("claims.status.APPROVED")}
               >
                 {acceptanceStatus === "ACCEPTED" && (
                   <div className="h-2.5 w-2.5 rounded-full bg-white dark:bg-gray-900" />
                 )}
               </button>
               <Label htmlFor="accepted" className="cursor-pointer font-medium text-sm text-foreground">
-                Prihvaćeno
+                {t("claims.status.APPROVED")}
               </Label>
             </div>
             <div className="flex items-center gap-3">
@@ -563,20 +565,20 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                     ? "border-red-500 bg-red-500 dark:border-red-400 dark:bg-red-400"
                     : "border-muted-foreground/40 hover:border-red-500/50 dark:border-muted-foreground/60 dark:hover:border-red-400/50"
                 )}
-                aria-label="Odbijeno"
+                aria-label={t("claims.status.REJECTED")}
               >
                 {acceptanceStatus === "REJECTED" && (
                   <div className="h-2.5 w-2.5 rounded-full bg-white dark:bg-gray-900" />
                 )}
               </button>
               <Label htmlFor="rejected" className="cursor-pointer font-medium text-sm text-foreground">
-                Odbijeno
+                {t("claims.status.REJECTED")}
               </Label>
             </div>
           </div>
 
           <Button onClick={handleSendEmail} disabled={sending}>
-            {sending ? "Sending..." : "Send Email"}
+            {sending ? t("claims.emails.sending") : t("claims.emails.sendEmail")}
           </Button>
         </div>
       </Card>
