@@ -285,6 +285,24 @@
       "noFindings": "Nema nalaza",
       "initialFinding": "Početno zapažanje"
     },
+    "overview": {
+      "from": "Od",
+      "to": "Do",
+      "useEmailBody": "Koristi Email Body",
+      "useSummary": "Koristi Summary",
+      "emailBodyPlaceholder": "Tekst email poruke (može se uređivati - izvučen iz prve dolazne poruke)",
+      "summaryPlaceholder": "Unesi sažetak na {lang}...",
+      "translatedPlaceholder": "Preveden sažetak na {lang}...",
+      "swapLanguages": "Zameni jezike",
+      "translating": "Prevođenje...",
+      "translate": {
+        "sameLanguage": "Izvorni i ciljni jezik ne mogu biti isti",
+        "invalidSource": "Nevažeći izvorni jezik",
+        "noEmailBody": "Nema teksta email poruke za prevod",
+        "noSummary": "Nema sažetka na {lang} za prevod",
+        "error": "Greška pri prevodu"
+      }
+    },
     "new": {
       "required": {
         "mrNumber": "MR Number je obavezno polje",

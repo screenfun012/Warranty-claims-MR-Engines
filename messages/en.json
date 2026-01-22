@@ -287,6 +287,24 @@
       "noFindings": "No findings",
       "initialFinding": "Initial Finding"
     },
+    "overview": {
+      "from": "From",
+      "to": "To",
+      "useEmailBody": "Use Email Body",
+      "useSummary": "Use Summary",
+      "emailBodyPlaceholder": "Email body text (editable - extracted from first inbound email)",
+      "summaryPlaceholder": "Enter summary in {lang}...",
+      "translatedPlaceholder": "Translated summary in {lang}...",
+      "swapLanguages": "Swap Languages",
+      "translating": "Translating...",
+      "translate": {
+        "sameLanguage": "Source and target languages cannot be the same",
+        "invalidSource": "Invalid source language",
+        "noEmailBody": "No email body text to translate",
+        "noSummary": "No {lang} summary to translate",
+        "error": "Translation failed"
+      }
+    },
     "new": {
       "required": {
         "mrNumber": "MR Number is required",

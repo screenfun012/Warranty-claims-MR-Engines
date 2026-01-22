@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,7 @@ const getEmailBodyText = (claim: any): string => {
 };
 
 export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOverviewProps) {
+  const t = useTranslations();
   const [translating, setTranslating] = useState(false);
   const [sourceLang, setSourceLang] = useState<string>("SR");
   const [targetLang, setTargetLang] = useState<string>("EN");
@@ -170,22 +172,22 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
 
   const handleTranslate = async () => {
     if (sourceLang === targetLang) {
-      alert("Source and target languages cannot be the same");
+      alert(t("claims.overview.translate.sameLanguage"));
       return;
     }
 
     const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
     if (!sourceLangConfig) {
-      alert("Invalid source language");
+      alert(t("claims.overview.translate.invalidSource"));
       return;
     }
 
     const textToTranslate = sourceText; // Use current sourceText state (which can be edited)
     if (!textToTranslate || !textToTranslate.trim()) {
       if (useEmailBody) {
-        alert("No email body text to translate");
+        alert(t("claims.overview.translate.noEmailBody"));
       } else {
-        alert(`No ${sourceLangConfig.name} summary to translate`);
+        alert(t("claims.overview.translate.noSummary", { lang: sourceLangConfig.name }));
       }
       return;
     }
@@ -219,7 +221,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
         const cleanError = errorMessage.startsWith("Translation failed: ") 
           ? errorMessage.substring("Translation failed: ".length)
           : errorMessage;
-        alert("Translation failed: " + cleanError);
+        alert(t("claims.overview.translate.error") + ": " + cleanError);
         return;
       }
       
@@ -230,19 +232,19 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           onUpdate({ [targetLangConfig.field]: data.translated });
         }
       } else {
-        const errorMessage = data.error || "Unknown error";
+        const errorMessage = data.error || t("common.error");
         const cleanError = errorMessage.startsWith("Translation failed: ") 
           ? errorMessage.substring("Translation failed: ".length)
           : errorMessage;
-        alert("Translation failed: " + cleanError);
+        alert(t("claims.overview.translate.error") + ": " + cleanError);
       }
     } catch (error) {
       console.error("Translation error:", error);
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      const errorMessage = error instanceof Error ? error.message : t("common.error");
       const cleanError = errorMessage.startsWith("Translation failed: ") 
         ? errorMessage.substring("Translation failed: ".length)
         : errorMessage;
-      alert("Translation failed: " + cleanError);
+      alert(t("claims.overview.translate.error") + ": " + cleanError);
     } finally {
       setTranslating(false);
     }
@@ -256,7 +258,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Languages className="h-5 w-5 text-primary" />
-          <h2 className="text-lg font-semibold text-primary">Summary</h2>
+          <h2 className="text-lg font-semibold text-primary">{t("claims.tabs.summary")}</h2>
         </div>
         {emailBodyText && (
           <Button
@@ -271,7 +273,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
             }}
             disabled={isReadOnly}
           >
-            {useEmailBody ? "Koristi Email Body" : "Koristi Summary"}
+            {useEmailBody ? t("claims.overview.useEmailBody") : t("claims.overview.useSummary")}
           </Button>
         )}
       </div>
@@ -280,7 +282,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
         {/* Source Language */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium text-muted-foreground">From</Label>
+            <Label className="text-sm font-medium text-muted-foreground">{t("claims.overview.from")}</Label>
             <Select value={sourceLang} onValueChange={handleSourceChange} disabled={isReadOnly}>
               <SelectTrigger className="w-36 h-8">
                 <SelectValue />
@@ -317,8 +319,8 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
             }}
             rows={10}
             placeholder={useEmailBody 
-              ? "Email body text (editable - extracted from first inbound email)" 
-              : `Enter summary in ${sourceLangConfig?.name || sourceLang}...`}
+              ? t("claims.overview.emailBodyPlaceholder")
+              : t("claims.overview.summaryPlaceholder", { lang: sourceLangConfig?.name || sourceLang })}
             disabled={isReadOnly}
             className="min-h-[200px] resize-y whitespace-pre-wrap"
           />
@@ -327,7 +329,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
         {/* Target Language */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium text-muted-foreground">To</Label>
+            <Label className="text-sm font-medium text-muted-foreground">{t("claims.overview.to")}</Label>
             <Select value={targetLang} onValueChange={handleTargetChange} disabled={isReadOnly}>
               <SelectTrigger className="w-36 h-8">
                 <SelectValue />
@@ -362,7 +364,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
               setIsEditingTarget(prev => ({ ...prev, [targetLang]: false }));
             }}
             rows={10}
-            placeholder={`Translated summary in ${targetLangConfig?.name || targetLang}...`}
+            placeholder={t("claims.overview.translatedPlaceholder", { lang: targetLangConfig?.name || targetLang })}
             disabled={isReadOnly}
             className="min-h-[200px] resize-y whitespace-pre-wrap"
           />
@@ -379,7 +381,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           className="gap-2"
         >
           <ArrowLeftRight className="h-4 w-4" />
-          Swap Languages
+          {t("claims.overview.swapLanguages")}
         </Button>
         <Button
           variant="default"
@@ -389,7 +391,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           className="gap-2"
         >
           <Languages className="h-4 w-4" />
-          {translating ? "Translating..." : "Translate"}
+          {translating ? t("claims.overview.translating") : t("inbox.translate")}
         </Button>
       </div>
     </Card>
