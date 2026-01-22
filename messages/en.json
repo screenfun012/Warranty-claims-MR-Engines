@@ -113,6 +113,7 @@
   },
   "claims": {
     "title": "Claims",
+    "subtitle": "Manage all claims",
     "newClaim": "New Claim",
     "claimCode": "MR Number",
     "mrNumber": "MR Number",
@@ -130,6 +131,23 @@
     "locked": "Locked",
     "unlocked": "Unlocked",
     "notFound": "Claim not found",
+    "filters": {
+      "active": "Active filters",
+      "allClaims": "All claims",
+      "selectedCount": "{count} selected",
+      "searchByCode": "Search by code",
+      "searchByCustomer": "Search by customer",
+      "olderThan7Days": "Older than 7 days",
+      "showing": "Showing",
+      "of": "of",
+      "claims": "claims",
+      "clearAll": "Clear all filters"
+    },
+    "list": {
+      "title": "Claims List",
+      "count": "claims",
+      "emptyHint": "Adjust your filters or create a new claim"
+    },
     "status": {
       "NEW": "New",
       "IN_ANALYSIS": "In Analysis",
@@ -180,7 +198,20 @@
     "delete": {
       "title": "Delete Claim",
       "confirm": "Are you sure you want to delete this claim? All data and files will be permanently deleted.",
-      "success": "Claim deleted successfully"
+      "success": "Claim deleted successfully",
+      "error": "Error deleting claim"
+    },
+    "unlock": {
+      "title": "Unlock Claim",
+      "confirm": "Are you sure you want to unlock this claim? The claim will be available for editing by other users.",
+      "button": "Unlock",
+      "error": "Error unlocking claim"
+    },
+    "lock": {
+      "title": "Lock Claim",
+      "confirm": "Are you sure you want to lock this claim? The claim will be read-only for other users.",
+      "button": "Lock",
+      "error": "Error locking claim"
     },
     "photos": {
       "title": "Our Files",

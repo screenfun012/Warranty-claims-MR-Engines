@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
@@ -55,7 +56,7 @@ interface Claim {
 
 // Status badge component with icons - unified status system
 // Text is neutral gray, icons are colored and animated
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status, label }: { status: string; label: string }) => {
   const getIcon = () => {
     switch (status) {
       case "NEW":
@@ -93,23 +94,20 @@ const StatusBadge = ({ status }: { status: string }) => {
     >
       {getIcon()}
       <span className="text-sm font-medium">
-        {statusLabels[status] || status}
+        {label}
       </span>
     </Badge>
   );
-};
-
-const statusLabels: Record<string, string> = {
-  NEW: "Novo",
-  IN_ANALYSIS: "U Obradi",
-  APPROVED: "Prihvaćeno",
-  REJECTED: "Odbijeno",
 };
 
 export default function ClaimsPage() {
   const router = useRouter();
   const { user } = useUser();
   const queryClient = useQueryClient();
+  const t = useTranslations();
+  
+  // Helper to get status label
+  const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
   
   // Get user role
   interface Auth0User {
@@ -373,10 +371,10 @@ export default function ClaimsPage() {
         queryClient.invalidateQueries({ queryKey: ['claims'] });
       } else {
         const data = await res.json();
-        alert(`Greška: ${data.error || "Neuspešno brisanje"}`);
+        alert(`${t("common.error")}: ${data.error || t("claims.delete.error")}`);
       }
     } catch (error) {
-      alert("Greška pri brisanju reklamacije");
+      alert(t("claims.delete.error"));
     } finally {
       setIsDeleting(false);
     }
@@ -406,12 +404,12 @@ export default function ClaimsPage() {
         // Revert optimistic update on error
         const data = await res.json();
         queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
-        alert(`Greška: ${data.error || "Neuspešno otključavanje"}`);
+        alert(`${t("common.error")}: ${data.error || t("claims.unlock.error")}`);
       }
     } catch (error) {
       // Revert optimistic update on error
       queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
-      alert("Greška pri otključavanju reklamacije");
+      alert(t("claims.unlock.error"));
     } finally {
       setIsUnlocking(false);
     }
@@ -464,10 +462,10 @@ export default function ClaimsPage() {
       <div className="flex items-center justify-between mb-6 animate-in fade-in slide-in-from-top-2">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
-            Claims
+            {t("claims.title")}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Upravljanje svim reklamacijama
+            {t("claims.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -476,7 +474,7 @@ export default function ClaimsPage() {
             className="bg-primary hover:bg-primary/90 transition-all hover:shadow-lg"
           >
             <Plus className="h-4 w-4 mr-2" />
-            New claim
+            {t("claims.newClaim")}
           </Button>
         </div>
       </div>
@@ -485,16 +483,13 @@ export default function ClaimsPage() {
         {/* Active filters indicator */}
         {(filters.status.length > 0 || filters.urgentOnly || textFilters.claimCode.trim() || textFilters.customerId.trim()) && (
           <div className="mb-4 pb-4 border-b flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-muted-foreground">Aktivni filteri:</span>
+            <span className="text-sm font-medium text-muted-foreground">{t("claims.filters.active")}:</span>
             {filters.status.map((status) => (
               <span
                 key={status}
                 className="inline-flex items-center gap-1 bg-zinc-800 dark:bg-zinc-900 text-zinc-200 dark:text-zinc-300 border border-zinc-600 dark:border-zinc-600 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded-md px-2.5 py-1 text-sm font-medium"
               >
-                {status === "NEW" ? "Novo" : 
-                 status === "IN_ANALYSIS" ? "U obradi" :
-                 status === "APPROVED" ? "Prihvaćeno" :
-                 status === "REJECTED" ? "Odbijeno" : status}
+                {getStatusLabel(status)}
                 <button
                   onClick={() => {
                     setFilters({ ...filters, status: filters.status.filter(s => s !== status) });
@@ -509,7 +504,7 @@ export default function ClaimsPage() {
               <span
                 className="inline-flex items-center gap-1 bg-zinc-800 dark:bg-zinc-900 text-zinc-200 dark:text-zinc-300 border border-zinc-600 dark:border-zinc-600 hover:bg-zinc-700 dark:hover:bg-zinc-800 rounded-md px-2.5 py-1 text-sm font-medium"
               >
-                Hitne reklamacije
+                {t("dashboard.urgentClaims")}
                 <button
                   onClick={() => {
                     setFilters({ ...filters, urgentOnly: false });
@@ -555,7 +550,7 @@ export default function ClaimsPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "0ms" }}>
-            <label className="text-sm font-medium mb-2 block">Status</label>
+            <label className="text-sm font-medium mb-2 block">{t("common.status")}</label>
             <div className="relative" ref={statusDropdownRef}>
               <button
                 type="button"
@@ -564,13 +559,10 @@ export default function ClaimsPage() {
               >
                 <span className={filters.status.length === 0 ? "text-muted-foreground" : ""}>
                   {filters.status.length === 0 
-                    ? "Sve reklamacije" 
+                    ? t("claims.filters.allClaims") 
                     : filters.status.length === 1 
-                      ? (filters.status[0] === "NEW" ? "Novo" : 
-                         filters.status[0] === "IN_ANALYSIS" ? "U obradi" :
-                         filters.status[0] === "APPROVED" ? "Prihvaćeno" :
-                         filters.status[0] === "REJECTED" ? "Odbijeno" : filters.status[0])
-                      : `${filters.status.length} izabrano`}
+                      ? getStatusLabel(filters.status[0])
+                      : t("claims.filters.selectedCount", { count: filters.status.length })}
                 </span>
                 <ChevronDownIcon className="h-4 w-4 opacity-50" />
               </button>
@@ -578,10 +570,10 @@ export default function ClaimsPage() {
                 <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
                   <div className="p-2 space-y-1">
                     {[
-                      { value: "NEW", label: "Novo" },
-                      { value: "IN_ANALYSIS", label: "U Obradi" },
-                      { value: "APPROVED", label: "Prihvaćeno" },
-                      { value: "REJECTED", label: "Odbijeno" },
+                      { value: "NEW", label: t("claims.status.NEW") },
+                      { value: "IN_ANALYSIS", label: t("claims.status.IN_ANALYSIS") },
+                      { value: "APPROVED", label: t("claims.status.APPROVED") },
+                      { value: "REJECTED", label: t("claims.status.REJECTED") },
                     ].map((option) => {
                       const isSelected = filters.status.includes(option.value);
                       return (
@@ -613,11 +605,11 @@ export default function ClaimsPage() {
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "100ms" }}>
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
-              Claim Code
+              {t("claims.mrNumber")}
             </label>
             <div className="relative">
               <Input
-                placeholder="Search by claim code"
+                placeholder={t("claims.filters.searchByCode")}
                 value={textFilters.claimCode}
                 onChange={handleClaimCodeChange}
                 onFocus={() => {
@@ -658,11 +650,11 @@ export default function ClaimsPage() {
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "200ms" }}>
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
               <Search className="h-3.5 w-3.5 text-muted-foreground" />
-              Customer
+              {t("claims.customer")}
             </label>
             <div className="relative">
               <Input
-                placeholder="Pretraži po imenu klijenta"
+                placeholder={t("claims.filters.searchByCustomer")}
                 value={textFilters.customerId}
                 onChange={handleCustomerIdChange}
                 onFocus={() => {
@@ -703,7 +695,7 @@ export default function ClaimsPage() {
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "50ms" }}>
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
               <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-              Hitne reklamacije
+              {t("dashboard.urgentClaims")}
             </label>
             <div className="flex items-center gap-2 h-9 px-3 py-2 rounded-md border border-input bg-transparent">
               <input
@@ -716,7 +708,7 @@ export default function ClaimsPage() {
                 className="h-4 w-4 rounded border-input cursor-pointer"
               />
               <label htmlFor="urgentOnly" className="text-sm text-muted-foreground cursor-pointer flex-1">
-                Starije od 7 dana
+                {t("claims.filters.olderThan7Days")}
               </label>
             </div>
           </div>
@@ -725,7 +717,7 @@ export default function ClaimsPage() {
         {/* Results count */}
         <div className="mt-4 pt-4 border-t flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Prikazano: <span className="font-semibold text-foreground">{displayClaims.length}</span> od <span className="font-semibold text-foreground">{allClaims.length}</span> reklamacija
+            {t("claims.filters.showing")}: <span className="font-semibold text-foreground">{displayClaims.length}</span> {t("claims.filters.of")} <span className="font-semibold text-foreground">{allClaims.length}</span> {t("claims.filters.claims")}
           </p>
           {(filters.status.length > 0 || filters.urgentOnly || textFilters.claimCode.trim() || textFilters.customerId.trim()) && (
             <Button
@@ -740,7 +732,7 @@ export default function ClaimsPage() {
               className="h-8"
             >
               <X className="h-3 w-3 mr-1" />
-              Obriši sve filtere
+              {t("claims.filters.clearAll")}
             </Button>
           )}
         </div>
@@ -750,23 +742,23 @@ export default function ClaimsPage() {
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Lista reklamacija</h2>
+            <h2 className="text-lg font-semibold">{t("claims.list.title")}</h2>
             {displayClaims.length > 0 && (
               <Badge variant="secondary" className="ml-2">
-                {displayClaims.length} {displayClaims.length === 1 ? "reklamacija" : "reklamacija"}
+                {displayClaims.length} {t("claims.list.count")}
               </Badge>
             )}
           </div>
         </div>
         <ResponsiveTable
           headers={[
-            { key: "claimCode", label: "MR Number" },
-            { key: "status", label: "Status" },
-            { key: "customer", label: "Customer Company" },
-            { key: "engineType", label: "Engine Type" },
-            { key: "assignedTo", label: "Assigned To (Worker)" },
-            { key: "claimArrival", label: "Claim Arrival" },
-            ...(isSuperAdmin ? [{ key: "actions", label: "Akcije" }] : []),
+            { key: "claimCode", label: t("claims.mrNumber") },
+            { key: "status", label: t("common.status") },
+            { key: "customer", label: t("claims.metadata.customerCompany") },
+            { key: "engineType", label: t("claims.engineType") },
+            { key: "assignedTo", label: t("claims.metadata.assignedWorker") },
+            { key: "claimArrival", label: t("claims.claimArrivalDate") },
+            ...(isSuperAdmin ? [{ key: "actions", label: t("common.actions") }] : []),
           ]}
           data={displayClaims.map((claim, index) => ({
             claimCode: (
@@ -774,7 +766,7 @@ export default function ClaimsPage() {
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
               </span>
             ),
-            status: <StatusBadge status={claim.status} />,
+            status: <StatusBadge status={claim.status} label={getStatusLabel(claim.status)} />,
             customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.company || "-"}</span>,
             engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
             assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,
@@ -840,9 +832,9 @@ export default function ClaimsPage() {
               <div className="p-4 bg-muted/50 rounded-full mb-4 animate-pulse">
                 <FileText className="h-12 w-12 text-muted-foreground" />
               </div>
-              <p className="text-lg font-semibold mb-2">No claims found</p>
+              <p className="text-lg font-semibold mb-2">{t("claims.noClaims")}</p>
               <p className="text-sm text-muted-foreground mb-4">
-                Try adjusting your filters or create a new claim
+                {t("claims.list.emptyHint")}
               </p>
               <Button 
                 onClick={() => router.push("/claims/new")} 
@@ -850,7 +842,7 @@ export default function ClaimsPage() {
                 className="mt-2"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Create New Claim
+                {t("claims.newClaim")}
               </Button>
             </div>
           }
@@ -863,10 +855,10 @@ export default function ClaimsPage() {
         open={!!deleteClaimId}
         onOpenChange={(open) => !open && setDeleteClaimId(null)}
         onConfirm={() => deleteClaimId && handleDeleteClaim(deleteClaimId)}
-        title="Brisanje reklamacije"
-        description="Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna."
-        confirmText={isDeleting ? "Brisanje..." : "Obriši"}
-        cancelText="Otkaži"
+        title={t("claims.delete.title")}
+        description={t("claims.delete.confirm")}
+        confirmText={isDeleting ? t("common.loading") : t("common.delete")}
+        cancelText={t("common.cancel")}
         variant="destructive"
       />
 
@@ -875,10 +867,10 @@ export default function ClaimsPage() {
         open={!!unlockClaimId}
         onOpenChange={(open) => !open && setUnlockClaimId(null)}
         onConfirm={() => unlockClaimId && handleUnlockClaim(unlockClaimId)}
-        title="Otključavanje reklamacije"
-        description="Da li ste sigurni da želite da otključate ovu reklamaciju? Reklamacija će biti dostupna za uređivanje ostalim korisnicima."
-        confirmText={isUnlocking ? "Otključavanje..." : "Otključaj"}
-        cancelText="Otkaži"
+        title={t("claims.unlock.title")}
+        description={t("claims.unlock.confirm")}
+        confirmText={isUnlocking ? t("common.loading") : t("claims.unlock.button")}
+        cancelText={t("common.cancel")}
         variant="default"
       />
 
@@ -910,20 +902,20 @@ export default function ClaimsPage() {
               // Revert optimistic update on error
               const data = await res.json();
               queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
-              alert(`Greška: ${data.error || "Neuspešno zaključavanje"}`);
+              alert(`${t("common.error")}: ${data.error || t("claims.lock.error")}`);
             }
           } catch (error) {
             // Revert optimistic update on error
             queryClient.invalidateQueries({ queryKey: ['claims'] }); // Revert by refetching
-            alert("Greška pri zaključavanju reklamacije");
+            alert(t("claims.lock.error"));
           } finally {
             setIsLocking(false);
           }
         }}
-        title="Zaključavanje reklamacije"
-        description="Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike."
-        confirmText={isLocking ? "Zaključavanje..." : "Zaključaj"}
-        cancelText="Otkaži"
+        title={t("claims.lock.title")}
+        description={t("claims.lock.confirm")}
+        confirmText={isLocking ? t("common.loading") : t("claims.lock.button")}
+        cancelText={t("common.cancel")}
         variant="default"
       />
     </div>

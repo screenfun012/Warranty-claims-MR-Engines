@@ -113,6 +113,7 @@
   },
   "claims": {
     "title": "Reklamacije",
+    "subtitle": "Upravljanje svim reklamacijama",
     "newClaim": "Nova reklamacija",
     "claimCode": "MR Number",
     "mrNumber": "MR Number",
@@ -130,6 +131,23 @@
     "locked": "Zaključano",
     "unlocked": "Otključano",
     "notFound": "Reklamacija nije pronađena",
+    "filters": {
+      "active": "Aktivni filteri",
+      "allClaims": "Sve reklamacije",
+      "selectedCount": "{count} izabrano",
+      "searchByCode": "Pretraži po kodu",
+      "searchByCustomer": "Pretraži po kupcu",
+      "olderThan7Days": "Starije od 7 dana",
+      "showing": "Prikazano",
+      "of": "od",
+      "claims": "reklamacija",
+      "clearAll": "Obriši sve filtere"
+    },
+    "list": {
+      "title": "Lista reklamacija",
+      "count": "reklamacija",
+      "emptyHint": "Podesite filtere ili kreirajte novu reklamaciju"
+    },
     "status": {
       "NEW": "Novo",
       "IN_ANALYSIS": "U Obradi",
@@ -180,7 +198,20 @@
     "delete": {
       "title": "Brisanje reklamacije",
       "confirm": "Da li ste sigurni da želite da obrišete ovu reklamaciju? Svi podaci i fajlovi će biti trajno obrisani.",
-      "success": "Reklamacija uspešno obrisana"
+      "success": "Reklamacija uspešno obrisana",
+      "error": "Greška pri brisanju reklamacije"
+    },
+    "unlock": {
+      "title": "Otključavanje reklamacije",
+      "confirm": "Da li ste sigurni da želite da otključate ovu reklamaciju? Reklamacija će biti dostupna za uređivanje ostalim korisnicima.",
+      "button": "Otključaj",
+      "error": "Greška pri otključavanju reklamacije"
+    },
+    "lock": {
+      "title": "Zaključavanje reklamacije",
+      "confirm": "Da li ste sigurni da želite da zaključate ovu reklamaciju? Reklamacija će biti read-only za ostale korisnike.",
+      "button": "Zaključaj",
+      "error": "Greška pri zaključavanju reklamacije"
     },
     "photos": {
       "title": "Naši fajlovi",
