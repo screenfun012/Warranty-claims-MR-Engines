@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -112,6 +113,7 @@ const checkForUpdates = async (lastCheck?: string | null): Promise<{ hasUpdates:
 export default function InboxPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const t = useTranslations();
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
@@ -234,7 +236,7 @@ export default function InboxPage() {
       console.error("Error syncing:", error);
       clearInterval(progressInterval);
       setSyncProgress(0);
-      alert("Sync failed: " + (error instanceof Error ? error.message : "Unknown error"));
+      alert(t("inbox.sync.error") + ": " + (error instanceof Error ? error.message : t("common.error")));
     } finally {
       setSyncing(false);
     }
@@ -264,14 +266,14 @@ export default function InboxPage() {
   return (
     <div className="p-8">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Inbox</h1>
+          <h1 className="text-3xl font-bold">{t("inbox.title")}</h1>
           <Button 
             onClick={handleSync} 
             disabled={syncing} 
             className="bg-primary hover:bg-primary/90 relative overflow-hidden"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Sinhronizacija..." : "Sync emails now"}
+            {syncing ? t("inbox.syncing") : t("inbox.syncEmails")}
             {syncing && syncProgress > 0 && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-foreground/20">
                 <div 
@@ -284,11 +286,11 @@ export default function InboxPage() {
         </div>
 
         <Card className="p-4 mb-6">
-          <Label>Search</Label>
+          <Label>{t("common.search")}</Label>
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by subject, sender, or claim code..."
+            placeholder={t("inbox.searchPlaceholder")}
             className="mt-2"
           />
         </Card>
@@ -314,11 +316,11 @@ export default function InboxPage() {
           <Card className="p-4 hover:shadow-md transition-shadow">
             <ResponsiveTable
               headers={[
-                { key: "date", label: "Date" },
-                { key: "sender", label: "Original Sender" },
-                { key: "subject", label: "Subject" },
-                { key: "claim", label: "Linked Claim" },
-                { key: "actions", label: "Actions" },
+                { key: "date", label: t("common.date") },
+                { key: "sender", label: t("inbox.from") },
+                { key: "subject", label: t("inbox.subject") },
+                { key: "claim", label: t("inbox.claim") },
+                { key: "actions", label: t("common.actions") },
               ]}
               data={filteredThreads.map((thread) => {
                 const lastMessage = thread.messages[thread.messages.length - 1];
@@ -345,7 +347,7 @@ export default function InboxPage() {
                       </span>
                       {showNewBadge && (
                         <Badge variant="destructive" className="shrink-0 animate-pulse">
-                          Novo
+                          {t("claims.status.NEW")}
                         </Badge>
                       )}
                     </div>
@@ -359,10 +361,10 @@ export default function InboxPage() {
                         router.push(`/claims/${thread.claim!.id}`);
                       }}
                     >
-                      {thread.claim.claimCodeRaw || "View Claim"}
+                      {thread.claim.claimCodeRaw || t("inbox.viewClaim")}
                     </Badge>
                   ) : (
-                    <Badge variant="outline">Unassigned</Badge>
+                    <Badge variant="outline">{t("inbox.unassigned")}</Badge>
                   ),
                   actions: (
                     <Button
@@ -394,12 +396,12 @@ export default function InboxPage() {
                         setSelectedThread(thread);
                       }}
                     >
-                      View
+                      {t("common.view")}
                     </Button>
                   ),
                 };
               })}
-              emptyMessage={searchQuery ? "No email threads found matching your search" : "No email threads found"}
+              emptyMessage={searchQuery ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
               onRowClick={(row, index) => {
                 const thread = filteredThreads[index];
                 if (!thread.viewedAt) {
@@ -438,6 +440,7 @@ function ThreadDetail({
 }) {
   const router = useRouter();
   const { user } = useUser();
+  const t = useTranslations();
   interface Auth0User {
     email?: string;
     role?: string;
@@ -554,11 +557,11 @@ function ThreadDetail({
         router.push(`/claims/${claimId}?refresh=${Date.now()}`);
       } else {
         const errorData = await res.json();
-        alert("Failed to create claim: " + (errorData.error || "Unknown error"));
+        alert(t("claims.new.error.failed") + ": " + (errorData.error || t("common.error")));
       }
     } catch (error) {
       console.error("Error creating claim:", error);
-      alert("Failed to create claim");
+      alert(t("claims.new.error.failed"));
     }
   };
 
@@ -581,11 +584,11 @@ function ThreadDetail({
         router.push(`/claims/${claimId}?refresh=${Date.now()}`);
       } else {
         const errorData = await res.json();
-        alert("Failed to link claim: " + (errorData.error || "Unknown error"));
+        alert(t("inbox.linkClaim.error") + ": " + (errorData.error || t("common.error")));
       }
     } catch (error) {
       console.error("Error linking claim:", error);
-      alert("Failed to link claim");
+      alert(t("inbox.linkClaim.error"));
     }
   };
 
@@ -597,14 +600,14 @@ function ThreadDetail({
       });
       const data = await res.json();
       if (data.success) {
-        alert("Text extracted successfully");
+        alert(t("inbox.extractTextSuccess"));
         fetchFullThread();
       } else {
-        alert("Failed to extract text: " + data.error);
+        alert(t("inbox.extractTextError") + ": " + data.error);
       }
     } catch (error) {
       console.error("Error extracting text:", error);
-      alert("Failed to extract text");
+      alert(t("inbox.extractTextError"));
     } finally {
       setExtracting(null);
     }
@@ -620,14 +623,14 @@ function ThreadDetail({
       });
       const data = await res.json();
       if (data.translated) {
-        alert("Translation completed");
+        alert(t("inbox.translateSuccess"));
         fetchFullThread();
       } else {
-        alert("Translation failed: " + data.error);
+        alert(t("inbox.translateError") + ": " + data.error);
       }
     } catch (error) {
       console.error("Translation error:", error);
-      alert("Translation failed");
+      alert(t("inbox.translateError"));
     } finally {
       setTranslating(null);
     }
@@ -700,11 +703,11 @@ function ThreadDetail({
             <>
               <Button onClick={() => setShowCreateClaim(true)} className="flex-1 sm:flex-none min-w-0">
                 <Plus className="h-4 w-4 mr-2 shrink-0" />
-                <span className="truncate">Create claim from this thread</span>
+                <span className="truncate">{t("inbox.createClaim")}</span>
               </Button>
               <Button variant="outline" onClick={() => setShowLinkClaim(true)} className="flex-1 sm:flex-none min-w-0">
                 <LinkIcon className="h-4 w-4 mr-2 shrink-0" />
-                <span className="truncate">Link to existing claim</span>
+                <span className="truncate">{t("inbox.linkToClaim")}</span>
               </Button>
             </>
           )}
@@ -715,38 +718,38 @@ function ThreadDetail({
               disabled={isDeleting}
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              {isDeleting ? "Brisanje..." : "Obriši poruku"}
+              {isDeleting ? t("common.loading") : t("inbox.deleteThread")}
             </Button>
           )}
         </div>
 
         {showCreateClaim && (
           <Card className="p-4 mb-4 bg-muted/50 border border-border">
-            <p className="mb-2">Create a new claim from this email thread?</p>
+            <p className="mb-2">{t("inbox.createClaimConfirm")}</p>
             <div className="flex gap-2">
-              <Button onClick={handleCreateClaim} size="sm">Yes, Create Claim</Button>
-              <Button variant="outline" onClick={() => setShowCreateClaim(false)} size="sm">Cancel</Button>
+              <Button onClick={handleCreateClaim} size="sm">{t("inbox.createClaimButton")}</Button>
+              <Button variant="outline" onClick={() => setShowCreateClaim(false)} size="sm">{t("common.cancel")}</Button>
             </div>
           </Card>
         )}
 
         {showLinkClaim && (
           <Card className="p-4 mb-4 bg-muted/50 border border-border">
-            <Label className="mb-2 block">Select claim to link:</Label>
+            <Label className="mb-2 block">{t("inbox.selectClaimToLink")}</Label>
             <Select onValueChange={handleLinkClaim}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a claim" />
+                <SelectValue placeholder={t("inbox.selectClaim")} />
               </SelectTrigger>
               <SelectContent>
                 {claims.map((claim) => (
                   <SelectItem key={claim.id} value={claim.id}>
-                    {claim.claimCodeRaw || claim.id} - {claim.customer?.name || "No customer"} ({claim.status})
+                    {claim.claimCodeRaw || claim.id} - {claim.customer?.name || t("inbox.noCustomer")} ({t(`claims.status.${claim.status}` as any) || claim.status})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Button variant="outline" onClick={() => setShowLinkClaim(false)} className="mt-2" size="sm">
-              Cancel
+              {t("common.cancel")}
             </Button>
           </Card>
         )}
@@ -765,17 +768,17 @@ function ThreadDetail({
           >
             <div className="flex justify-between mb-2">
               <div>
-                <strong>From:</strong> {message.from}
+                <strong>{t("inbox.from")}:</strong> {message.from}
                 {message.to && (
                   <>
                     <br />
-                    <strong>To:</strong> {message.to}
+                    <strong>{t("inbox.to")}:</strong> {message.to}
                   </>
                 )}
                 {message.cc && (
                   <>
                     <br />
-                    <strong>CC:</strong> {message.cc}
+                    <strong>{t("inbox.cc")}:</strong> {message.cc}
                   </>
                 )}
               </div>
@@ -798,7 +801,7 @@ function ThreadDetail({
               <div className="mt-4 pt-4">
                 <h4 className="font-semibold mb-4 flex items-center gap-2">
                   <Paperclip className="h-4 w-4" />
-                  Attachments ({message.attachments.length})
+                  {t("inbox.attachments")} ({message.attachments.length})
                 </h4>
                 <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 overflow-hidden">
                   {message.attachments.map((attachment) => {
@@ -874,7 +877,7 @@ function ThreadDetail({
                                   })}
                                 >
                                   <Eye className="h-4 w-4 mr-2" />
-                                  View
+                                  {t("common.view")}
                                 </DropdownMenuItem>
                                 {canExtractText && !hasText && (
                                   <DropdownMenuItem
@@ -884,12 +887,12 @@ function ThreadDetail({
                                     {extracting === attachment.id ? (
                                       <>
                                         <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                                        Extracting...
+                                        {t("inbox.extractTextExtracting")}
                                       </>
                                     ) : (
                                       <>
                                         <FileText className="h-4 w-4 mr-2" />
-                                        Extract Text
+                                        {t("inbox.extractText")}
                                       </>
                                     )}
                                   </DropdownMenuItem>
@@ -899,7 +902,7 @@ function ThreadDetail({
                                     onClick={() => toggleAttachmentExpanded(attachment.id)}
                                   >
                                     <FileText className="h-4 w-4 mr-2" />
-                                    {isExpanded ? "Hide Text" : "Show Text"}
+                                    {isExpanded ? t("inbox.hideText") : t("inbox.showText")}
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuItem asChild>
@@ -909,7 +912,7 @@ function ThreadDetail({
                                     className="flex items-center w-full"
                                   >
                                     <Download className="h-4 w-4 mr-2" />
-                                    Download
+                                    {t("common.download")}
                                   </a>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -943,13 +946,13 @@ function ThreadDetail({
                           size="sm"
                           onClick={() => toggleAttachmentExpanded(attachmentId)}
                         >
-                          Hide Text
+                          {t("inbox.hideText")}
                         </Button>
                       </div>
                       
                       <div className="space-y-4">
                         <div>
-                          <Label className="mb-2 block">Original Text</Label>
+                          <Label className="mb-2 block">{t("inbox.originalText")}</Label>
                           <Textarea 
                             value={attachment.textOriginal || ""} 
                             rows={6} 
@@ -960,7 +963,7 @@ function ThreadDetail({
                         
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <Label>Serbian Translation</Label>
+                            <Label>{t("inbox.serbianTranslation")}</Label>
                             {!attachment.textSr && (
                               <Button
                                 variant="outline"
@@ -970,8 +973,8 @@ function ThreadDetail({
                               >
                                 <Languages className="h-4 w-4 mr-2" />
                                 {translating?.attachmentId === attachment.id && translating?.lang === "SR" 
-                                  ? "Translating..." 
-                                  : "Translate to SR"}
+                                  ? t("inbox.translating") 
+                                  : t("inbox.translateToSR")}
                               </Button>
                             )}
                           </div>
@@ -979,13 +982,13 @@ function ThreadDetail({
                             value={attachment.textSr || ""}
                             rows={6}
                             readOnly
-                            placeholder="Serbian translation will appear here..."
+                            placeholder={t("inbox.serbianTranslationPlaceholder")}
                           />
                         </div>
                         
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <Label>English Translation</Label>
+                            <Label>{t("inbox.englishTranslation")}</Label>
                             {!attachment.textEn && (
                               <Button
                                 variant="outline"
@@ -995,8 +998,8 @@ function ThreadDetail({
                               >
                                 <Languages className="h-4 w-4 mr-2" />
                                 {translating?.attachmentId === attachment.id && translating?.lang === "EN" 
-                                  ? "Translating..." 
-                                  : "Translate to EN"}
+                                  ? t("inbox.translating") 
+                                  : t("inbox.translateToEN")}
                               </Button>
                             )}
                           </div>
@@ -1004,7 +1007,7 @@ function ThreadDetail({
                             value={attachment.textEn || ""}
                             rows={6}
                             readOnly
-                            placeholder="English translation will appear here..."
+                            placeholder={t("inbox.englishTranslationPlaceholder")}
                           />
                         </div>
                       </div>
@@ -1040,14 +1043,14 @@ function ThreadDetail({
               ) : (
                 <div className="flex items-center justify-center h-64 bg-muted rounded">
                   <p className="text-muted-foreground">
-                    Preview not available for this file type. 
+                    {t("inbox.previewNotAvailable")}{" "}
                     <a 
                       href={`/api/files/${previewAttachment.id}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="ml-2 text-primary underline"
                     >
-                      Download instead
+                      {t("inbox.downloadInstead")}
                     </a>
                   </p>
                 </div>
@@ -1075,23 +1078,23 @@ function ThreadDetail({
               onBack();
             } else {
               const errorData = await res.json();
-              alert(`Greška pri brisanju: ${errorData.error || "Nepoznata greška"}`);
+              alert(`${t("common.error")}: ${errorData.error || t("common.error")}`);
               setIsDeleting(false);
             }
           } catch (error) {
             console.error("Error deleting email thread:", error);
-            alert("Greška pri brisanju poruke");
+            alert(t("inbox.deleteThreadError"));
             setIsDeleting(false);
           }
         }}
-        title={fullThread?.claimId ? "Brisanje poruke i reklamacije" : "Brisanje poruke"}
+        title={fullThread?.claimId ? t("inbox.deleteThreadWithClaimTitle") : t("inbox.deleteThreadTitle")}
         description={
           fullThread?.claimId
-            ? `UPOZORENJE: Ova poruka je povezana sa reklamacijom ${fullThread.claim?.claimCodeRaw || ""}. Brisanjem ove poruke će se TRAJNO obrisati:\n\n• Email poruka i svi attachmenti\n• Povezana reklamacija i svi njeni podaci\n• Svi fajlovi sa Synology/NAS servera\n\nOva akcija je NEPOVRATNA. Da li ste sigurni?`
-            : "Da li ste sigurni da želite da obrišete ovu poruku? Ova akcija je nepovratna i obrišće sve povezane podatke i fajlove sa Synology/NAS servera."
+            ? t("inbox.deleteThreadWarning", { claimCode: fullThread.claim?.claimCodeRaw || "" })
+            : t("inbox.deleteThreadConfirm")
         }
-        confirmText="Obriši trajno"
-        cancelText="Otkaži"
+        confirmText={t("inbox.deletePermanently")}
+        cancelText={t("common.cancel")}
         variant="destructive"
       />
     </div>
