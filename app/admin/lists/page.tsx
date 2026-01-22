@@ -13,7 +13,9 @@ import {
   Plus, 
   Trash2,
   ArrowLeft,
-  Shield
+  Shield,
+  RefreshCw,
+  AlertTriangle
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -61,6 +63,11 @@ export default function AdminListsPage() {
     name: string;
   }>({ open: false, type: "worker", id: "", name: "" });
   const [deleting, setDeleting] = useState(false);
+  
+  // Cleanup state
+  const [orphanedCount, setOrphanedCount] = useState(0);
+  const [cleaning, setCleaning] = useState(false);
+  const [showCleanupDialog, setShowCleanupDialog] = useState(false);
 
   const auth0User = user as Auth0User | undefined;
   const userRoles = auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
@@ -84,9 +91,10 @@ export default function AdminListsPage() {
 
   const fetchData = async () => {
     try {
-      const [workersRes, companiesRes] = await Promise.all([
+      const [workersRes, companiesRes, cleanupRes] = await Promise.all([
         fetch("/api/admin/workers"),
         fetch("/api/admin/companies"),
+        fetch("/api/admin/cleanup"),
       ]);
 
       if (workersRes.ok) {
@@ -98,11 +106,36 @@ export default function AdminListsPage() {
         const data = await companiesRes.json();
         setCompanies(data.companies || []);
       }
+
+      if (cleanupRes.ok) {
+        const data = await cleanupRes.json();
+        setOrphanedCount(data.orphanedCustomers || 0);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast.error("Greška pri učitavanju podataka");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCleanup = async () => {
+    setCleaning(true);
+    try {
+      const res = await fetch("/api/admin/cleanup", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(`Obrisano ${data.deletedCustomers} zastarelih kupaca`);
+        setOrphanedCount(0);
+        setShowCleanupDialog(false);
+      } else {
+        const error = await res.json();
+        toast.error(error.error || "Greška pri čišćenju");
+      }
+    } catch (error) {
+      toast.error("Greška pri čišćenju podataka");
+    } finally {
+      setCleaning(false);
     }
   };
 
@@ -344,6 +377,33 @@ export default function AdminListsPage() {
         </Card>
       </div>
 
+      {/* Cleanup Section */}
+      {orphanedCount > 0 && (
+        <Card className="p-6 border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div>
+                <h3 className="font-semibold text-amber-800 dark:text-amber-200">
+                  Zastareli podaci pronađeni
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  {orphanedCount} kupac/kupaca bez reklamacija (test podaci ili obrisane reklamacije)
+                </p>
+              </div>
+            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCleanupDialog(true)}
+              className="border-amber-500 text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Očisti
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteDialog.open} onOpenChange={(open) => !deleting && setDeleteDialog({ ...deleteDialog, open })}>
         <DialogContent>
@@ -371,6 +431,38 @@ export default function AdminListsPage() {
               disabled={deleting}
             >
               {deleting ? "Brisanje..." : "Obriši"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cleanup Confirmation Dialog */}
+      <Dialog open={showCleanupDialog} onOpenChange={(open) => !cleaning && setShowCleanupDialog(open)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Potvrdi čišćenje</DialogTitle>
+          </DialogHeader>
+          <p>
+            Da li ste sigurni da želite da obrišete{" "}
+            <strong>{orphanedCount}</strong> zastarelih kupaca iz baze?
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Ova akcija je nepovratna. Kupci bez reklamacija će biti trajno obrisani.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCleanupDialog(false)}
+              disabled={cleaning}
+            >
+              Otkaži
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleCleanup}
+              disabled={cleaning}
+            >
+              {cleaning ? "Čišćenje..." : "Obriši zastarele"}
             </Button>
           </DialogFooter>
         </DialogContent>

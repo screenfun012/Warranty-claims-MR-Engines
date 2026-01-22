@@ -62,6 +62,7 @@ export async function DELETE(
     // Proveri da claim još uvek postoji pre brisanja (može biti obrisan u međuvremenu)
     const existingClaim = await prisma.claim.findUnique({
       where: { id },
+      select: { id: true, customerId: true },
     });
     
     if (!existingClaim) {
@@ -71,9 +72,30 @@ export async function DELETE(
       );
     }
     
+    const customerIdToCheck = existingClaim.customerId;
+    
     await prisma.claim.delete({
       where: { id },
     });
+
+    // Clean up orphaned customer (if they have no other claims)
+    if (customerIdToCheck) {
+      const remainingClaims = await prisma.claim.count({
+        where: { customerId: customerIdToCheck },
+      });
+      
+      if (remainingClaims === 0) {
+        try {
+          await prisma.customer.delete({
+            where: { id: customerIdToCheck },
+          });
+          console.log(`[Delete Claim] Deleted orphaned customer ${customerIdToCheck}`);
+        } catch (err) {
+          console.error(`[Delete Claim] Error deleting orphaned customer:`, err);
+          // Don't fail if customer deletion fails
+        }
+      }
+    }
 
     return NextResponse.json({ 
       success: true,
