@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ interface Claim {
 
 // Status badge component with icons - styled like the table
 // Text is neutral gray, icons are colored and animated - unified status system
-const StatusBadge = ({ status }: { status: string }) => {
+const StatusBadge = ({ status, label }: { status: string; label: string }) => {
   const getIcon = () => {
     switch (status) {
       case "NEW":
@@ -124,17 +125,10 @@ const StatusBadge = ({ status }: { status: string }) => {
     >
       {getIcon()}
       <span className="text-sm font-medium">
-        {statusLabels[status] || status}
+        {label}
       </span>
     </Badge>
   );
-};
-
-const statusLabels: Record<string, string> = {
-  NEW: "Novo",
-  IN_ANALYSIS: "U Obradi",
-  APPROVED: "Prihvaćeno",
-  REJECTED: "Odbijeno",
 };
 
 // Fetch function for React Query
@@ -156,12 +150,16 @@ export default function ClaimDetailPage() {
   const searchParams = useSearchParams();
   const claimId = params?.id as string;
   const queryClient = useQueryClient();
+  const t = useTranslations();
   
   const [activeTab, setActiveTab] = useState("overview");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
   const { user } = useUser();
+  
+  // Helper to get status label
+  const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
   interface Auth0User {
     role?: string;
     roles?: string[];
@@ -306,9 +304,9 @@ export default function ClaimDetailPage() {
   if (!claim) {
     return (
       <div className="p-8">
-        <p className="text-muted-foreground">Reklamacija nije pronađena</p>
+        <p className="text-muted-foreground">{t("claims.notFound")}</p>
         <Button variant="outline" onClick={() => router.push("/claims")} className="mt-4">
-          ← Nazad na listu
+          ← {t("claims.backToList")}
         </Button>
       </div>
     );
@@ -321,9 +319,9 @@ export default function ClaimDetailPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 mb-2">
             <h1 className="text-xl font-bold truncate">
-              {claim.claimCodeRaw || "Unassigned Claim"}
+              {claim.claimCodeRaw || t("claims.unassigned")}
             </h1>
-            <StatusBadge status={claim.status} />
+            <StatusBadge status={claim.status} label={getStatusLabel(claim.status)} />
           </div>
           {claim.customer?.name && (
             <p className="text-sm text-muted-foreground truncate">{claim.customer.name}</p>
@@ -336,7 +334,7 @@ export default function ClaimDetailPage() {
             onClick={() => router.push("/claims")}
             className="h-8"
           >
-            ← Nazad
+            ← {t("common.back")}
           </Button>
           {claim.status === "CLOSED" && canDelete && (
             <Button 
@@ -346,7 +344,7 @@ export default function ClaimDetailPage() {
               disabled={isDeleting}
               className="h-8"
             >
-              {isDeleting ? "Brisanje..." : "Obriši"}
+              {isDeleting ? t("common.loading") : t("common.delete")}
             </Button>
           )}
         </div>
@@ -357,9 +355,9 @@ export default function ClaimDetailPage() {
         <Card className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
           <p className="text-xs text-blue-700 dark:text-blue-300">
             <strong>
-              {claim.status === "CLOSED" ? "Završena reklamacija." : "Zaključana reklamacija."}
+              {claim.status === "CLOSED" ? t("claims.lockedInfo.closed") : t("claims.lockedInfo.locked")}
             </strong>{" "}
-            Svi podaci su read-only. Kontaktirajte super admina da otključa reklamaciju.
+            {t("claims.lockedInfo.readOnly")}
           </p>
         </Card>
       )}
@@ -374,23 +372,23 @@ export default function ClaimDetailPage() {
             <TabsList className="grid grid-cols-5 w-full h-10 relative z-10">
               <TabsTrigger value="overview" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <Languages className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Translation</span>
+                <span className="hidden sm:inline">{t("claims.tabs.summary")}</span>
               </TabsTrigger>
               <TabsTrigger value="emails" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <Mail className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Emails</span>
+                <span className="hidden sm:inline">{t("claims.tabs.emails")}</span>
               </TabsTrigger>
               <TabsTrigger value="documents" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <FileText className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Docs</span>
+                <span className="hidden sm:inline">{t("claims.tabs.documents")}</span>
               </TabsTrigger>
               <TabsTrigger value="findings" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <Search className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Findings</span>
+                <span className="hidden sm:inline">{t("claims.tabs.findings")}</span>
               </TabsTrigger>
               <TabsTrigger value="photos" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
                 <Folder className="h-3.5 w-3.5 sm:mr-1.5" />
-                <span className="hidden sm:inline">Naši fajlovi</span>
+                <span className="hidden sm:inline">{t("claims.tabs.photos")}</span>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
@@ -430,19 +428,19 @@ export default function ClaimDetailPage() {
               router.push("/claims");
             } else {
               const errorData = await res.json();
-              alert(`Greška pri brisanju: ${errorData.error || "Nepoznata greška"}`);
+              alert(`${t("common.error")}: ${errorData.error || t("common.error")}`);
               setIsDeleting(false);
             }
           } catch (error) {
             console.error("Error deleting claim:", error);
-            alert("Greška pri brisanju reklamacije");
+            alert(t("claims.delete.error"));
             setIsDeleting(false);
           }
         }}
-        title="Brisanje reklamacije"
-        description="Da li ste sigurni da želite da obrišete ovu reklamaciju? Ova akcija je nepovratna i obrišće sve povezane podatke."
-        confirmText="Obriši"
-        cancelText="Otkaži"
+        title={t("claims.delete.title")}
+        description={t("claims.delete.confirm")}
+        confirmText={t("common.delete")}
+        cancelText={t("common.cancel")}
         variant="destructive"
       />
     </div>

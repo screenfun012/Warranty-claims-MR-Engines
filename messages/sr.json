@@ -131,6 +131,13 @@
     "locked": "Zaključano",
     "unlocked": "Otključano",
     "notFound": "Reklamacija nije pronađena",
+    "unassigned": "Nedodeljena reklamacija",
+    "backToList": "Nazad na listu",
+    "lockedInfo": {
+      "closed": "Završena reklamacija.",
+      "locked": "Zaključana reklamacija.",
+      "readOnly": "Svi podaci su read-only. Kontaktirajte super admina da otključa reklamaciju."
+    },
     "filters": {
       "active": "Aktivni filteri",
       "allClaims": "Sve reklamacije",

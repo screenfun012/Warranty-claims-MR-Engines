@@ -131,6 +131,13 @@
     "locked": "Locked",
     "unlocked": "Unlocked",
     "notFound": "Claim not found",
+    "unassigned": "Unassigned Claim",
+    "backToList": "Back to list",
+    "lockedInfo": {
+      "closed": "Closed claim.",
+      "locked": "Locked claim.",
+      "readOnly": "All data is read-only. Contact super admin to unlock the claim."
+    },
     "filters": {
       "active": "Active filters",
       "allClaims": "All claims",
