@@ -307,7 +307,14 @@
       "title": "Nalazi",
       "add": "Dodaj nalaz",
       "noFindings": "Nema nalaza",
-      "initialFinding": "Početno zapažanje"
+      "initialFinding": "Početno zapažanje",
+      "finding": "Zapazanje",
+      "placeholder": "Unesi zapazanja...",
+      "deleteConfirm": "Da li ste sigurni da želite da obrišete ovo zapazanje?",
+      "deleteError": "Greška pri brisanju zapazanja",
+      "createError": "Greška pri kreiranju zapazanja",
+      "noSections": "Nema sekcija izveštaja. Kreirajte jednu da dodate nalaze.",
+      "createSection": "Kreiraj novu sekciju"
     },
     "overview": {
       "from": "Od",

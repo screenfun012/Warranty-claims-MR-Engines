@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +16,7 @@ interface ClaimFindingsProps {
 }
 
 export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFindingsProps) {
+  const t = useTranslations();
   const [sections, setSections] = useState<any[]>(claim.reportSections || []);
   const [pendingSaves, setPendingSaves] = useState<Map<string, string>>(new Map());
   const saveTimeouts = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -134,7 +136,7 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
             {sections.map((section: any, index: number) => (
               <div key={section.id} className="pl-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <Label>Zapazanje {index + 1}</Label>
+                  <Label>{t("claims.findings.finding")} {index + 1}</Label>
                   <div className="flex items-center gap-2">
                     {section.createdAt && (
                       <span className="text-sm text-muted-foreground">
@@ -152,7 +154,7 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                       variant="ghost"
                       size="sm"
                       onClick={async () => {
-                        if (!confirm("Da li ste sigurni da želite da obrišete ovo zapazanje?")) {
+                        if (!confirm(t("claims.findings.deleteConfirm"))) {
                           return;
                         }
                         try {
@@ -174,11 +176,11 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                             // No need to reload - onUpdate will update the UI
                           } else {
                             const errorData = await res.json();
-                            alert("Failed to delete section: " + (errorData.error || "Unknown error"));
+                            alert(t("claims.findings.deleteError") + ": " + (errorData.error || t("common.error")));
                           }
                         } catch (error) {
                           console.error("Error deleting section:", error);
-                          alert("Failed to delete section");
+                          alert(t("claims.findings.deleteError"));
                         }
                       }}
                       className="text-destructive hover:text-destructive"
@@ -303,7 +305,7 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                         }
                       }
                     }}
-                    placeholder="Unesi zapazanja..."
+                    placeholder={t("claims.findings.placeholder")}
                     disabled={isReadOnly}
                   />
                 </div>
@@ -340,21 +342,21 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                 }
               } else {
                 const errorData = await res.json();
-                alert("Failed to create section: " + (errorData.error || "Unknown error"));
+                alert(t("claims.findings.createError") + ": " + (errorData.error || t("common.error")));
               }
             } catch (error) {
               console.error("Error creating section:", error);
-              alert("Failed to create section");
+              alert(t("claims.findings.createError"));
             }
           }}
         >
-          + Add New Section
+          {t("claims.findings.add")}
         </Button>
       </div>
       )}
       {sections.length === 0 && !isReadOnly && (
         <Card className="p-6">
-          <p className="text-muted-foreground mb-6">No report sections found. Create one to add findings.</p>
+          <p className="text-muted-foreground mb-6">{t("claims.findings.noSections")}</p>
           <Button
             onClick={async () => {
               try {
@@ -380,15 +382,15 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
                   }
                 } else {
                   const errorData = await res.json();
-                  alert("Failed to create section: " + (errorData.error || "Unknown error"));
+                  alert(t("claims.findings.createError") + ": " + (errorData.error || t("common.error")));
                 }
               } catch (error) {
                 console.error("Error creating section:", error);
-                alert("Failed to create section");
+                alert(t("claims.findings.createError"));
               }
             }}
           >
-            Create New Section
+            {t("claims.findings.createSection")}
           </Button>
         </Card>
       )}
