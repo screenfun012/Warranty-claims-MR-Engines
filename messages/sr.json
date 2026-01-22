@@ -267,12 +267,14 @@
   },
   "statistics": {
     "title": "Statistika",
+    "subtitle": "Statistika i analiza metapodataka reklamacija",
     "filters": "Filteri",
     "showFilters": "Prikaži filtere",
     "hideFilters": "Sakrij filtere",
     "clearFilters": "Obriši filtere",
     "exportCsv": "Izvezi CSV",
-    "totalClaims": "Ukupno: {count} reklamacija",
+    "totalClaims": "Ukupno reklamacija",
+    "matchesFilters": "{count} reklamacija odgovara filterima",
     "dateFrom": "Datum od",
     "dateTo": "Datum do",
     "selectStartDate": "Izaberi početni datum",
@@ -287,7 +289,12 @@
     "customerName": "Ime kupca",
     "customerCompany": "Kompanija kupca",
     "allCustomers": "Svi kupci",
-    "allCompanies": "Sve kompanije"
+    "allCompanies": "Sve kompanije",
+    "selectCustomers": "Izaberi kupce...",
+    "selectCompanies": "Izaberi kompanije...",
+    "filterByYear": "Filtriraj po godini",
+    "filterByEngineType": "Filtriraj po tipu motora",
+    "market": "Tržište"
   },
   "admin": {
     "title": "Admin Panel",

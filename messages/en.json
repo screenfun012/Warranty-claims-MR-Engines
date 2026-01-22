@@ -267,12 +267,14 @@
   },
   "statistics": {
     "title": "Statistics",
+    "subtitle": "Claim metadata statistics and analysis",
     "filters": "Filters",
     "showFilters": "Show Filters",
     "hideFilters": "Hide Filters",
     "clearFilters": "Clear Filters",
     "exportCsv": "Export CSV",
-    "totalClaims": "Total: {count} claims",
+    "totalClaims": "Total Claims",
+    "matchesFilters": "{count} claims match filters",
     "dateFrom": "Date From",
     "dateTo": "Date To",
     "selectStartDate": "Select start date",
@@ -287,7 +289,12 @@
     "customerName": "Customer Name",
     "customerCompany": "Customer Company",
     "allCustomers": "All customers",
-    "allCompanies": "All companies"
+    "allCompanies": "All companies",
+    "selectCustomers": "Select customers...",
+    "selectCompanies": "Select companies...",
+    "filterByYear": "Filter by year",
+    "filterByEngineType": "Filter by engine type",
+    "market": "Market"
   },
   "admin": {
     "title": "Admin Panel",

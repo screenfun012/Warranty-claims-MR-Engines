@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,7 @@ interface Filters {
 
 export default function StatisticsPage() {
   const router = useRouter();
+  const t = useTranslations();
   const [filters, setFilters] = useState<Filters>({
     status: [],
     customerNames: [],
@@ -206,27 +208,27 @@ export default function StatisticsPage() {
   // Export to CSV
   const handleExport = useCallback(() => {
     const headers = [
-      "MR Number",
-      "Customer Number",
-      "Status",
-      "Customer Name",
-      "Customer Company",
-      "Engine Type",
-      "Engine Code",
-      "Fault Department",
-      "Worker Fault",
-      "Date Engine Done",
-      "Claim Arrival Date",
-      "Assigned To",
-      "Reason",
-      "Domestic Market",
-      "Created At",
+      t("claims.mrNumber"),
+      t("claims.customerNumber"),
+      t("common.status"),
+      t("statistics.customerName"),
+      t("statistics.customerCompany"),
+      t("claims.engineType"),
+      t("claims.engineCode"),
+      t("claims.metadata.faultDepartment"),
+      t("claims.metadata.workerFault"),
+      t("claims.dateEngineDone"),
+      t("claims.claimArrivalDate"),
+      t("claims.metadata.assignedWorker"),
+      t("claims.metadata.reason"),
+      t("claims.metadata.domesticMarket"),
+      t("claims.createdAt"),
     ];
 
     const rows = sortedClaims.map(claim => [
       claim.claimCodeRaw || "",
       claim.customerNumber || "",
-      claim.status,
+      t(`claims.status.${claim.status}` as any) || claim.status,
       claim.customer?.name || "",
       claim.customer?.company || "",
       claim.engineType || "",
@@ -237,7 +239,7 @@ export default function StatisticsPage() {
       claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
       claim.assignedWorkerName || "",
       claim.reason || "",
-      claim.isDomesticMarket ? "Yes" : "No",
+      claim.isDomesticMarket ? t("common.yes") : t("common.no"),
       new Date(claim.createdAt).toLocaleDateString(),
     ]);
 
@@ -293,8 +295,8 @@ export default function StatisticsPage() {
         <div className="flex items-center gap-3">
           <BarChart3 className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-3xl font-bold">Statistics</h1>
-            <p className="text-muted-foreground">Claim metadata statistics and analysis</p>
+            <h1 className="text-3xl font-bold">{t("statistics.title")}</h1>
+            <p className="text-muted-foreground">{t("statistics.subtitle")}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -304,7 +306,7 @@ export default function StatisticsPage() {
             className="flex items-center gap-2"
           >
             <Filter className="h-4 w-4" />
-            {showFilters ? "Hide Filters" : "Show Filters"}
+            {showFilters ? t("statistics.hideFilters") : t("statistics.showFilters")}
           </Button>
           <Button
             onClick={handleExport}
@@ -312,7 +314,7 @@ export default function StatisticsPage() {
             disabled={sortedClaims.length === 0}
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            {t("statistics.exportCsv")}
           </Button>
         </div>
       </div>
@@ -321,7 +323,7 @@ export default function StatisticsPage() {
       <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Total Claims</p>
+            <p className="text-sm text-muted-foreground">{t("statistics.totalClaims")}</p>
             {isLoading ? (
               <Skeleton className="h-8 w-24 mt-2" />
             ) : (
@@ -331,11 +333,11 @@ export default function StatisticsPage() {
           {hasActiveFilters && (
             <div className="flex items-center gap-2">
               <Badge variant="secondary">
-                {totalCount} claim{totalCount !== 1 ? "s" : ""} match filter{totalCount !== 1 ? "s" : ""}
+                {t("statistics.matchesFilters", { count: totalCount })}
               </Badge>
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 <X className="h-4 w-4 mr-1" />
-                Clear Filters
+                {t("statistics.clearFilters")}
               </Button>
             </div>
           )}
@@ -347,10 +349,10 @@ export default function StatisticsPage() {
         <Card className="p-6">
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Filters</h2>
+              <h2 className="text-lg font-semibold">{t("statistics.filters")}</h2>
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear All
+                  {t("statistics.clearFilters")}
                 </Button>
               )}
             </div>
@@ -358,7 +360,7 @@ export default function StatisticsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Status Filter */}
               <div>
-                <Label>Status</Label>
+                <Label>{t("common.status")}</Label>
                 <Select
                   value={filters.status.length > 0 ? filters.status.join(",") : "all"}
                   onValueChange={(value) => {
@@ -369,44 +371,44 @@ export default function StatisticsPage() {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="All statuses" />
+                    <SelectValue placeholder={t("statistics.allStatuses")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="NEW">New</SelectItem>
-                    <SelectItem value="IN_ANALYSIS">In Analysis</SelectItem>
-                    <SelectItem value="APPROVED">Approved</SelectItem>
-                    <SelectItem value="REJECTED">Rejected</SelectItem>
-                    <SelectItem value="CLOSED">Closed</SelectItem>
+                    <SelectItem value="all">{t("statistics.allStatuses")}</SelectItem>
+                    <SelectItem value="NEW">{t("claims.status.NEW")}</SelectItem>
+                    <SelectItem value="IN_ANALYSIS">{t("claims.status.IN_ANALYSIS")}</SelectItem>
+                    <SelectItem value="APPROVED">{t("claims.status.APPROVED")}</SelectItem>
+                    <SelectItem value="REJECTED">{t("claims.status.REJECTED")}</SelectItem>
+                    <SelectItem value="CLOSED">{t("claims.status.CLOSED")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Customer Name - Multi-select */}
               <div>
-                <Label>Customer Name</Label>
+                <Label>{t("statistics.customerName")}</Label>
                 <MultiSelect
                   options={uniqueCustomerNames}
                   selected={filters.customerNames}
                   onChange={(selected) => setFilters(prev => ({ ...prev, customerNames: selected }))}
-                  placeholder="Select customers..."
+                  placeholder={t("statistics.selectCustomers")}
                 />
               </div>
 
               {/* Customer Company - Multi-select */}
               <div>
-                <Label>Customer Company</Label>
+                <Label>{t("statistics.customerCompany")}</Label>
                 <MultiSelect
                   options={uniqueCustomerCompanies}
                   selected={filters.customerCompanies}
                   onChange={(selected) => setFilters(prev => ({ ...prev, customerCompanies: selected }))}
-                  placeholder="Select companies..."
+                  placeholder={t("statistics.selectCompanies")}
                 />
               </div>
 
               {/* Fault Department - Multi-select */}
               <div>
-                <Label>Fault Department</Label>
+                <Label>{t("claims.metadata.faultDepartment")}</Label>
                 <MultiSelect
                   options={departmentsData?.departments?.map((dept: any) => ({
                     value: dept.id,
@@ -419,18 +421,18 @@ export default function StatisticsPage() {
                       faultDepartmentId: selected,
                     }));
                   }}
-                  placeholder="Select departments..."
+                  placeholder={t("statistics.allDepartments")}
                 />
               </div>
 
               {/* Year Engine Done */}
               <div>
-                <Label>Year Engine Done</Label>
+                <Label>{t("claims.metadata.yearEngineDone")}</Label>
                 <Input
                   type="number"
                   value={filters.yearEngineDone}
                   onChange={(e) => setFilters(prev => ({ ...prev, yearEngineDone: e.target.value }))}
-                  placeholder="Filter by year"
+                  placeholder={t("statistics.filterByYear")}
                   min="1900"
                   max="2100"
                 />
@@ -438,55 +440,55 @@ export default function StatisticsPage() {
 
               {/* Engine Type */}
               <div>
-                <Label>Engine Type</Label>
+                <Label>{t("claims.engineType")}</Label>
                 <Input
                   value={filters.engineType}
                   onChange={(e) => setFilters(prev => ({ ...prev, engineType: e.target.value }))}
-                  placeholder="Filter by engine type"
+                  placeholder={t("statistics.filterByEngineType")}
                 />
               </div>
 
               {/* Domestic Market */}
               <div>
-                <Label>Market</Label>
+                <Label>{t("statistics.market")}</Label>
                 <Select
                   value={filters.isDomesticMarket || "all"}
                   onValueChange={(value) => setFilters(prev => ({ ...prev, isDomesticMarket: value === "all" ? "" : value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="All markets" />
+                    <SelectValue placeholder={t("statistics.allMarkets")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All markets</SelectItem>
-                    <SelectItem value="true">Domestic</SelectItem>
-                    <SelectItem value="false">International</SelectItem>
+                    <SelectItem value="all">{t("statistics.allMarkets")}</SelectItem>
+                    <SelectItem value="true">{t("statistics.domestic")}</SelectItem>
+                    <SelectItem value="false">{t("statistics.international")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {/* Date From */}
               <div>
-                <Label>Date From</Label>
+                <Label>{t("statistics.dateFrom")}</Label>
                 <DatePicker
                   date={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
                   onSelect={(date) => setFilters(prev => ({ 
                     ...prev, 
                     dateFrom: date ? format(date, "yyyy-MM-dd") : "" 
                   }))}
-                  placeholder="Select start date"
+                  placeholder={t("statistics.selectStartDate")}
                 />
               </div>
 
               {/* Date To */}
               <div>
-                <Label>Date To</Label>
+                <Label>{t("statistics.dateTo")}</Label>
                 <DatePicker
                   date={filters.dateTo ? new Date(filters.dateTo) : undefined}
                   onSelect={(date) => setFilters(prev => ({ 
                     ...prev, 
                     dateTo: date ? format(date, "yyyy-MM-dd") : "" 
                   }))}
-                  placeholder="Select end date"
+                  placeholder={t("statistics.selectEndDate")}
                 />
               </div>
             </div>
@@ -505,24 +507,24 @@ export default function StatisticsPage() {
         ) : sortedClaims.length === 0 ? (
           <div className="text-center py-12">
             <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground">No claims found matching the filters</p>
+            <p className="text-muted-foreground">{t("statistics.noClaimsFound")}</p>
           </div>
         ) : (
           <ResponsiveTable
             headers={[
-              { key: "mrNumber", label: "MR Number" },
-              { key: "customerNumber", label: "Customer Number" },
-              { key: "status", label: "Status" },
-              { key: "customer", label: "Customer" },
-              { key: "company", label: "Company" },
-              { key: "engineType", label: "Engine Type" },
-              { key: "engineCode", label: "Engine Code" },
-              { key: "faultDept", label: "Fault Dept" },
-              { key: "dateEngineDone", label: "Date Engine Done" },
-              { key: "claimArrivalDate", label: "Claim Arrival" },
-              { key: "assignedTo", label: "Assigned To" },
-              { key: "market", label: "Market" },
-              { key: "created", label: "Created" },
+              { key: "mrNumber", label: t("claims.mrNumber") },
+              { key: "customerNumber", label: t("claims.customerNumber") },
+              { key: "status", label: t("common.status") },
+              { key: "customer", label: t("claims.customer") },
+              { key: "company", label: t("claims.company") },
+              { key: "engineType", label: t("claims.engineType") },
+              { key: "engineCode", label: t("claims.engineCode") },
+              { key: "faultDept", label: t("claims.metadata.faultDepartment") },
+              { key: "dateEngineDone", label: t("claims.dateEngineDone") },
+              { key: "claimArrivalDate", label: t("claims.claimArrivalDate") },
+              { key: "assignedTo", label: t("claims.metadata.assignedWorker") },
+              { key: "market", label: t("statistics.market") },
+              { key: "created", label: t("claims.createdAt") },
               { key: "reason", label: "" },
             ]}
             data={sortedClaims.map((claim) => ({
@@ -532,7 +534,7 @@ export default function StatisticsPage() {
               customerNumber: (
                 <span className="font-medium">{claim.customerNumber || "-"}</span>
               ),
-              status: <Badge variant="outline">{claim.status}</Badge>,
+              status: <Badge variant="outline">{t(`claims.status.${claim.status}` as any) || claim.status}</Badge>,
               customer: claim.customer?.name || "-",
               company: claim.customer?.company || "-",
               engineType: claim.engineType || "-",
@@ -544,9 +546,9 @@ export default function StatisticsPage() {
               claimArrivalDate: claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "-",
               assignedTo: claim.assignedWorkerName || "-",
               market: claim.isDomesticMarket ? (
-                <Badge variant="secondary">Domestic</Badge>
+                <Badge variant="secondary">{t("statistics.domestic")}</Badge>
               ) : (
-                <Badge variant="outline">International</Badge>
+                <Badge variant="outline">{t("statistics.international")}</Badge>
               ),
               created: new Date(claim.createdAt).toLocaleDateString(),
               reason: claim.reason ? (
@@ -556,7 +558,7 @@ export default function StatisticsPage() {
                       <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-md">
-                      <p className="font-semibold mb-1">Reason:</p>
+                      <p className="font-semibold mb-1">{t("claims.metadata.reason")}:</p>
                       <p>{claim.reason}</p>
                     </TooltipContent>
                   </Tooltip>
@@ -566,7 +568,7 @@ export default function StatisticsPage() {
             emptyMessage={
               <div className="text-center py-12">
                 <BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No claims found matching the filters</p>
+                <p className="text-muted-foreground">{t("statistics.noClaimsFound")}</p>
               </div>
             }
             onRowClick={(row, index) => {
