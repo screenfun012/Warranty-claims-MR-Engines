@@ -26,7 +26,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { useTranslations } from "next-intl";
-import { useTranslations } from "next-intl";
 
 interface Worker {
   id: string;
