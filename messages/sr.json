@@ -32,7 +32,33 @@
     "success": "Uspešno",
     "warning": "Upozorenje",
     "language": "Jezik",
-    "theme": "Tema"
+    "theme": "Tema",
+    "refresh": "Osveži",
+    "add": "Dodaj",
+    "remove": "Ukloni",
+    "select": "Izaberi",
+    "selectAll": "Izaberi sve",
+    "clear": "Obriši",
+    "upload": "Otpremi",
+    "download": "Preuzmi",
+    "details": "Detalji",
+    "open": "Otvori",
+    "system": "Sistem"
+  },
+  "time": {
+    "justNow": "upravo sada",
+    "minuteAgo": "pre 1 minut",
+    "minutesAgo": "pre {count} minuta",
+    "hourAgo": "pre 1 sat",
+    "hoursAgo2to4": "pre {count} sata",
+    "hoursAgo": "pre {count} sati",
+    "dayAgo": "pre 1 dan",
+    "daysAgo": "pre {count} dana",
+    "weekAgo": "pre 1 nedelju",
+    "weeksAgo": "pre {count} nedelje",
+    "monthAgo": "pre 1 mesec",
+    "monthsAgo": "pre {count} meseci",
+    "overYearAgo": "pre više od godinu dana"
   },
   "nav": {
     "dashboard": "Početna",
@@ -59,7 +85,8 @@
     "openClaims": "Otvorene reklamacije",
     "closedClaims": "Zatvorene reklamacije",
     "pendingClaims": "Na čekanju",
-    "urgentClaims": "Hitne reklamacije"
+    "urgentClaims": "Hitne reklamacije",
+    "customers": "Kupci"
   },
   "inbox": {
     "title": "Pristiglo",
@@ -80,7 +107,9 @@
     "deleteThread": "Obriši poruku",
     "deleteThreadConfirm": "Da li ste sigurni da želite da obrišete ovu poruku?",
     "deleteThreadWarning": "UPOZORENJE: Ova poruka je povezana sa reklamacijom. Brisanjem će se TRAJNO obrisati:\n\n• Email poruka i svi prilozi\n• Povezana reklamacija i svi njeni podaci\n• Svi fajlovi sa Synology/NAS servera\n\nOva akcija je NEPOVRATNA. Da li ste sigurni?",
-    "deletePermanently": "Obriši trajno"
+    "deletePermanently": "Obriši trajno",
+    "markAsRead": "Označi kao pročitano",
+    "markAsUnread": "Označi kao nepročitano"
   },
   "claims": {
     "title": "Reklamacije",
@@ -96,8 +125,13 @@
     "createdAt": "Kreirano",
     "updatedAt": "Ažurirano",
     "noClaims": "Nema reklamacija",
+    "claimArrivalDate": "Datum prijema",
+    "dateEngineDone": "Datum izrade motora",
+    "locked": "Zaključano",
+    "unlocked": "Otključano",
+    "notFound": "Reklamacija nije pronađena",
     "status": {
-      "NEW": "Nova",
+      "NEW": "Novo",
       "IN_ANALYSIS": "U Obradi",
       "IN_PROGRESS": "U toku",
       "APPROVED": "Prihvaćeno",
@@ -117,11 +151,12 @@
     "tabs": {
       "summary": "Pregled",
       "metadata": "Podaci",
-      "photos": "Fotografije",
-      "documents": "Dokumenti",
+      "photos": "Naši fajlovi",
+      "documents": "Dokumenti kupca",
       "findings": "Nalazi",
       "report": "Izveštaj",
-      "timeline": "Istorija"
+      "timeline": "Istorija",
+      "emails": "Mailovi"
     },
     "metadata": {
       "customerName": "Ime kupca",
@@ -134,12 +169,33 @@
       "internationalMarket": "Strano tržište",
       "addDepartment": "Dodaj odeljenje",
       "newDepartment": "Novo odeljenje",
-      "departmentName": "Naziv odeljenja"
+      "departmentName": "Naziv odeljenja",
+      "assignedWorker": "Zaduženi radnik",
+      "addWorker": "Dodaj radnika",
+      "addCompany": "Dodaj firmu",
+      "selectWorker": "Izaberi radnika",
+      "selectCompany": "Izaberi firmu",
+      "selectDepartments": "Izaberi odeljenja"
     },
     "delete": {
       "title": "Brisanje reklamacije",
       "confirm": "Da li ste sigurni da želite da obrišete ovu reklamaciju? Svi podaci i fajlovi će biti trajno obrisani.",
       "success": "Reklamacija uspešno obrisana"
+    },
+    "photos": {
+      "title": "Naši fajlovi",
+      "upload": "Otpremi fajlove",
+      "noPhotos": "Nema fajlova",
+      "uploadSuccess": "Fajl uspešno otpremljen",
+      "uploadError": "Greška pri otpremanju fajla",
+      "deleteSuccess": "Fajl uspešno obrisan",
+      "deleteConfirm": "Da li ste sigurni da želite da obrišete ovaj fajl?"
+    },
+    "findings": {
+      "title": "Nalazi",
+      "add": "Dodaj nalaz",
+      "noFindings": "Nema nalaza",
+      "initialFinding": "Početno zapažanje"
     }
   },
   "statistics": {
@@ -160,13 +216,19 @@
     "allMarkets": "Sva tržišta",
     "domestic": "Domaće",
     "international": "Strano",
-    "noClaimsFound": "Nema reklamacija koje odgovaraju filterima"
+    "noClaimsFound": "Nema reklamacija koje odgovaraju filterima",
+    "customerName": "Ime kupca",
+    "customerCompany": "Kompanija kupca",
+    "allCustomers": "Svi kupci",
+    "allCompanies": "Sve kompanije"
   },
   "admin": {
-    "title": "Admin",
+    "title": "Admin Panel",
+    "subtitle": "Upravljanje sistemom i korisnicima",
+    "sections": "Admin sekcije",
     "users": {
       "title": "Upravljanje korisnicima",
-      "description": "Upravljajte korisnicima i njihovim ulogama u sistemu",
+      "description": "Upravljaj korisnicima, ulogama i dozvolama",
       "totalUsers": "Ukupno korisnika",
       "activeUsers": "Aktivni korisnici",
       "pendingApproval": "Čeka odobrenje",
@@ -181,7 +243,110 @@
       "deactivate": "Deaktiviraj",
       "noUsers": "Nema korisnika u sistemu",
       "pendingUsers": "Korisnici koji čekaju odobrenje ({count})",
-      "registeredOn": "Registrovan"
+      "registeredOn": "Registrovan",
+      "waitingCount": "{count} čeka"
+    },
+    "lists": {
+      "title": "Radnici i Firme",
+      "description": "Upravljaj listama radnika i firmi za padajuće menije",
+      "workers": "Radnici",
+      "companies": "Firme",
+      "addWorker": "Dodaj radnika",
+      "addCompany": "Dodaj firmu",
+      "workerName": "Ime radnika",
+      "companyName": "Naziv firme",
+      "deleteWorker": "Obriši radnika",
+      "deleteCompany": "Obriši firmu",
+      "noWorkers": "Nema radnika",
+      "noCompanies": "Nema firmi",
+      "cleanup": {
+        "title": "Čišćenje podataka",
+        "orphanedCustomers": "Zastareli kupci",
+        "orphanedCount": "{count} zastarelih kupaca",
+        "cleanupDesc": "Ovi kupci nemaju povezane reklamacije i mogu se obrisati.",
+        "cleanupButton": "Očisti",
+        "cleanupConfirm": "Da li ste sigurni da želite da obrišete {count} zastarelih kupaca?",
+        "cleanupSuccess": "Uspešno obrisano {count} kupaca"
+      }
+    },
+    "email": {
+      "title": "Email postavke",
+      "description": "Pregled i upravljanje email sinhronizacijom"
+    },
+    "system": {
+      "title": "Sistemske postavke",
+      "description": "Konfiguracija sistema i okruženja"
+    },
+    "stats": {
+      "users": "Korisnici",
+      "claims": "Reklamacije",
+      "emails": "Email poruke",
+      "system": "Sistem",
+      "activeOf": "{active} aktivnih",
+      "inAnalysis": "{count} u obradi",
+      "unreadOf": "nepročitanih od {total} ukupno",
+      "allWorking": "Sve funkcioniše",
+      "emailNotConfigured": "Email nije konfigurisan",
+      "database": "Baza"
+    },
+    "activity": {
+      "title": "Evidencija aktivnosti",
+      "noActivity": "Nema zabeleženih aktivnosti",
+      "noActivityDesc": "Aktivnosti će se pojaviti kada korisnici počnu da koriste aplikaciju",
+      "details": "Detalji aktivnosti",
+      "user": "Korisnik",
+      "action": "Akcija",
+      "entityType": "Tip entiteta",
+      "entityName": "Naziv",
+      "time": "Vreme",
+      "ipAddress": "IP Adresa",
+      "additionalDetails": "Dodatni detalji",
+      "openClaim": "Otvori reklamaciju",
+      "assignedTo": "Zadužen"
+    },
+    "actions": {
+      "CREATE": "Kreirao",
+      "UPDATE": "Ažurirao",
+      "DELETE": "Obrisao",
+      "VIEW": "Pogledao",
+      "LOGIN": "Prijavljen",
+      "LOGOUT": "Odjavljen",
+      "UPLOAD": "Otpremio",
+      "DOWNLOAD": "Preuzeo",
+      "APPROVE": "Odobrio",
+      "REJECT": "Odbio",
+      "LOCK": "Zaključao",
+      "UNLOCK": "Otključao"
+    },
+    "entities": {
+      "CLAIM": "reklamaciju",
+      "EMAIL": "email",
+      "USER": "korisnika",
+      "CUSTOMER": "kupca",
+      "ATTACHMENT": "prilog",
+      "DEPARTMENT": "odeljenje",
+      "WORKER": "radnika",
+      "COMPANY": "firmu",
+      "SYSTEM": "sistem"
+    },
+    "dbStats": {
+      "title": "Statistika baze",
+      "claims": "Reklamacije",
+      "customers": "Kupci",
+      "emails": "Email poruke",
+      "attachments": "Prilozi",
+      "departments": "Odeljenja",
+      "byStatus": "Reklamacije po statusu"
+    },
+    "systemStatus": {
+      "title": "Status sistema",
+      "database": "Baza podataka",
+      "email": "Email",
+      "api": "API",
+      "connected": "Povezano",
+      "ok": "OK",
+      "online": "Online",
+      "notConfigured": "Nije konfigurisano"
     }
   },
   "settings": {

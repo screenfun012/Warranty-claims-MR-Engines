@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,6 @@ import {
   Server,
   CheckCircle,
   XCircle,
-  Clock,
   Building2,
   FolderOpen,
   Layers,
@@ -87,34 +87,6 @@ interface ActivityLogEntry {
   createdAt: string;
 }
 
-// Custom function for Latin Serbian time formatting
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
-  const diffWeek = Math.floor(diffDay / 7);
-  const diffMonth = Math.floor(diffDay / 30);
-
-  if (diffSec < 60) return "upravo sada";
-  if (diffMin === 1) return "pre 1 minut";
-  if (diffMin < 5) return `pre ${diffMin} minuta`;
-  if (diffMin < 60) return `pre ${diffMin} minuta`;
-  if (diffHour === 1) return "pre 1 sat";
-  if (diffHour < 5) return `pre ${diffHour} sata`;
-  if (diffHour < 24) return `pre ${diffHour} sati`;
-  if (diffDay === 1) return "pre 1 dan";
-  if (diffDay < 5) return `pre ${diffDay} dana`;
-  if (diffDay < 7) return `pre ${diffDay} dana`;
-  if (diffWeek === 1) return "pre 1 nedelju";
-  if (diffWeek < 5) return `pre ${diffWeek} nedelje`;
-  if (diffMonth === 1) return "pre 1 mesec";
-  if (diffMonth < 12) return `pre ${diffMonth} meseci`;
-  return `pre više od godinu dana`;
-}
-
 interface Auth0User {
   'https://mr-engines-warranty/roles'?: string[] | string;
   app_metadata?: {
@@ -127,41 +99,6 @@ const statusColors: Record<string, string> = {
   IN_ANALYSIS: "bg-amber-500",
   APPROVED: "bg-green-500",
   REJECTED: "bg-red-500",
-};
-
-const statusLabels: Record<string, string> = {
-  NEW: "Novo",
-  IN_ANALYSIS: "U Obradi",
-  APPROVED: "Prihvaćeno",
-  REJECTED: "Odbijeno",
-};
-
-// Action labels for display
-const actionLabels: Record<string, string> = {
-  CREATE: "Kreirao",
-  UPDATE: "Ažurirao",
-  DELETE: "Obrisao",
-  VIEW: "Pogledao",
-  LOGIN: "Prijavljen",
-  LOGOUT: "Odjavljen",
-  UPLOAD: "Uploadovao",
-  DOWNLOAD: "Preuzeo",
-  APPROVE: "Odobrio",
-  REJECT: "Odbio",
-  LOCK: "Zaključao",
-  UNLOCK: "Otključao",
-};
-
-const entityLabels: Record<string, string> = {
-  CLAIM: "reklamaciju",
-  EMAIL: "email",
-  USER: "korisnika",
-  CUSTOMER: "kupca",
-  ATTACHMENT: "prilog",
-  DEPARTMENT: "odeljenje",
-  WORKER: "radnika",
-  COMPANY: "firmu",
-  SYSTEM: "sistem",
 };
 
 const actionIcons: Record<string, React.ReactNode> = {
@@ -178,6 +115,7 @@ const actionIcons: Record<string, React.ReactNode> = {
 export default function AdminDashboardPage() {
   const { user, isLoading } = useUser();
   const router = useRouter();
+  const t = useTranslations();
   const [stats, setStats] = useState<SystemStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
@@ -187,6 +125,37 @@ export default function AdminDashboardPage() {
   const auth0User = user as Auth0User | undefined;
   const userRoles = auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
   const isSuperAdmin = Array.isArray(userRoles) ? userRoles.includes('SUPER_ADMIN') : userRoles === 'SUPER_ADMIN';
+
+  // Time formatting with translations
+  const formatTimeAgo = (date: Date): string => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+    const diffWeek = Math.floor(diffDay / 7);
+    const diffMonth = Math.floor(diffDay / 30);
+
+    if (diffSec < 60) return t("time.justNow");
+    if (diffMin === 1) return t("time.minuteAgo");
+    if (diffMin < 60) return t("time.minutesAgo", { count: diffMin });
+    if (diffHour === 1) return t("time.hourAgo");
+    if (diffHour < 5) return t("time.hoursAgo2to4", { count: diffHour });
+    if (diffHour < 24) return t("time.hoursAgo", { count: diffHour });
+    if (diffDay === 1) return t("time.dayAgo");
+    if (diffDay < 7) return t("time.daysAgo", { count: diffDay });
+    if (diffWeek === 1) return t("time.weekAgo");
+    if (diffWeek < 5) return t("time.weeksAgo", { count: diffWeek });
+    if (diffMonth === 1) return t("time.monthAgo");
+    if (diffMonth < 12) return t("time.monthsAgo", { count: diffMonth });
+    return t("time.overYearAgo");
+  };
+
+  // Translation helpers for dynamic keys
+  const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
+  const getActionLabel = (action: string) => t(`admin.actions.${action}` as any) || action;
+  const getEntityLabel = (entityType: string) => t(`admin.entities.${entityType}` as any) || entityType;
 
   useEffect(() => {
     if (isLoading) return;
@@ -279,33 +248,33 @@ export default function AdminDashboardPage() {
 
   const adminSections = [
     {
-      title: "Upravljanje korisnicima",
-      description: "Upravljaj korisnicima, ulogama i dozvolama",
+      title: t("admin.users.title"),
+      description: t("admin.users.description"),
       icon: Users,
       href: "/admin/users",
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-500/10 border-blue-500/20",
-      badge: stats?.pendingApproval ? `${stats.pendingApproval} čeka` : undefined,
+      badge: stats?.pendingApproval ? t("admin.users.waitingCount", { count: stats.pendingApproval }) : undefined,
     },
     {
-      title: "Radnici i Firme",
-      description: "Upravljaj listama radnika i firmi za padajuće menije",
+      title: t("admin.lists.title"),
+      description: t("admin.lists.description"),
       icon: Database,
       href: "/admin/lists",
       color: "text-orange-600 dark:text-orange-400",
       bgColor: "bg-orange-500/10 border-orange-500/20",
     },
     {
-      title: "Email postavke",
-      description: "Pregled i upravljanje email sinhronizacijom",
+      title: t("admin.email.title"),
+      description: t("admin.email.description"),
       icon: Mail,
       href: "/settings",
       color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-500/10 border-green-500/20",
     },
     {
-      title: "Sistemske postavke",
-      description: "Konfiguracija sistema i okruženja",
+      title: t("admin.system.title"),
+      description: t("admin.system.description"),
       icon: Settings,
       href: "/settings",
       color: "text-purple-600 dark:text-purple-400",
@@ -320,15 +289,15 @@ export default function AdminDashboardPage() {
         <div>
           <h1 className="text-4xl font-bold tracking-tight flex items-center gap-3">
             <Shield className="w-10 h-10 text-primary" />
-            Admin Panel
+            {t("admin.title")}
           </h1>
           <p className="text-muted-foreground mt-2">
-            Upravljanje sistemom i korisnicima
+            {t("admin.subtitle")}
           </p>
         </div>
         <Button variant="outline" onClick={refreshAll} className="gap-2">
           <RefreshCw className="h-4 w-4" />
-          Osveži
+          {t("common.refresh")}
         </Button>
       </div>
 
@@ -337,49 +306,49 @@ export default function AdminDashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="p-6 bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Korisnici</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("admin.stats.users")}</p>
               <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
               {stats.totalUsers}
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              {stats.activeUsers} aktivnih
+              {t("admin.stats.activeOf", { active: stats.activeUsers })}
               {stats.pendingApproval > 0 && (
-                <span className="text-amber-500 ml-2">• {stats.pendingApproval} čeka odobrenje</span>
+                <span className="text-amber-500 ml-2">• {stats.pendingApproval} {t("admin.users.pending").toLowerCase()}</span>
               )}
             </p>
           </Card>
 
           <Card className="p-6 bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Reklamacije</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("admin.stats.claims")}</p>
               <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <p className="text-4xl font-bold text-green-600 dark:text-green-400">
               {stats.totalClaims}
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              {stats.claimsByStatus.IN_ANALYSIS} u obradi
+              {t("admin.stats.inAnalysis", { count: stats.claimsByStatus.IN_ANALYSIS })}
             </p>
           </Card>
 
           <Card className="p-6 bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Email poruke</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("admin.stats.emails")}</p>
               <Mail className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <p className="text-4xl font-bold text-amber-600 dark:text-amber-400">
               {stats.unreadEmails}
             </p>
             <p className="text-sm text-muted-foreground mt-2">
-              nepročitanih od {stats.totalEmails} ukupno
+              {t("admin.stats.unreadOf", { total: stats.totalEmails })}
             </p>
           </Card>
 
           <Card className={`p-6 ${stats.emailConfigured ? 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20' : 'bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20'}`}>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Sistem</p>
+              <p className="text-sm font-medium text-muted-foreground">{t("admin.stats.system")}</p>
               {stats.emailConfigured ? (
                 <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               ) : (
@@ -387,10 +356,10 @@ export default function AdminDashboardPage() {
               )}
             </div>
             <Badge variant={stats.emailConfigured ? "default" : "destructive"} className="text-sm">
-              {stats.emailConfigured ? "Sve funkcioniše" : "Email nije konfigurisan"}
+              {stats.emailConfigured ? t("admin.stats.allWorking") : t("admin.stats.emailNotConfigured")}
             </Badge>
             <p className="text-sm text-muted-foreground mt-2">
-              Baza: {stats.databaseStatus}
+              {t("admin.stats.database")}: {stats.databaseStatus}
             </p>
           </Card>
         </div>
@@ -403,11 +372,11 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold flex items-center gap-2">
               <Activity className="h-5 w-5" />
-              Evidencija aktivnosti
+              {t("admin.activity.title")}
             </h2>
             <Button variant="ghost" size="sm" onClick={fetchActivityLog} className="gap-1">
               <RefreshCw className="h-3 w-3" />
-              Osveži
+              {t("common.refresh")}
             </Button>
           </div>
           <div className="space-y-2 max-h-[400px] overflow-y-auto">
@@ -428,15 +397,15 @@ export default function AdminDashboardPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm">
                       <span className="font-medium text-primary">
-                        {entry.userName || entry.userEmail?.split("@")[0] || "Sistem"}
+                        {entry.userName || entry.userEmail?.split("@")[0] || t("common.system")}
                       </span>
                       {" "}
                       <span className="text-muted-foreground">
-                        {actionLabels[entry.action]?.toLowerCase() || entry.action.toLowerCase()}
+                        {getActionLabel(entry.action).toLowerCase()}
                       </span>
                       {" "}
                       <span className="text-muted-foreground">
-                        {entityLabels[entry.entityType] || entry.entityType.toLowerCase()}
+                        {getEntityLabel(entry.entityType)}
                       </span>
                       {entry.entityName && (
                         <>
@@ -467,8 +436,8 @@ export default function AdminDashboardPage() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>Nema zabeleženih aktivnosti</p>
-                <p className="text-xs mt-1">Aktivnosti će se pojaviti kada korisnici počnu da koriste aplikaciju</p>
+                <p>{t("admin.activity.noActivity")}</p>
+                <p className="text-xs mt-1">{t("admin.activity.noActivityDesc")}</p>
               </div>
             )}
           </div>
@@ -478,41 +447,41 @@ export default function AdminDashboardPage() {
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Layers className="h-5 w-5" />
-            Statistika baze
+            {t("admin.dbStats.title")}
           </h2>
           <div className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-green-500" />
-                <span>Reklamacije</span>
+                <span>{t("admin.dbStats.claims")}</span>
               </div>
               <span className="font-bold">{stats?.totalClaims || 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Building2 className="h-5 w-5 text-blue-500" />
-                <span>Kupci</span>
+                <span>{t("admin.dbStats.customers")}</span>
               </div>
               <span className="font-bold">{stats?.totalCustomers || 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-amber-500" />
-                <span>Email poruke</span>
+                <span>{t("admin.dbStats.emails")}</span>
               </div>
               <span className="font-bold">{stats?.totalEmails || 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <FolderOpen className="h-5 w-5 text-purple-500" />
-                <span>Prilozi</span>
+                <span>{t("admin.dbStats.attachments")}</span>
               </div>
               <span className="font-bold">{stats?.totalAttachments || 0}</span>
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Layers className="h-5 w-5 text-orange-500" />
-                <span>Odeljenja</span>
+                <span>{t("admin.dbStats.departments")}</span>
               </div>
               <span className="font-bold">{stats?.totalDepartments || 0}</span>
             </div>
@@ -521,7 +490,7 @@ export default function AdminDashboardPage() {
           {/* Claims by Status */}
           {stats?.claimsByStatus && (
             <div className="mt-4 pt-4 border-t">
-              <h3 className="text-sm font-medium mb-3 text-muted-foreground">Reklamacije po statusu</h3>
+              <h3 className="text-sm font-medium mb-3 text-muted-foreground">{t("admin.dbStats.byStatus")}</h3>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(stats.claimsByStatus).map(([status, count]) => (
                   <div key={status} className="flex items-center gap-2 p-2 rounded bg-muted/30">
@@ -531,7 +500,7 @@ export default function AdminDashboardPage() {
                       status === 'APPROVED' ? 'text-green-500' :
                       'text-red-500'
                     }`} />
-                    <span className="text-sm">{statusLabels[status]}</span>
+                    <span className="text-sm">{getStatusLabel(status)}</span>
                     <span className="font-bold ml-auto">{count}</span>
                   </div>
                 ))}
@@ -545,7 +514,7 @@ export default function AdminDashboardPage() {
       <div>
         <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
           <Activity className="h-6 w-6" />
-          Admin sekcije
+          {t("admin.sections")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {adminSections.map((section) => (
@@ -575,44 +544,44 @@ export default function AdminDashboardPage() {
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
             <Server className="h-6 w-6" />
-            Status sistema
+            {t("admin.systemStatus.title")}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Database className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Baza podataka</span>
+                <span className="font-medium">{t("admin.systemStatus.database")}</span>
               </div>
               <Badge variant="default" className="bg-green-500">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                {stats.databaseStatus}
+                {t("admin.systemStatus.connected")}
               </Badge>
             </div>
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Email</span>
+                <span className="font-medium">{t("admin.systemStatus.email")}</span>
               </div>
               {stats.emailConfigured ? (
                 <Badge variant="default" className="bg-green-500">
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  OK
+                  {t("admin.systemStatus.ok")}
                 </Badge>
               ) : (
                 <Badge variant="destructive">
                   <XCircle className="h-3 w-3 mr-1" />
-                  Nije konfigurisano
+                  {t("admin.systemStatus.notConfigured")}
                 </Badge>
               )}
             </div>
             <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Server className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">API</span>
+                <span className="font-medium">{t("admin.systemStatus.api")}</span>
               </div>
               <Badge variant="default" className="bg-green-500">
                 <CheckCircle className="h-3 w-3 mr-1" />
-                Online
+                {t("admin.systemStatus.online")}
               </Badge>
             </div>
           </div>
@@ -625,18 +594,18 @@ export default function AdminDashboardPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {selectedActivity && actionIcons[selectedActivity.action]}
-              Detalji aktivnosti
+              {t("admin.activity.details")}
             </DialogTitle>
           </DialogHeader>
           {selectedActivity && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Korisnik</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.activity.user")}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <User className="h-4 w-4 text-muted-foreground" />
                     <p className="font-medium">
-                      {selectedActivity.userName || selectedActivity.userEmail || "Sistem"}
+                      {selectedActivity.userName || selectedActivity.userEmail || t("common.system")}
                     </p>
                   </div>
                   {selectedActivity.userEmail && selectedActivity.userName && (
@@ -646,22 +615,22 @@ export default function AdminDashboardPage() {
                   )}
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Akcija</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.activity.action")}</p>
                   <Badge variant="outline" className="mt-1">
-                    {actionLabels[selectedActivity.action] || selectedActivity.action}
+                    {getActionLabel(selectedActivity.action)}
                   </Badge>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Tip entiteta</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.activity.entityType")}</p>
                   <p className="font-medium capitalize">
-                    {entityLabels[selectedActivity.entityType] || selectedActivity.entityType}
+                    {getEntityLabel(selectedActivity.entityType)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Naziv</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.activity.entityName")}</p>
                   <p className="font-medium">
                     {selectedActivity.entityName || "-"}
                   </p>
@@ -669,7 +638,7 @@ export default function AdminDashboardPage() {
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground">Vreme</p>
+                <p className="text-sm text-muted-foreground">{t("admin.activity.time")}</p>
                 <p className="font-medium">
                   {new Date(selectedActivity.createdAt).toLocaleString("sr-Latn-RS", {
                     day: "2-digit",
@@ -684,7 +653,7 @@ export default function AdminDashboardPage() {
 
               {selectedActivity.ipAddress && (
                 <div>
-                  <p className="text-sm text-muted-foreground">IP Adresa</p>
+                  <p className="text-sm text-muted-foreground">{t("admin.activity.ipAddress")}</p>
                   <p className="font-medium font-mono text-sm">
                     {selectedActivity.ipAddress}
                   </p>
@@ -693,7 +662,7 @@ export default function AdminDashboardPage() {
 
               {selectedActivity.details && Object.keys(selectedActivity.details).length > 0 && (
                 <div>
-                  <p className="text-sm text-muted-foreground mb-2">Dodatni detalji</p>
+                  <p className="text-sm text-muted-foreground mb-2">{t("admin.activity.additionalDetails")}</p>
                   <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
                     {Object.entries(selectedActivity.details).map(([key, value]) => (
                       <div key={key} className="flex justify-between">
@@ -713,7 +682,7 @@ export default function AdminDashboardPage() {
                 <Link href={`/claims/${selectedActivity.entityId}`}>
                   <Button className="w-full gap-2">
                     <ExternalLink className="h-4 w-4" />
-                    Otvori reklamaciju
+                    {t("admin.activity.openClaim")}
                   </Button>
                 </Link>
               )}
