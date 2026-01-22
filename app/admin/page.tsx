@@ -20,14 +20,41 @@ import {
   Server,
   CheckCircle,
   XCircle,
-  AlertCircle
+  Clock,
+  TrendingUp,
+  Building2,
+  FolderOpen,
+  Layers,
+  RefreshCw,
+  ExternalLink,
+  Circle
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { sr } from "date-fns/locale";
 
 interface SystemStats {
   totalUsers: number;
   activeUsers: number;
+  pendingApproval: number;
   totalClaims: number;
+  claimsByStatus: {
+    NEW: number;
+    IN_ANALYSIS: number;
+    APPROVED: number;
+    REJECTED: number;
+  };
   unreadEmails: number;
+  totalEmails: number;
+  totalCustomers: number;
+  totalAttachments: number;
+  totalDepartments: number;
+  recentActivity: {
+    id: string;
+    code: string | null;
+    status: string;
+    customer: string;
+    createdAt: string;
+  }[];
   emailConfigured: boolean;
   databaseStatus: string;
 }
@@ -38,6 +65,20 @@ interface Auth0User {
     roles?: string[] | string;
   };
 }
+
+const statusColors: Record<string, string> = {
+  NEW: "bg-blue-500",
+  IN_ANALYSIS: "bg-amber-500",
+  APPROVED: "bg-green-500",
+  REJECTED: "bg-red-500",
+};
+
+const statusLabels: Record<string, string> = {
+  NEW: "Novo",
+  IN_ANALYSIS: "U Obradi",
+  APPROVED: "Prihvaćeno",
+  REJECTED: "Odbijeno",
+};
 
 export default function AdminDashboardPage() {
   const { user, isLoading } = useUser();
@@ -82,13 +123,10 @@ export default function AdminDashboardPage() {
   if (isLoading || loading) {
     return (
       <div className="p-6 space-y-6">
-        {/* Header Skeleton */}
         <div className="space-y-2">
           <Skeleton className="h-10 w-48" />
           <Skeleton className="h-4 w-64" />
         </div>
-
-        {/* Stats Cards Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <Card key={i} className="p-6">
@@ -97,19 +135,19 @@ export default function AdminDashboardPage() {
             </Card>
           ))}
         </div>
-
-        {/* Admin Sections Skeleton */}
-        <div className="space-y-4">
-          <Skeleton className="h-7 w-40" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <Card key={i} className="p-6">
-                <Skeleton className="h-8 w-8 mb-4" />
-                <Skeleton className="h-6 w-32 mb-2" />
-                <Skeleton className="h-4 w-full" />
-              </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="p-6">
+            <Skeleton className="h-6 w-40 mb-4" />
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full mb-2" />
             ))}
-          </div>
+          </Card>
+          <Card className="p-6">
+            <Skeleton className="h-6 w-40 mb-4" />
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-10 w-full mb-2" />
+            ))}
+          </Card>
         </div>
       </div>
     );
@@ -127,6 +165,7 @@ export default function AdminDashboardPage() {
       href: "/admin/users",
       color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-500/10 border-blue-500/20",
+      badge: stats?.pendingApproval ? `${stats.pendingApproval} čeka` : undefined,
     },
     {
       title: "Radnici i Firme",
@@ -137,8 +176,8 @@ export default function AdminDashboardPage() {
       bgColor: "bg-orange-500/10 border-orange-500/20",
     },
     {
-      title: "Email status",
-      description: "Pregled i upravljanje email sinchronizacijom",
+      title: "Email postavke",
+      description: "Pregled i upravljanje email sinhronizacijom",
       icon: Mail,
       href: "/settings",
       color: "text-green-600 dark:text-green-400",
@@ -167,14 +206,18 @@ export default function AdminDashboardPage() {
             Upravljanje sistemom i korisnicima
           </p>
         </div>
+        <Button variant="outline" onClick={fetchStats} className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+          Osveži
+        </Button>
       </div>
 
-      {/* System Status Overview */}
+      {/* Main Stats */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="p-6 bg-gradient-to-br from-blue-500/5 to-blue-500/10 border-blue-500/20">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Ukupno korisnika</p>
+              <p className="text-sm font-medium text-muted-foreground">Korisnici</p>
               <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
             </div>
             <p className="text-4xl font-bold text-blue-600 dark:text-blue-400">
@@ -182,46 +225,175 @@ export default function AdminDashboardPage() {
             </p>
             <p className="text-sm text-muted-foreground mt-2">
               {stats.activeUsers} aktivnih
+              {stats.pendingApproval > 0 && (
+                <span className="text-amber-500 ml-2">• {stats.pendingApproval} čeka odobrenje</span>
+              )}
             </p>
           </Card>
 
           <Card className="p-6 bg-gradient-to-br from-green-500/5 to-green-500/10 border-green-500/20">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Ukupno reklamacija</p>
+              <p className="text-sm font-medium text-muted-foreground">Reklamacije</p>
               <FileText className="h-5 w-5 text-green-600 dark:text-green-400" />
             </div>
             <p className="text-4xl font-bold text-green-600 dark:text-green-400">
               {stats.totalClaims}
             </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              {stats.claimsByStatus.IN_ANALYSIS} u obradi
+            </p>
           </Card>
 
           <Card className="p-6 bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20">
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Nepročitane poruke</p>
+              <p className="text-sm font-medium text-muted-foreground">Email poruke</p>
               <Mail className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             </div>
             <p className="text-4xl font-bold text-amber-600 dark:text-amber-400">
               {stats.unreadEmails}
             </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              nepročitanih od {stats.totalEmails} ukupno
+            </p>
           </Card>
 
           <Card className={`p-6 ${stats.emailConfigured ? 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20' : 'bg-gradient-to-br from-red-500/5 to-red-500/10 border-red-500/20'}`}>
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground">Email status</p>
+              <p className="text-sm font-medium text-muted-foreground">Sistem</p>
               {stats.emailConfigured ? (
                 <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Badge variant={stats.emailConfigured ? "default" : "destructive"}>
-                {stats.emailConfigured ? "Konfigurisano" : "Nije konfigurisano"}
-              </Badge>
-            </div>
+            <Badge variant={stats.emailConfigured ? "default" : "destructive"} className="text-sm">
+              {stats.emailConfigured ? "Sve funkcioniše" : "Email nije konfigurisan"}
+            </Badge>
+            <p className="text-sm text-muted-foreground mt-2">
+              Baza: {stats.databaseStatus}
+            </p>
           </Card>
         </div>
       )}
+
+      {/* Middle Section - Activity & Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Activity */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Poslednja aktivnost
+            </h2>
+            <Link href="/claims">
+              <Button variant="ghost" size="sm" className="gap-1">
+                Sve reklamacije
+                <ExternalLink className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
+          <div className="space-y-3">
+            {stats?.recentActivity && stats.recentActivity.length > 0 ? (
+              stats.recentActivity.slice(0, 6).map((activity) => (
+                <Link key={activity.id} href={`/claims/${activity.id}`}>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-2 h-2 rounded-full ${statusColors[activity.status] || 'bg-gray-500'}`} />
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">
+                          {activity.code || "Nova reklamacija"}
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {activity.customer}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0 ml-2">
+                      <Badge variant="outline" className="text-xs">
+                        {statusLabels[activity.status] || activity.status}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {formatDistanceToNow(new Date(activity.createdAt), { 
+                          addSuffix: true, 
+                          locale: sr 
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <p className="text-muted-foreground text-center py-4">Nema nedavne aktivnosti</p>
+            )}
+          </div>
+        </Card>
+
+        {/* Database Stats */}
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <Layers className="h-5 w-5" />
+            Statistika baze
+          </h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <FileText className="h-5 w-5 text-green-500" />
+                <span>Reklamacije</span>
+              </div>
+              <span className="font-bold">{stats?.totalClaims || 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-blue-500" />
+                <span>Kupci</span>
+              </div>
+              <span className="font-bold">{stats?.totalCustomers || 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <Mail className="h-5 w-5 text-amber-500" />
+                <span>Email poruke</span>
+              </div>
+              <span className="font-bold">{stats?.totalEmails || 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <FolderOpen className="h-5 w-5 text-purple-500" />
+                <span>Prilozi</span>
+              </div>
+              <span className="font-bold">{stats?.totalAttachments || 0}</span>
+            </div>
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <Layers className="h-5 w-5 text-orange-500" />
+                <span>Odeljenja</span>
+              </div>
+              <span className="font-bold">{stats?.totalDepartments || 0}</span>
+            </div>
+          </div>
+
+          {/* Claims by Status */}
+          {stats?.claimsByStatus && (
+            <div className="mt-4 pt-4 border-t">
+              <h3 className="text-sm font-medium mb-3 text-muted-foreground">Reklamacije po statusu</h3>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(stats.claimsByStatus).map(([status, count]) => (
+                  <div key={status} className="flex items-center gap-2 p-2 rounded bg-muted/30">
+                    <Circle className={`h-3 w-3 fill-current ${
+                      status === 'NEW' ? 'text-blue-500' :
+                      status === 'IN_ANALYSIS' ? 'text-amber-500' :
+                      status === 'APPROVED' ? 'text-green-500' :
+                      'text-red-500'
+                    }`} />
+                    <span className="text-sm">{statusLabels[status]}</span>
+                    <span className="font-bold ml-auto">{count}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Card>
+      </div>
 
       {/* Admin Sections */}
       <div>
@@ -229,13 +401,20 @@ export default function AdminDashboardPage() {
           <Activity className="h-6 w-6" />
           Admin sekcije
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {adminSections.map((section) => (
-            <Link key={section.href} href={section.href}>
-              <Card className={`p-6 ${section.bgColor} hover:shadow-lg transition-all cursor-pointer group`}>
+            <Link key={section.href + section.title} href={section.href}>
+              <Card className={`p-6 ${section.bgColor} hover:shadow-lg transition-all cursor-pointer group h-full`}>
                 <div className="flex items-start justify-between mb-4">
                   <section.icon className={`h-8 w-8 ${section.color} group-hover:scale-110 transition-transform`} />
-                  <ArrowRight className={`h-5 w-5 ${section.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
+                  <div className="flex items-center gap-2">
+                    {section.badge && (
+                      <Badge variant="secondary" className="text-xs">
+                        {section.badge}
+                      </Badge>
+                    )}
+                    <ArrowRight className={`h-5 w-5 ${section.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
+                  </div>
                 </div>
                 <h3 className="text-lg font-semibold mb-2">{section.title}</h3>
                 <p className="text-sm text-muted-foreground">{section.description}</p>
@@ -252,8 +431,8 @@ export default function AdminDashboardPage() {
             <Server className="h-6 w-6" />
             Status sistema
           </h2>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Database className="h-5 w-5 text-muted-foreground" />
                 <span className="font-medium">Baza podataka</span>
@@ -263,15 +442,15 @@ export default function AdminDashboardPage() {
                 {stats.databaseStatus}
               </Badge>
             </div>
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-muted-foreground" />
-                <span className="font-medium">Email konfiguracija</span>
+                <span className="font-medium">Email</span>
               </div>
               {stats.emailConfigured ? (
                 <Badge variant="default" className="bg-green-500">
                   <CheckCircle className="h-3 w-3 mr-1" />
-                  Konfigurisano
+                  OK
                 </Badge>
               ) : (
                 <Badge variant="destructive">
@@ -279,6 +458,16 @@ export default function AdminDashboardPage() {
                   Nije konfigurisano
                 </Badge>
               )}
+            </div>
+            <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-3">
+                <Server className="h-5 w-5 text-muted-foreground" />
+                <span className="font-medium">API</span>
+              </div>
+              <Badge variant="default" className="bg-green-500">
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Online
+              </Badge>
             </div>
           </div>
         </Card>

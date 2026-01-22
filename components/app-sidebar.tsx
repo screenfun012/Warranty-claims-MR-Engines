@@ -78,7 +78,7 @@ const allNavigation: NavigationItemWithRole[] = [
   { name: "Claims", translationKey: "nav.claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
   { name: "Statistics", translationKey: "nav.statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
   { name: "Settings", translationKey: "nav.settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
-  { name: "Admin", translationKey: "nav.admin", href: "/admin/users", icon: Shield, minRole: "SUPER_ADMIN" },
+  { name: "Admin", translationKey: "nav.admin", href: "/admin", icon: Shield, minRole: "SUPER_ADMIN" },
 ];
 
 // Role hierarchy for permission checks
