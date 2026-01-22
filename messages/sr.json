@@ -248,6 +248,21 @@
       "add": "Dodaj nalaz",
       "noFindings": "Nema nalaza",
       "initialFinding": "Početno zapažanje"
+    },
+    "new": {
+      "required": {
+        "mrNumber": "MR Number je obavezno polje",
+        "engineType": "Tip motora je obavezno polje"
+      },
+      "error": {
+        "failed": "Neuspešno kreiranje reklamacije",
+        "invalidResponse": "Neuspešno kreiranje reklamacije: Nevažeći odgovor"
+      },
+      "customerNamePlaceholder": "Ime kupca (za domaće tržište)",
+      "selectDate": "Izaberi datum",
+      "initialFindingPlaceholder": "Početno zapažanje o reklamaciji (opcionalno, biće sačuvano u Findings tab)",
+      "creating": "Kreiranje...",
+      "createButton": "Kreiraj Reklamaciju"
     }
   },
   "statistics": {

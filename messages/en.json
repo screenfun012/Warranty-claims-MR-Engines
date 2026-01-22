@@ -248,6 +248,21 @@
       "add": "Add Finding",
       "noFindings": "No findings",
       "initialFinding": "Initial Finding"
+    },
+    "new": {
+      "required": {
+        "mrNumber": "MR Number is required",
+        "engineType": "Engine Type is required"
+      },
+      "error": {
+        "failed": "Failed to create claim",
+        "invalidResponse": "Failed to create claim: Invalid response"
+      },
+      "customerNamePlaceholder": "Customer name (for domestic market)",
+      "selectDate": "Select date",
+      "initialFindingPlaceholder": "Initial finding about the claim (optional, will be saved in Findings tab)",
+      "creating": "Creating...",
+      "createButton": "Create Claim"
     }
   },
   "statistics": {

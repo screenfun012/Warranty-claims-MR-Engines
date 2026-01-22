@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,12 +26,16 @@ const FALLBACK_COMPANY_LIST = [
 ];
 
 export default function NewClaimPage() {
+  const t = useTranslations();
   const [companies, setCompanies] = useState<string[]>([]);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [newCompany, setNewCompany] = useState("");
   const [showAddCompany, setShowAddCompany] = useState(false);
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  
+  // Helper to get status label
+  const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
 
   // Load companies from API
   useEffect(() => {
@@ -71,10 +76,10 @@ export default function NewClaimPage() {
     // Validate required fields - only MR Number and Engine Type are required
     const newErrors: Record<string, string> = {};
     if (!formData.claimCodeRaw.trim()) {
-      newErrors.claimCodeRaw = "MR Number is required";
+      newErrors.claimCodeRaw = t("claims.new.required.mrNumber");
     }
     if (!formData.engineType.trim()) {
-      newErrors.engineType = "Engine Type is required";
+      newErrors.engineType = t("claims.new.required.engineType");
     }
     
     if (Object.keys(newErrors).length > 0) {
@@ -109,15 +114,15 @@ export default function NewClaimPage() {
           window.dispatchEvent(new Event('claim-created'));
           router.push(`/claims/${data.claim.id}`);
         } else {
-          alert("Failed to create claim: Invalid response");
+          alert(t("claims.new.error.invalidResponse"));
         }
       } else {
         const errorData = await res.json();
-        alert("Failed to create claim: " + (errorData.error || "Unknown error"));
+        alert(t("claims.new.error.failed") + ": " + (errorData.error || t("common.error")));
       }
     } catch (error) {
       console.error("Error creating claim:", error);
-      alert("Failed to create claim");
+      alert(t("claims.new.error.failed"));
     } finally {
       setLoading(false);
     }
@@ -126,9 +131,9 @@ export default function NewClaimPage() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Nova Reklamacija</h1>
+        <h1 className="text-3xl font-bold">{t("claims.newClaim")}</h1>
         <Button variant="outline" onClick={() => router.push("/claims")}>
-          Otkaži
+          {t("common.cancel")}
         </Button>
       </div>
 
@@ -137,7 +142,7 @@ export default function NewClaimPage() {
           <div className="space-y-4">
             {/* MR Number - Required */}
             <div>
-              <Label>MR Number <span className="text-red-500">*</span></Label>
+              <Label>{t("claims.mrNumber")} <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.claimCodeRaw}
                 onChange={(e) => {
@@ -154,19 +159,19 @@ export default function NewClaimPage() {
 
             {/* Customer Number - Optional */}
             <div>
-              <Label>Customer Number</Label>
+              <Label>{t("claims.customerNumber")}</Label>
               <Input
                 value={formData.customerNumber}
                 onChange={(e) => {
                   setFormData({ ...formData, customerNumber: e.target.value });
                 }}
-                placeholder="Broj kupca"
+                placeholder={t("claims.customerNumber")}
               />
             </div>
 
             {/* Status */}
             <div>
-              <Label>Status</Label>
+              <Label>{t("common.status")}</Label>
               <Select
                 value={formData.status}
                 onValueChange={(value) => setFormData({ ...formData, status: value })}
@@ -175,27 +180,27 @@ export default function NewClaimPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NEW">Novo</SelectItem>
-                  <SelectItem value="IN_ANALYSIS">U Obradi</SelectItem>
-                  <SelectItem value="APPROVED">Prihvaćeno</SelectItem>
-                  <SelectItem value="REJECTED">Odbijeno</SelectItem>
+                  <SelectItem value="NEW">{getStatusLabel("NEW")}</SelectItem>
+                  <SelectItem value="IN_ANALYSIS">{getStatusLabel("IN_ANALYSIS")}</SelectItem>
+                  <SelectItem value="APPROVED">{getStatusLabel("APPROVED")}</SelectItem>
+                  <SelectItem value="REJECTED">{getStatusLabel("REJECTED")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             {/* Customer Name - Optional (for domestic market) */}
             <div>
-              <Label>Customer Name</Label>
+              <Label>{t("claims.metadata.customerName")}</Label>
               <Input
                 value={formData.customerName}
                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                placeholder="Ime kupca (za domaće tržište)"
+                placeholder={t("claims.new.customerNamePlaceholder")}
               />
             </div>
 
             {/* Customer Company - Optional */}
             <div>
-              <Label>Customer Company</Label>
+              <Label>{t("claims.metadata.customerCompany")}</Label>
               <Select
                 value={formData.customerCompany}
                 onValueChange={(value) => {
@@ -207,7 +212,7 @@ export default function NewClaimPage() {
                 }}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select company" />
+                  <SelectValue placeholder={t("claims.metadata.selectCompany")} />
                 </SelectTrigger>
                 <SelectContent>
                   {companies.map((company) => (
@@ -220,7 +225,7 @@ export default function NewClaimPage() {
                     className="text-primary font-medium"
                   >
                     <Plus className="h-4 w-4 inline mr-2" />
-                    Dodaj novu kompaniju
+                    {t("claims.metadata.addCompany")}
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -228,15 +233,15 @@ export default function NewClaimPage() {
                 <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Dodaj novu kompaniju</DialogTitle>
+                      <DialogTitle>{t("claims.metadata.addCompany")}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
                       <div>
-                        <Label>Naziv kompanije</Label>
+                        <Label>{t("claims.metadata.companyName")}</Label>
                         <Input
                           value={newCompany}
                           onChange={(e) => setNewCompany(e.target.value)}
-                          placeholder="Unesi naziv kompanije"
+                          placeholder={t("claims.metadata.enterCompanyName")}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && newCompany.trim()) {
                               const trimmed = newCompany.trim();
@@ -255,7 +260,7 @@ export default function NewClaimPage() {
                           setShowAddCompany(false);
                           setNewCompany("");
                         }}>
-                          Otkaži
+                          {t("common.cancel")}
                         </Button>
                         <Button 
                           onClick={() => {
@@ -269,7 +274,7 @@ export default function NewClaimPage() {
                           }}
                           disabled={!newCompany.trim() || companies.includes(newCompany.trim())}
                         >
-                          Dodaj
+                          {t("common.add")}
                         </Button>
                       </div>
                     </div>
@@ -280,24 +285,24 @@ export default function NewClaimPage() {
 
             {/* Date Engine Done - Optional */}
             <div>
-              <Label>Date Engine Done</Label>
+              <Label>{t("claims.dateEngineDone")}</Label>
               <DatePicker
                 date={formData.dateEngineDone}
                 onSelect={(date) => setFormData({ ...formData, dateEngineDone: date })}
-                placeholder="Izaberi datum"
+                placeholder={t("claims.new.selectDate")}
               />
             </div>
 
             {/* Engine Type - Required */}
             <div>
-              <Label>Engine Type <span className="text-red-500">*</span></Label>
+              <Label>{t("claims.engineType")} <span className="text-red-500">*</span></Label>
               <Input
                 value={formData.engineType}
                 onChange={(e) => {
                   setFormData({ ...formData, engineType: e.target.value });
                   if (errors.engineType) setErrors({ ...errors, engineType: "" });
                 }}
-                placeholder="Tip motora"
+                placeholder={t("claims.engineType")}
                 className={errors.engineType ? "border-red-500" : ""}
               />
               {errors.engineType && (
@@ -307,21 +312,21 @@ export default function NewClaimPage() {
 
             {/* Initial Finding - Optional */}
             <div>
-              <Label>Početno Zapažanje</Label>
+              <Label>{t("claims.findings.initialFinding")}</Label>
               <Textarea
                 value={formData.initialFinding}
                 onChange={(e) => setFormData({ ...formData, initialFinding: e.target.value })}
-                placeholder="Početno zapažanje o reklamaciji (opcionalno, biće sačuvano u Findings tab)"
+                placeholder={t("claims.new.initialFindingPlaceholder")}
                 rows={4}
               />
             </div>
 
             <div className="flex gap-2 pt-4">
               <Button type="submit" disabled={loading}>
-                {loading ? "Kreiranje..." : "Kreiraj Reklamaciju"}
+                {loading ? t("claims.new.creating") : t("claims.new.createButton")}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.push("/claims")}>
-                Otkaži
+                {t("common.cancel")}
               </Button>
             </div>
           </div>
