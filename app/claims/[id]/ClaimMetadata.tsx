@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -107,6 +108,7 @@ function hasMinRole(userRole: string | undefined, minRole: string): boolean {
 
 export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMetadataProps) {
   const { user } = useUser();
+  const t = useTranslations();
   const auth0User = user as any;
   const userRole = auth0User?.['https://mr-engines-warranty/roles']?.[0] || auth0User?.role || "VIEWER";
   const canManageDepartments = hasMinRole(userRole, "ADMIN");
@@ -256,11 +258,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         onUpdate({ faultDepartmentIds: newIds });
       } else {
         const errorData = await res.json();
-        alert("Failed to add department: " + (errorData.error || "Unknown error"));
+        alert(t("claims.metadata.addDepartmentError") + ": " + (errorData.error || t("common.error")));
       }
     } catch (error) {
       console.error("Error adding department:", error);
-      alert("Failed to add department");
+      alert(t("claims.metadata.addDepartmentError"));
     } finally {
       setAddingDepartment(false);
     }
@@ -280,12 +282,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Greška pri slanju emaila");
+        throw new Error(error.error || t("claims.metadata.email.error"));
       }
       
       setNotificationSent(true);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Greška pri slanju emaila");
+      alert(error instanceof Error ? error.message : t("claims.metadata.email.error"));
       setNotificationSent(false);
     } finally {
       setIsSendingNotification(false);
@@ -517,14 +519,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     <Card className="p-4 sm:p-6 overflow-hidden">
       <h2 className="text-lg font-semibold mb-6 text-primary flex items-center gap-2">
         <Settings className="h-5 w-5" />
-        Metadata
+        {t("claims.tabs.metadata")}
       </h2>
       <div className="space-y-4 overflow-hidden">
         {/* MR Number - Required */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Hash className="h-4 w-4 text-muted-foreground" />
-            MR Number <span className="text-red-500">*</span>
+            {t("claims.mrNumber")} <span className="text-red-500">*</span>
           </Label>
           <Input
             value={claimCode}
@@ -556,17 +558,17 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 {isSendingNotification ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Slanje...
+                    {t("claims.metadata.email.sending")}
                   </>
                 ) : notificationSent ? (
                   <>
                     <CheckCircle2 className="h-4 w-4" />
-                    Obaveštenje poslato
+                    {t("claims.metadata.email.sent")}
                   </>
                 ) : (
                   <>
                     <Mail className="h-4 w-4" />
-                    Potvrdi i pošalji obaveštenje klijentu
+                    {t("claims.metadata.email.sendNotification")}
                   </>
                 )}
               </label>
@@ -578,14 +580,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Hash className="h-4 w-4 text-muted-foreground" />
-            Customer Number
+            {t("claims.customerNumber")}
           </Label>
           <Input
             value={customerNumber}
             onChange={(e) => setCustomerNumber(e.target.value)}
             onFocus={() => setEditingField('customerNumber')}
             onBlur={(e) => handleFieldBlur('customerNumber', e.target.value)}
-            placeholder="Customer number"
+            placeholder={t("claims.customerNumber")}
             disabled={isReadOnly}
             className="h-9"
           />
@@ -595,11 +597,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            Customer Name
+            {t("claims.metadata.customerName")}
           </Label>
           <Input
             value={customerName}
-            placeholder="Customer name"
+            placeholder={t("claims.metadata.customerName")}
             disabled={isReadOnly}
             onFocus={() => setEditingField('customerName')}
             onChange={(e) => setCustomerName(e.target.value)}
@@ -612,7 +614,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            Customer Company <span className="text-red-500">*</span>
+            {t("claims.metadata.customerCompany")} <span className="text-red-500">*</span>
           </Label>
           <Select
             value={customerCompany}
@@ -627,7 +629,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             disabled={isReadOnly}
           >
             <SelectTrigger className="h-9">
-              <SelectValue placeholder="Select company" />
+              <SelectValue placeholder={t("claims.metadata.selectCompany")} />
             </SelectTrigger>
             <SelectContent>
               {companies.map((company) => (
@@ -640,7 +642,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 className="text-primary font-medium"
               >
                 <Plus className="h-4 w-4 inline mr-2" />
-                Dodaj novu kompaniju
+                {t("claims.metadata.addCompany")}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -648,15 +650,15 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             <Dialog open={showAddCompany} onOpenChange={setShowAddCompany}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Dodaj novu kompaniju</DialogTitle>
+                  <DialogTitle>{t("claims.metadata.addCompany")}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label>Naziv kompanije</Label>
+                    <Label>{t("claims.metadata.companyName")}</Label>
                     <Input
                       value={newCompany}
                       onChange={(e) => setNewCompany(e.target.value)}
-                      placeholder="Unesi naziv kompanije"
+                      placeholder={t("claims.metadata.enterCompanyName")}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && newCompany.trim()) {
                           const trimmed = newCompany.trim();
@@ -676,7 +678,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                       setShowAddCompany(false);
                       setNewCompany("");
                     }}>
-                      Otkaži
+                      {t("common.cancel")}
                     </Button>
                     <Button 
                       onClick={() => {
@@ -691,7 +693,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                       }}
                       disabled={!newCompany.trim() || companies.includes(newCompany.trim())}
                     >
-                      Dodaj
+                      {t("common.add")}
                     </Button>
                   </div>
                 </div>
@@ -702,7 +704,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
 
         {/* Engine Type */}
         <div>
-          <Label className="text-sm font-medium mb-2">Engine Type</Label>
+          <Label className="text-sm font-medium mb-2">{t("claims.engineType")}</Label>
           <Input
             value={engineType}
             onChange={(e) => setEngineType(e.target.value)}
@@ -715,13 +717,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
 
         {/* Engine Code */}
         <div>
-          <Label className="text-sm font-medium mb-2">Engine Code</Label>
+          <Label className="text-sm font-medium mb-2">{t("claims.engineCode")}</Label>
           <Input
             value={engineCode}
             onChange={(e) => setEngineCode(e.target.value)}
             onFocus={() => setEditingField('mrEngineCode')}
             onBlur={(e) => handleFieldBlur('mrEngineCode', e.target.value)}
-            placeholder="Engine code"
+            placeholder={t("claims.engineCode")}
             disabled={isReadOnly}
             className="h-9"
           />
@@ -731,7 +733,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <User className="h-4 w-4 text-muted-foreground" />
-            Assigned Worker (Ko je radio motor)
+            {t("claims.metadata.assignedWorker")}
           </Label>
           <Select
             value={assignedWorkerName}
@@ -746,7 +748,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             disabled={isReadOnly}
           >
             <SelectTrigger className="h-9">
-              <SelectValue placeholder="Select worker" />
+              <SelectValue placeholder={t("claims.metadata.selectWorker")} />
             </SelectTrigger>
             <SelectContent>
               {workers.map((worker) => (
@@ -759,7 +761,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 className="text-primary font-medium"
               >
                 <Plus className="h-4 w-4 inline mr-2" />
-                Dodaj novog radnika
+                {t("claims.metadata.addWorker")}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -767,15 +769,15 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             <Dialog open={showAddWorker} onOpenChange={setShowAddWorker}>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Dodaj novog radnika</DialogTitle>
+                  <DialogTitle>{t("claims.metadata.addWorker")}</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div>
-                    <Label>Ime i prezime radnika</Label>
+                    <Label>{t("claims.metadata.workerName")}</Label>
                     <Input
                       value={newWorker}
                       onChange={(e) => setNewWorker(e.target.value)}
-                      placeholder="Unesi ime i prezime"
+                      placeholder={t("claims.metadata.enterWorkerName")}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && newWorker.trim()) {
                           const trimmed = newWorker.trim();
@@ -795,7 +797,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                       setShowAddWorker(false);
                       setNewWorker("");
                     }}>
-                      Otkaži
+                      {t("common.cancel")}
                     </Button>
                     <Button 
                       onClick={() => {
@@ -810,7 +812,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                       }}
                       disabled={!newWorker.trim() || workers.includes(newWorker.trim())}
                     >
-                      Dodaj
+                      {t("common.add")}
                     </Button>
                   </div>
                 </div>
@@ -821,7 +823,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
 
         {/* Fault Department - Multi-select */}
         <div>
-          <Label className="text-sm font-medium mb-2">Fault Department</Label>
+          <Label className="text-sm font-medium mb-2">{t("claims.metadata.faultDepartment")}</Label>
           <div className="flex gap-2 min-w-0">
             <MultiSelect
               options={departments.map((dept) => ({ value: dept.id, label: dept.name }))}
@@ -831,7 +833,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 // Update claim with multiple departments
                 onUpdate({ faultDepartmentIds: selected });
               }}
-              placeholder="Select departments..."
+              placeholder={t("claims.metadata.selectDepartments")}
               disabled={isReadOnly || loadingDepartments}
               className="flex-1 min-w-0"
             />
@@ -844,15 +846,15 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Add New Department</DialogTitle>
+                    <DialogTitle>{t("claims.metadata.addDepartment")}</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
                     <div>
-                      <Label>Department Name</Label>
+                      <Label>{t("claims.metadata.departmentName")}</Label>
                       <Input
                         value={newDepartmentName}
                         onChange={(e) => setNewDepartmentName(e.target.value)}
-                        placeholder="Enter department name"
+                        placeholder={t("claims.metadata.enterDepartmentName")}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !addingDepartment) {
                             handleAddDepartment();
@@ -862,10 +864,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" onClick={() => setShowAddDepartment(false)}>
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                       <Button onClick={handleAddDepartment} disabled={!newDepartmentName.trim() || addingDepartment}>
-                        {addingDepartment ? "Adding..." : "Add"}
+                        {addingDepartment ? t("common.loading") : t("common.add")}
                       </Button>
                     </div>
                   </div>
@@ -877,13 +879,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
 
         {/* Worker Fault */}
         <div>
-          <Label className="text-sm font-medium mb-2">Worker Fault</Label>
+          <Label className="text-sm font-medium mb-2">{t("claims.metadata.workerFault")}</Label>
           <Input
             value={workerFault}
             onChange={(e) => setWorkerFault(e.target.value)}
             onFocus={() => setEditingField('workerFault')}
             onBlur={(e) => handleFieldBlur('workerFault', e.target.value)}
-            placeholder="Worker responsible for fault"
+            placeholder={t("claims.metadata.workerFault")}
             disabled={isReadOnly}
             className="h-9"
           />
@@ -893,7 +895,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            Date Engine Done
+            {t("claims.dateEngineDone")}
           </Label>
           <DatePicker
             date={dateEngineDone}
@@ -906,7 +908,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               }
               onUpdate(updates);
             }}
-            placeholder="Select date"
+            placeholder={t("common.select") + " " + t("common.date")}
             disabled={isReadOnly}
           />
         </div>
@@ -915,7 +917,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            Claim Arrival Date
+            {t("claims.claimArrivalDate")}
           </Label>
           <DatePicker
             date={claimArrivalDate}
@@ -928,7 +930,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               }
               onUpdate(updates);
             }}
-            placeholder="Select date"
+            placeholder={t("common.select") + " " + t("common.date")}
             disabled={isReadOnly}
           />
         </div>
@@ -937,14 +939,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
-            Reason
+            {t("claims.metadata.reason")}
           </Label>
           <Textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             onFocus={() => setEditingField('reason')}
             onBlur={(e) => handleFieldBlur('reason', e.target.value)}
-            placeholder="Short reason for the claim"
+            placeholder={t("claims.metadata.reasonPlaceholder")}
             disabled={isReadOnly}
             rows={3}
             className="resize-y"
@@ -960,7 +962,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             disabled={isReadOnly}
           />
           <Label htmlFor="isDomesticMarket" className="text-sm font-medium cursor-pointer">
-            Domestic Market
+            {t("claims.metadata.domesticMarket")}
           </Label>
         </div>
 
@@ -969,7 +971,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           <div>
             <Label className="text-sm font-medium flex items-center gap-2 mb-2">
               <FolderOpen className="h-4 w-4 text-muted-foreground" />
-              Server Folder Path
+              {t("claims.metadata.serverFolderPath")}
             </Label>
             <Input value={claim.serverFolderPath} disabled className="h-9" />
           </div>

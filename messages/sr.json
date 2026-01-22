@@ -190,17 +190,31 @@
       "workerFault": "Greška radnika",
       "yearEngineDone": "Godina izrade motora",
       "reason": "Razlog",
+      "reasonPlaceholder": "Kratak razlog za reklamaciju",
       "domesticMarket": "Domaće tržište",
       "internationalMarket": "Strano tržište",
       "addDepartment": "Dodaj odeljenje",
+      "addDepartmentError": "Greška pri dodavanju odeljenja",
       "newDepartment": "Novo odeljenje",
       "departmentName": "Naziv odeljenja",
-      "assignedWorker": "Zaduženi radnik",
+      "enterDepartmentName": "Unesi naziv odeljenja",
+      "assignedWorker": "Zaduženi radnik (Ko je radio motor)",
       "addWorker": "Dodaj radnika",
+      "workerName": "Ime i prezime radnika",
+      "enterWorkerName": "Unesi ime i prezime",
       "addCompany": "Dodaj firmu",
+      "companyName": "Naziv kompanije",
+      "enterCompanyName": "Unesi naziv kompanije",
       "selectWorker": "Izaberi radnika",
       "selectCompany": "Izaberi firmu",
-      "selectDepartments": "Izaberi odeljenja"
+      "selectDepartments": "Izaberi odeljenja",
+      "serverFolderPath": "Putanja foldera na serveru",
+      "email": {
+        "error": "Greška pri slanju emaila",
+        "sending": "Slanje...",
+        "sent": "Obaveštenje poslato",
+        "sendNotification": "Potvrdi i pošalji obaveštenje klijentu"
+      }
     },
     "delete": {
       "title": "Brisanje reklamacije",

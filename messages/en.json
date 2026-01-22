@@ -190,17 +190,31 @@
       "workerFault": "Worker Fault",
       "yearEngineDone": "Year Engine Done",
       "reason": "Reason",
+      "reasonPlaceholder": "Short reason for the claim",
       "domesticMarket": "Domestic Market",
       "internationalMarket": "International Market",
       "addDepartment": "Add Department",
+      "addDepartmentError": "Failed to add department",
       "newDepartment": "New Department",
       "departmentName": "Department Name",
-      "assignedWorker": "Assigned Worker",
+      "enterDepartmentName": "Enter department name",
+      "assignedWorker": "Assigned Worker (Who worked on engine)",
       "addWorker": "Add Worker",
+      "workerName": "Worker Full Name",
+      "enterWorkerName": "Enter full name",
       "addCompany": "Add Company",
+      "companyName": "Company Name",
+      "enterCompanyName": "Enter company name",
       "selectWorker": "Select worker",
       "selectCompany": "Select company",
-      "selectDepartments": "Select departments"
+      "selectDepartments": "Select departments",
+      "serverFolderPath": "Server Folder Path",
+      "email": {
+        "error": "Error sending email",
+        "sending": "Sending...",
+        "sent": "Notification sent",
+        "sendNotification": "Confirm and send notification to client"
+      }
     },
     "delete": {
       "title": "Delete Claim",
