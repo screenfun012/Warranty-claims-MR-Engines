@@ -20,6 +20,15 @@ import { Toaster } from "sonner";
 export const metadata: Metadata = {
   title: "MR Engines – Warranty Claims",
   description: "Warranty claims management system for MR Engines",
+  icons: {
+    icon: [
+      { url: "/images/mr-engines-logo-icon.png", type: "image/png" },
+      { url: "/images/mr-engines-icon.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/images/mr-engines-logo-icon.png", type: "image/png" },
+    ],
+  },
 };
 
 async function getMessages(locale: Locale) {
