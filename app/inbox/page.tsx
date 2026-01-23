@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2 } from "lucide-react";
+import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -287,12 +287,15 @@ export default function InboxPage() {
 
         <Card className="p-4 mb-6">
           <Label>{t("common.search")}</Label>
-          <Input
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder={t("inbox.searchPlaceholder")}
-            className="mt-2"
-          />
+          <div className="relative mt-2">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder={t("inbox.searchPlaceholder")}
+              className="pl-9"
+            />
+          </div>
         </Card>
 
         {selectedThread ? (

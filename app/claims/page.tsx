@@ -644,11 +644,9 @@ export default function ClaimsPage() {
             </div>
           </div>
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "100ms" }}>
-            <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-              <Search className="h-3.5 w-3.5 text-muted-foreground" />
-              {t("claims.mrNumber")}
-            </label>
+            <label className="text-sm font-medium mb-2 block">{t("claims.mrNumber")}</label>
             <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
               <Input
                 placeholder={t("claims.filters.searchByCode")}
                 value={textFilters.claimCode}
@@ -667,7 +665,7 @@ export default function ClaimsPage() {
                     setShowClaimCodeSuggestions(false);
                   }
                 }}
-                className="h-9 min-h-[36px] transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-9 min-h-[36px] pl-9 transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               {showClaimCodeSuggestions && claimCodeSuggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
@@ -689,11 +687,9 @@ export default function ClaimsPage() {
             </div>
           </div>
           <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "200ms" }}>
-            <label className="text-sm font-medium mb-2 block flex items-center gap-2">
-              <Search className="h-3.5 w-3.5 text-muted-foreground" />
-              {t("claims.customer")}
-            </label>
+            <label className="text-sm font-medium mb-2 block">{t("claims.customer")}</label>
             <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
               <Input
                 placeholder={t("claims.filters.searchByCustomer")}
                 value={textFilters.customerId}
@@ -712,7 +708,7 @@ export default function ClaimsPage() {
                     setShowCustomerSuggestions(false);
                   }
                 }}
-                className="h-9 min-h-[36px] transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-9 min-h-[36px] pl-9 transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
               {showCustomerSuggestions && customerSuggestions.length > 0 && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-60 overflow-auto">
