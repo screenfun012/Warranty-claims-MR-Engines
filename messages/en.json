@@ -190,6 +190,13 @@
       "claims": "claims",
       "clearAll": "Clear all filters"
     },
+    "pagination": {
+      "showing": "Showing",
+      "of": "of",
+      "claims": "claims",
+      "page": "Page",
+      "perPage": "Per page"
+    },
     "list": {
       "title": "Claims List",
       "count": "claims",

@@ -21,6 +21,11 @@ export async function GET(request: NextRequest) {
     const statusParams = searchParams.getAll("status"); // Get all status values for multi-select
     const claimCode = searchParams.get("claimCode");
     const customerName = searchParams.get("customerId"); // Keep param name for backward compatibility
+    
+    // Pagination parameters
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const offset = (page - 1) * limit;
 
     const where: any = {};
     // Handle multi-select status filter
@@ -95,51 +100,93 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    let claims = await prisma.claim.findMany({
-      where,
-      include: {
-        customer: true,
-        assignedTo: {
-          select: {
-            id: true,
-            fullName: true,
-            email: true,
+    // For search queries with Serbian characters, we need to fetch all and filter in memory
+    // Then apply pagination manually
+    const needsMemoryFilter = !!claimCode;
+    
+    let claims;
+    let total;
+    
+    if (needsMemoryFilter) {
+      // Fetch all matching claims for memory filtering
+      let allClaims = await prisma.claim.findMany({
+        where,
+        include: {
+          customer: true,
+          assignedTo: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
 
-    // Apply Serbian Latin normalization filter for claimCode if provided
-    if (claimCode) {
+      // Apply Serbian Latin normalization filter for claimCode
       const normalizedClaimCode = normalizeSerbianLatin(claimCode);
-      claims = claims.filter(claim => 
+      allClaims = allClaims.filter(claim => 
         normalizeSerbianLatin(claim.claimCodeRaw || "").includes(normalizedClaimCode)
       );
+      
+      total = allClaims.length;
+      // Apply pagination manually
+      claims = allClaims.slice(offset, offset + limit);
+    } else {
+      // Use database pagination
+      [claims, total] = await Promise.all([
+        prisma.claim.findMany({
+          where,
+          include: {
+            customer: true,
+            assignedTo: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: "desc",
+          },
+          skip: offset,
+          take: limit,
+        }),
+        prisma.claim.count({ where }),
+      ]);
     }
 
-    // Log to verify claimAcceptanceStatus is being returned
-    if (claims.length > 0) {
-      console.log(`[GET /api/claims] Returning ${claims.length} claims. Sample claimAcceptanceStatus:`, claims[0].claimAcceptanceStatus);
-      
-      // If claimAcceptanceStatus is not being returned, explicitly fetch it using raw query
-      for (const claim of claims) {
-        if (claim.claimAcceptanceStatus === undefined) {
-          const statusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
-            `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
-            claim.id
-          );
-          if (statusResult && statusResult.length > 0) {
-            (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
-            console.log(`[GET /api/claims] Fetched claimAcceptanceStatus from DB for claim ${claim.id}:`, statusResult[0].claimAcceptanceStatus);
-          }
+    // If claimAcceptanceStatus is not being returned, explicitly fetch it using raw query
+    for (const claim of claims) {
+      if (claim.claimAcceptanceStatus === undefined) {
+        const statusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
+          `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
+          claim.id
+        );
+        if (statusResult && statusResult.length > 0) {
+          (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
         }
       }
     }
 
-    return NextResponse.json({ claims });
+    // Calculate pagination info
+    const totalPages = Math.ceil(total / limit);
+
+    return NextResponse.json({ 
+      claims,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      }
+    });
   } catch (error) {
     console.error("Error fetching claims:", error);
     const permError = createPermissionError(error);

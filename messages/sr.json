@@ -188,6 +188,13 @@
       "claims": "reklamacija",
       "clearAll": "Obriši sve filtere"
     },
+    "pagination": {
+      "showing": "Prikazano",
+      "of": "od",
+      "claims": "reklamacija",
+      "page": "Stranica",
+      "perPage": "Po stranici"
+    },
     "list": {
       "title": "Lista reklamacija",
       "count": "reklamacija",

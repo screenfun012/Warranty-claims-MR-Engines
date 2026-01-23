@@ -10,7 +10,7 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock } from "lucide-react";
+import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
@@ -52,6 +52,15 @@ interface Claim {
   workerFault: string | null; // Worker at fault
   claimArrivalDate: string | null;
   createdAt: string;
+}
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
 }
 
 // Status badge component with icons - unified status system
@@ -132,6 +141,9 @@ export default function ClaimsPage() {
     customerId: "",
     urgentOnly: false, // Filter for urgent claims (NEW or IN_ANALYSIS older than 7 days)
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   // Separate state for text inputs to allow debouncing
@@ -146,20 +158,30 @@ export default function ClaimsPage() {
   const [customerSuggestions, setCustomerSuggestions] = useState<string[]>([]);
 
   // Fetch claims data function for React Query
-  const fetchClaimsData = useCallback(async (filters: { status: string[]; claimCode?: string; customerId?: string; urgentOnly?: boolean }, showAll = false) => {
+  const fetchClaimsData = useCallback(async (
+    filters: { status: string[]; claimCode?: string; customerId?: string; urgentOnly?: boolean },
+    page: number,
+    limit: number,
+    showAll = false
+  ) => {
     const params = new URLSearchParams();
     
-    // If showing all, only apply status filter for suggestions
+    // If showing all, only apply status filter for suggestions (no pagination)
     if (showAll) {
       if (filters.status.length > 0) {
         filters.status.forEach(s => params.append("status", s));
       }
+      // For suggestions, fetch more items
+      params.append("limit", "100");
     } else {
       if (filters.status.length > 0) {
         filters.status.forEach(s => params.append("status", s));
       }
       if (filters.claimCode) params.append("claimCode", filters.claimCode);
       if (filters.customerId) params.append("customerId", filters.customerId);
+      // Add pagination
+      params.append("page", page.toString());
+      params.append("limit", limit.toString());
     }
 
     const res = await fetch(`/api/claims?${params.toString()}`);
@@ -167,29 +189,48 @@ export default function ClaimsPage() {
       throw new Error("Failed to fetch claims");
     }
     const data = await res.json();
-    return data.claims || [];
+    return {
+      claims: data.claims || [],
+      pagination: data.pagination || null,
+    };
   }, []);
 
   // React Query for filtered claims (displayed in table)
-  const { data: claims = [], isLoading: loading, refetch: refetchClaims } = useQuery({
-    queryKey: ['claims', 'filtered', filters.status, filters.claimCode, filters.customerId],
-    queryFn: () => fetchClaimsData({ ...filters, claimCode: filters.claimCode || textFilters.claimCode, customerId: filters.customerId || textFilters.customerId }, false),
+  const { data: claimsData, isLoading: loading, refetch: refetchClaims } = useQuery({
+    queryKey: ['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, currentPage, pageSize],
+    queryFn: async () => {
+      const result = await fetchClaimsData(
+        { ...filters, claimCode: filters.claimCode || textFilters.claimCode, customerId: filters.customerId || textFilters.customerId },
+        currentPage,
+        pageSize,
+        false
+      );
+      // Update pagination state
+      if (result.pagination) {
+        setPagination(result.pagination);
+      }
+      return result.claims;
+    },
     staleTime: 30 * 1000, // 30 seconds - data stays fresh
     gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
   });
+  
+  const claims = claimsData || [];
 
   // React Query for all claims (used for suggestions)
-  const { data: allClaims = [], refetch: refetchAllClaims } = useQuery({
+  const { data: allClaimsData, refetch: refetchAllClaims } = useQuery({
     queryKey: ['claims', 'all', filters.status],
-    queryFn: () => fetchClaimsData({ ...filters }, true),
+    queryFn: () => fetchClaimsData({ ...filters }, 1, 100, true),
     staleTime: 60 * 1000, // 60 seconds - suggestions don't need to be as fresh
     gcTime: 5 * 60 * 1000,
   });
+  
+  const allClaims = allClaimsData?.claims || [];
 
   // Helper function to update claims in React Query cache
   const updateClaimInCache = useCallback((claimId: string, updates: Partial<Claim>) => {
     // Update filtered claims cache - use functional update to ensure React detects change
-    queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId], (old) => {
+    queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, currentPage, pageSize], (old) => {
       if (!old) return old;
       const updated = old.map(c => c.id === claimId ? { ...c, ...updates } : c);
       // Force re-render by creating new array reference
@@ -197,11 +238,10 @@ export default function ClaimsPage() {
     });
     
     // Update all claims cache (for suggestions)
-    queryClient.setQueryData<Claim[]>(['claims', 'all', filters.status], (old) => {
+    queryClient.setQueryData<{ claims: Claim[]; pagination: PaginationInfo | null }>(['claims', 'all', filters.status], (old) => {
       if (!old) return old;
-      const updated = old.map(c => c.id === claimId ? { ...c, ...updates } : c);
-      // Force re-render by creating new array reference
-      return [...updated];
+      const updated = old.claims.map(c => c.id === claimId ? { ...c, ...updates } : c);
+      return { ...old, claims: [...updated] };
     });
     
     // Also invalidate other possible filter combinations to ensure consistency
@@ -211,7 +251,7 @@ export default function ClaimsPage() {
     setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ['claims', 'filtered'] });
     }, 0);
-  }, [queryClient, filters]);
+  }, [queryClient, filters, currentPage, pageSize]);
 
   // Legacy fetchClaims function for backward compatibility (now just calls refetch)
   const fetchClaims = useCallback(async (showAll = false, customFilters?: { claimCode?: string; customerId?: string }) => {
@@ -728,6 +768,7 @@ export default function ClaimsPage() {
                 setTextFilters({ claimCode: "", customerId: "" });
                 setShowClaimCodeSuggestions(false);
                 setShowCustomerSuggestions(false);
+                setCurrentPage(1); // Reset to first page when clearing filters
               }}
               className="h-8"
             >
@@ -849,6 +890,88 @@ export default function ClaimsPage() {
           onRowClick={(row, index) => router.push(`/claims/${displayClaims[index].id}`)}
         />
       </Card>
+
+      {/* Pagination */}
+      {pagination && pagination.totalPages > 1 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {t("claims.pagination.showing")} <span className="font-medium">{((currentPage - 1) * pageSize) + 1}</span> - <span className="font-medium">{Math.min(currentPage * pageSize, pagination.total)}</span> {t("claims.pagination.of")} <span className="font-medium">{pagination.total}</span> {t("claims.pagination.claims")}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Page size selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{t("claims.pagination.perPage")}:</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value));
+                    setCurrentPage(1); // Reset to first page when changing page size
+                  }}
+                >
+                  <SelectTrigger className="w-[70px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Page navigation */}
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={!pagination.hasPrev}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <div className="flex items-center gap-1 px-2">
+                  <span className="text-sm">
+                    {t("claims.pagination.page")} <span className="font-medium">{currentPage}</span> {t("claims.pagination.of")} <span className="font-medium">{pagination.totalPages}</span>
+                  </span>
+                </div>
+                
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(prev => Math.min(pagination.totalPages, prev + 1))}
+                  disabled={!pagination.hasNext}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(pagination.totalPages)}
+                  disabled={currentPage === pagination.totalPages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog
