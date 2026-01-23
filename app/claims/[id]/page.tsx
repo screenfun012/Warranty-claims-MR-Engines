@@ -245,6 +245,7 @@ export default function ClaimDetailPage() {
       
       // Make API call for all updates
       try {
+          console.log('[updateClaim] Sending update to API:', updateData);
           const res = await fetch(`/api/claims/${claimId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
@@ -252,26 +253,37 @@ export default function ClaimDetailPage() {
           });
 
           if (!res.ok) {
-            console.error('[updateClaim] API error:', res.status);
+            const errorText = await res.text();
+            console.error('[updateClaim] API error:', res.status, errorText);
             // Revert optimistic update on error
             if (previousClaim) {
               queryClient.setQueryData(['claim', claimId], previousClaim);
             }
+            // Show user-friendly error
+            alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
             throw new Error(`API error: ${res.status}`);
           }
 
           const data = await res.json();
+          console.log('[updateClaim] API response:', data);
           if (data.claim) {
             queryClient.setQueryData(['claim', claimId], data.claim);
             // Invalidate statistics cache so it reflects the updated claim
             // This ensures faultDepartments changes appear in the statistics tab
             queryClient.invalidateQueries({ queryKey: ['statistics'] });
+            console.log('[updateClaim] Cache updated and statistics invalidated');
+          } else {
+            console.warn('[updateClaim] No claim in response:', data);
           }
         } catch (error) {
           console.error("Error saving claim update:", error);
           // Revert optimistic update on error
           if (previousClaim) {
             queryClient.setQueryData(['claim', claimId], previousClaim);
+          }
+          // Show user-friendly error if not already shown
+          if (error instanceof Error && !error.message.includes('API error')) {
+            alert(`Greška pri čuvanju: ${error.message}`);
           }
         }
     } catch (error) {
