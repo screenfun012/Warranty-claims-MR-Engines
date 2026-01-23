@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { auth0 } from "@/lib/auth0";
+import { getUserRoles } from "@/lib/auth0-management";
 
 /**
  * Check if the current user is approved to access the application
  * Creates user in database if they don't exist (new signup)
+ * ALSO syncs role from Auth0 to database on every login
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +21,19 @@ export async function GET(request: NextRequest) {
 
     const prisma = await getPrisma();
     const email = session.user.email;
+    const auth0UserId = (session.user as any).sub;
+
+    // Get role from Auth0 (source of truth)
+    let auth0Role: string | null = null;
+    if (auth0UserId) {
+      try {
+        const roles = await getUserRoles(auth0UserId);
+        auth0Role = roles.length > 0 ? roles[0] : null;
+        console.log(`[Check Approval] Auth0 role for ${email}: ${auth0Role}`);
+      } catch (error) {
+        console.warn(`[Check Approval] Could not fetch Auth0 role for ${email}:`, error);
+      }
+    }
 
     // Try to find user in database
     let user = await prisma.user.findUnique({
@@ -46,11 +61,14 @@ export async function GET(request: NextRequest) {
         );
       }
 
+      // Use Auth0 role if available, otherwise default to VIEWER
+      const initialRole = auth0Role || "VIEWER";
+
       user = await prisma.user.create({
         data: {
           email,
           fullName: session.user.name || session.user.nickname || null,
-          role: "VIEWER", // Default role for new users
+          role: initialRole,
           active: true,
           approved: false, // New users need approval
         },
@@ -64,7 +82,24 @@ export async function GET(request: NextRequest) {
         },
       });
       
-      console.log(`[Check Approval] Created new user from Auth0 login: ${email}`);
+      console.log(`[Check Approval] Created new user from Auth0 login: ${email} with role: ${initialRole}`);
+    } else {
+      // User exists - sync role from Auth0 if different
+      if (auth0Role && user.role !== auth0Role) {
+        console.log(`[Check Approval] Syncing role for ${email}: ${user.role} -> ${auth0Role}`);
+        user = await prisma.user.update({
+          where: { email },
+          data: { role: auth0Role },
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            role: true,
+            active: true,
+            approved: true,
+          },
+        });
+      }
     }
 
     // Check if user is approved

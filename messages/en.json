@@ -482,6 +482,9 @@
       "pendingUsers": "Users pending approval ({count})",
       "registeredOn": "Registered on",
       "waitingCount": "{count} waiting",
+      "syncRoles": "Sync Roles",
+      "syncing": "Syncing...",
+      "syncComplete": "Sync complete! Roles have been updated from Auth0.",
       "error": {
         "updateRole": "Error updating role",
         "updateStatus": "Error updating status",

@@ -480,6 +480,9 @@
       "pendingUsers": "Korisnici koji čekaju odobrenje ({count})",
       "registeredOn": "Registrovan",
       "waitingCount": "{count} čeka",
+      "syncRoles": "Sinhronizuj uloge",
+      "syncing": "Sinhronizacija...",
+      "syncComplete": "Sinhronizacija završena! Uloge su ažurirane iz Auth0.",
       "error": {
         "updateRole": "Greška pri ažuriranju role",
         "updateStatus": "Greška pri ažuriranju statusa",

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Shield, UserCheck, UserX, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Users, Shield, UserCheck, UserX, CheckCircle, XCircle, Clock, RefreshCw } from "lucide-react";
 import { ROLES } from "@/lib/auth/roles";
 import { useTranslations } from "next-intl";
 
@@ -28,6 +28,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const t = useTranslations('admin.users');
   const tCommon = useTranslations('common');
 
@@ -57,18 +58,29 @@ export default function AdminUsersPage() {
     fetchUsers();
   }, [isLoading, user, isSuperAdmin, router]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (sync = false) => {
     try {
-      const res = await fetch("/api/admin/users");
+      if (sync) setSyncing(true);
+      const url = sync ? "/api/admin/users?sync=true" : "/api/admin/users";
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setUsers(data.users || []);
+        if (sync && data.syncResults) {
+          console.log("[Sync Results]", data.syncResults);
+          alert(t('syncComplete') || 'Sinhronizacija završena! Uloge su ažurirane iz Auth0.');
+        }
       }
     } catch (error) {
       console.error("Error fetching users:", error);
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
+  };
+
+  const handleSyncRoles = () => {
+    fetchUsers(true);
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
@@ -198,6 +210,15 @@ export default function AdminUsersPage() {
             {t('description')}
           </p>
         </div>
+        <Button 
+          variant="outline" 
+          onClick={handleSyncRoles}
+          disabled={syncing}
+          className="gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+          {syncing ? (t('syncing') || 'Sinhronizacija...') : (t('syncRoles') || 'Sinhronizuj uloge')}
+        </Button>
       </div>
 
       {/* Stats Cards */}
