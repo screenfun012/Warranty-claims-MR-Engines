@@ -287,8 +287,32 @@ export async function PATCH(
     // Handle multiple fault departments update
     if (body.faultDepartmentIds !== undefined) {
       const departmentIds = Array.isArray(body.faultDepartmentIds) ? body.faultDepartmentIds : [];
+      console.log(`[PATCH /api/claims/${id}] Updating faultDepartments with IDs:`, departmentIds);
+      
       // Connect/disconnect departments (wrapped in try-catch in case junction table doesn't exist)
       try {
+        // First, try to ensure the junction table exists
+        try {
+          await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "_ClaimFaultDepartments" (
+              "A" TEXT NOT NULL,
+              "B" TEXT NOT NULL,
+              FOREIGN KEY ("A") REFERENCES "Claim" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+              FOREIGN KEY ("B") REFERENCES "Department" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+            )
+          `);
+          await prisma.$executeRawUnsafe(`
+            CREATE UNIQUE INDEX IF NOT EXISTS "_ClaimFaultDepartments_AB_unique" ON "_ClaimFaultDepartments"("A", "B")
+          `);
+          await prisma.$executeRawUnsafe(`
+            CREATE INDEX IF NOT EXISTS "_ClaimFaultDepartments_B_index" ON "_ClaimFaultDepartments"("B")
+          `);
+          console.log(`[PATCH /api/claims/${id}] Junction table ensured`);
+        } catch (tableError) {
+          console.warn(`[PATCH /api/claims/${id}] Junction table creation skipped (may already exist):`, tableError);
+        }
+        
+        // Now update the departments
         await prisma.claim.update({
           where: { id },
           data: {
@@ -299,9 +323,32 @@ export async function PATCH(
         });
         console.log(`[PATCH /api/claims/${id}] Successfully updated faultDepartments:`, departmentIds);
         faultDepartmentsUpdated = true;
+        
+        // Verify the update was saved
+        const verifyClaim = await prisma.claim.findUnique({
+          where: { id },
+          include: {
+            faultDepartments: {
+              select: { id: true, name: true },
+            },
+          },
+        });
+        const verifiedIds = (verifyClaim as any)?.faultDepartments?.map((d: any) => d.id) || [];
+        console.log(`[PATCH /api/claims/${id}] Verified faultDepartments in DB:`, verifiedIds);
+        
+        if (JSON.stringify(verifiedIds.sort()) !== JSON.stringify(departmentIds.sort())) {
+          console.error(`[PATCH /api/claims/${id}] WARNING: faultDepartments mismatch! Expected:`, departmentIds, "Got:", verifiedIds);
+        }
       } catch (faultDeptError) {
         console.error(`[PATCH /api/claims/${id}] Failed to update faultDepartments:`, faultDeptError);
-        // Continue without failing - the junction table might not exist yet
+        if (faultDeptError instanceof Error) {
+          console.error(`[PATCH /api/claims/${id}] Error details:`, {
+            message: faultDeptError.message,
+            stack: faultDeptError.stack,
+            name: faultDeptError.name,
+          });
+        }
+        // Don't fail the request, but log the error
       }
       delete updateData.faultDepartmentIds;
     }
