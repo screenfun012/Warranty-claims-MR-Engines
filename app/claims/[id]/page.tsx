@@ -328,28 +328,29 @@ export default function ClaimDetailPage() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-2 sm:p-4 space-y-4">
       {/* Compact Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-xl font-bold truncate">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold truncate">
               {claim.claimCodeRaw || t("claims.unassigned")}
             </h1>
             <StatusBadge status={claim.status} label={getStatusLabel(claim.status)} />
           </div>
           {claim.customer?.name && (
-            <p className="text-sm text-muted-foreground truncate">{claim.customer.name}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{claim.customer.name}</p>
           )}
         </div>
-        <div className="flex gap-2 shrink-0">
+        <div className="flex gap-2 shrink-0 flex-wrap">
           <Button 
             variant="ghost" 
             size="sm"
             onClick={() => router.push("/claims")}
-            className="h-8"
+            className="h-8 text-xs sm:text-sm"
           >
-            ← {t("common.back")}
+            <span className="hidden sm:inline">← </span>
+            {t("common.back")}
           </Button>
           {claim.status === "CLOSED" && canDelete && (
             <Button 
@@ -357,7 +358,7 @@ export default function ClaimDetailPage() {
               size="sm"
               onClick={() => setShowDeleteDialog(true)}
               disabled={isDeleting}
-              className="h-8"
+              className="h-8 text-xs sm:text-sm"
             >
               {isDeleting ? t("common.loading") : t("common.delete")}
             </Button>

@@ -294,32 +294,34 @@ export default function StatisticsPage() {
   }, [filters]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <BarChart3 className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">{t("statistics.title")}</h1>
-            <p className="text-muted-foreground">{t("statistics.subtitle")}</p>
+          <BarChart3 className="h-6 w-6 sm:h-8 sm:w-8 text-primary shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">{t("statistics.title")}</h1>
+            <p className="text-sm sm:text-base text-muted-foreground truncate">{t("statistics.subtitle")}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-initial"
           >
-            <Filter className="h-4 w-4" />
-            {showFilters ? t("statistics.hideFilters") : t("statistics.showFilters")}
+            <Filter className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">{showFilters ? t("statistics.hideFilters") : t("statistics.showFilters")}</span>
+            <span className="sm:hidden">{t("statistics.filters")}</span>
           </Button>
           <Button
             onClick={handleExport}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 flex-1 sm:flex-initial"
             disabled={sortedClaims.length === 0}
           >
-            <Download className="h-4 w-4" />
-            {t("statistics.exportCsv")}
+            <Download className="h-4 w-4 shrink-0" />
+            <span className="hidden sm:inline">{t("statistics.exportCsv")}</span>
+            <span className="sm:hidden">{t("statistics.export")}</span>
           </Button>
         </div>
       </div>

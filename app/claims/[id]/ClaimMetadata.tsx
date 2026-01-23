@@ -405,7 +405,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     }
   };
 
-  // Handle customer name/company update
+  // Handle customer name/company update with optimistic update
   const handleCustomerUpdate = async (field: 'name' | 'company', value: string) => {
     setEditingField(null);
     if (isReadOnly) return;
@@ -427,68 +427,98 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       return;
     }
     
+    // Optimistic update - update UI immediately
+    const optimisticCustomer = {
+      ...claim.customer,
+      name: normalizedNewName || null,
+      company: normalizedNewCompany || null,
+    };
+    
+    // Update local state immediately for instant feedback
+    if (field === 'name') {
+      setCustomerName(normalizedNewName);
+    } else {
+      setCustomerCompany(normalizedNewCompany);
+    }
+    
+    // Optimistically update the claim cache
+    onUpdate({ 
+      customer: optimisticCustomer,
+      ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
+    });
+    
+    // Then update in background (non-blocking)
     if (claim.customer?.id) {
-      try {
-        const res = await fetch(`/api/customers/${claim.customer.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            name: normalizedNewName || null, 
-            company: normalizedNewCompany || null 
-          }),
-        });
+      fetch(`/api/customers/${claim.customer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: normalizedNewName || null, 
+          company: normalizedNewCompany || null 
+        }),
+      })
+      .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
+          // Update with server response
           onUpdate({ 
             customerId: data.customer.id,
             customer: data.customer,
-            ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
           });
         } else {
+          // Revert on error
           const errorData = await res.json().catch(() => ({}));
           console.error("Failed to update customer:", errorData);
           if (field === 'name') setCustomerName(currentName);
           if (field === 'company') setCustomerCompany(currentCompany);
+          onUpdate({ customer: claim.customer });
           alert(t("claims.metadata.customer.updateError") + ": " + (errorData.error || t("common.error")));
         }
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error("Error updating customer:", error);
+        // Revert on error
         if (field === 'name') setCustomerName(currentName);
         if (field === 'company') setCustomerCompany(currentCompany);
+        onUpdate({ customer: claim.customer });
         alert(t("claims.metadata.customer.updateError"));
-      }
+      });
     } else if (normalizedNewName || normalizedNewCompany) {
       // Allow creating customer with name OR company (at least one must be provided)
-      try {
-        const res = await fetch("/api/customers", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            name: normalizedNewName || null,
-            company: normalizedNewCompany || null,
-            claimId: claim.id,
-          }),
-        });
+      fetch("/api/customers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: normalizedNewName || null,
+          company: normalizedNewCompany || null,
+          claimId: claim.id,
+        }),
+      })
+      .then(async (res) => {
         if (res.ok) {
           const data = await res.json();
+          // Update with server response
           onUpdate({ 
             customerId: data.customer.id,
             customer: data.customer,
-            ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
           });
         } else {
+          // Revert on error
           const errorData = await res.json().catch(() => ({}));
           console.error("Failed to create customer:", errorData);
           setCustomerName("");
           setCustomerCompany("");
+          onUpdate({ customer: null });
           alert(t("claims.metadata.customer.createError") + ": " + (errorData.error || t("common.error")));
         }
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error("Error creating customer:", error);
         setCustomerName("");
         setCustomerCompany("");
+        onUpdate({ customer: null });
         alert(t("claims.metadata.customer.createError"));
-      }
+      });
     } else {
       setCustomerName("");
       setCustomerCompany("");

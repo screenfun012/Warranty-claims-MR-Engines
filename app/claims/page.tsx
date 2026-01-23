@@ -498,23 +498,24 @@ export default function ClaimsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6 animate-in fade-in slide-in-from-top-2">
-        <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+    <div className="p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 animate-in fade-in slide-in-from-top-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent truncate">
             {t("claims.title")}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
             {t("claims.subtitle")}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Button 
             onClick={() => router.push("/claims/new")} 
-            className="bg-primary hover:bg-primary/90 transition-all hover:shadow-lg"
+            className="bg-primary hover:bg-primary/90 transition-all hover:shadow-lg flex-1 sm:flex-initial"
           >
-            <Plus className="h-4 w-4 mr-2" />
-            {t("claims.newClaim")}
+            <Plus className="h-4 w-4 sm:mr-2 shrink-0" />
+            <span className="hidden sm:inline">{t("claims.newClaim")}</span>
+            <span className="sm:hidden">{t("claims.new")}</span>
           </Button>
         </div>
       </div>
