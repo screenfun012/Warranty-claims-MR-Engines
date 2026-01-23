@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     if (entityType) where.entityType = entityType;
     if (userId) where.userId = userId;
 
-    // Fetch activities
+    // Fetch activities with user information
     const [activities, total] = await Promise.all([
       prisma.activityLog.findMany({
         where,
@@ -51,6 +51,13 @@ export async function GET(request: NextRequest) {
       }),
       prisma.activityLog.count({ where }),
     ]);
+
+    // Log for debugging
+    console.log("[ActivityAPI] Raw activities from DB:", {
+      count: activities.length,
+      sampleIds: activities.slice(0, 3).map(a => a.id),
+      sampleActions: activities.slice(0, 3).map(a => ({ action: a.action, entityType: a.entityType })),
+    });
 
     console.log("[ActivityAPI] Found activities:", {
       count: activities.length,

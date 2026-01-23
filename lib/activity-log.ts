@@ -87,6 +87,7 @@ export async function logActivity(params: LogActivityParams): Promise<void> {
 
 /**
  * Get user info from Auth0 session
+ * IMPORTANT: userId should be from User table (database ID), not Auth0 sub
  */
 export async function getUserFromSession(request: NextRequest): Promise<{
   userId: string | null;
@@ -107,17 +108,27 @@ export async function getUserFromSession(request: NextRequest): Promise<{
       hasUser: !!session?.user,
       userEmail: session?.user?.email,
       userName: session?.user?.name,
-      userId: session?.user?.sub,
+      auth0Sub: session?.user?.sub,
     });
     
-    if (session?.user) {
+    if (session?.user?.email) {
+      // Find user in database by email to get the correct User.id
+      const prisma = await getPrisma();
+      const dbUser = await prisma.user.findUnique({
+        where: { email: session.user.email },
+        select: { id: true, fullName: true },
+      });
+      
       const userInfo = {
-        userId: session.user.sub || null,
+        userId: dbUser?.id || null, // Use database User.id, not Auth0 sub
         userEmail: session.user.email || null,
-        userName: session.user.name || session.user.email?.split("@")[0] || null,
+        userName: dbUser?.fullName || session.user.name || session.user.email?.split("@")[0] || null,
         ipAddress,
       };
-      console.log("[ActivityLog] User info extracted:", userInfo);
+      console.log("[ActivityLog] User info extracted:", {
+        ...userInfo,
+        dbUserFound: !!dbUser,
+      });
       return userInfo;
     }
     

@@ -120,7 +120,7 @@ export async function PATCH(
     return NextResponse.json({ 
       user: updatedUser,
       message: role !== undefined 
-        ? "Role je ažurirana u Auth0. Korisnik mora da se odjavi i uloguje ponovo da bi promene bile aktivne." 
+        ? "Role je ažurirana u Auth0. Ako je role promenjena direktno na Auth0 Dashboard-u, korisnik mora da se odjavi i uloguje ponovo da bi promene bile aktivne. Ako je promenjena preko ove aplikacije, promene će biti vidljive nakon osvežavanja stranice." 
         : "Korisnik je ažuriran"
     });
   } catch (error) {
