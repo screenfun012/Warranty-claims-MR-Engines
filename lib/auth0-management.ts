@@ -301,8 +301,6 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
       throw new Error(`Failed to assign role: ${assignResponse.status} ${errorData}`);
     }
     
-    console.log(`[Auth0 Management] Assigned role '${roleName}' to user ${auth0UserId}`);
-    
     // Očisti role cache za ovog korisnika nakon promene
     clearRoleCache(auth0UserId);
   } catch (error) {

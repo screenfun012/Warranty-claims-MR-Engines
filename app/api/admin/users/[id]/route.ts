@@ -45,7 +45,7 @@ export async function PATCH(
         
         if (!auth0User) {
           return NextResponse.json(
-            { error: "Korisnik nije pronađen u Auth0. Molimo prijavite se preko Auth0 login-a." },
+            { error: `Korisnik ${user.email} nije pronađen u Auth0. Molimo proverite da li je korisnik registrovan preko Auth0 login-a.` },
             { status: 404 }
           );
         }
@@ -65,8 +65,6 @@ export async function PATCH(
         
         // Očisti role cache za ovog korisnika (assignRoleToUser već poziva clearRoleCache, ali dodajemo za sigurnost)
         clearRoleCache(auth0User.user_id);
-        
-        console.log(`[Update User] Updated role for ${user.email} to ${role} in Auth0`);
       } catch (error) {
         console.error('[Update User] Error updating Auth0 role:', error);
         // Ne baci grešku ako je problem sa Management API, samo loguj
@@ -83,6 +81,13 @@ export async function PATCH(
           return NextResponse.json(
             { error: "Auth0 rate limit je dostignut. Molimo sačekajte nekoliko sekundi i pokušajte ponovo. Ako se problem nastavi, pokušajte kasnije." },
             { status: 429 }
+          );
+        }
+        // Posebna poruka ako role nije pronađena
+        if (errorMessage.includes('not found in Auth0')) {
+          return NextResponse.json(
+            { error: `Uloga '${role}' ne postoji u Auth0. Molimo proverite da li je uloga kreirana u Auth0 Dashboard-u.` },
+            { status: 400 }
           );
         }
         return NextResponse.json(

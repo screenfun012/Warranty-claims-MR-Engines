@@ -81,14 +81,24 @@ export default function AdminUsersPage() {
       });
 
       if (res.ok) {
-        setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
-      } else {
         const data = await res.json();
-        alert(data.error || t('error.updateRole'));
+        setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+        // Show success message if provided
+        if (data.message) {
+          alert(data.message);
+        }
+      } else {
+        const data = await res.json().catch(() => ({ error: t('error.updateRole') }));
+        const errorMessage = data.error || t('error.updateRole');
+        alert(errorMessage);
+        // Refresh users list to get current state
+        fetchUsers();
       }
     } catch (error) {
       console.error("Error updating role:", error);
-      alert(t('error.updateRole'));
+      alert(t('error.updateRole') + ": " + (error instanceof Error ? error.message : 'Unknown error'));
+      // Refresh users list to get current state
+      fetchUsers();
     } finally {
       setUpdating(null);
     }

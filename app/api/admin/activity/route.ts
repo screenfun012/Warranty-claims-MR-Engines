@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         entityType: a.entityType,
         entityName: a.entityName,
         userName: a.userName,
+        userEmail: a.userEmail,
         createdAt: a.createdAt,
       })),
     });

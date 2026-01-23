@@ -199,7 +199,7 @@ export default function AdminDashboardPage() {
       
       if (res.ok) {
         const data = await res.json();
-        console.log("[Admin] Activity log data:", {
+        console.log("[Admin] Activity log data received:", {
           activitiesCount: data.activities?.length || 0,
           total: data.total,
           activities: data.activities,
@@ -211,9 +211,11 @@ export default function AdminDashboardPage() {
           status: res.status,
           error: errorData,
         });
+        setActivityLog([]);
       }
     } catch (error) {
       console.error("[Admin] Error fetching activity log:", error);
+      setActivityLog([]);
     } finally {
       setLoadingActivity(false);
     }
@@ -401,8 +403,10 @@ export default function AdminDashboardPage() {
               [...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full" />
               ))
-            ) : activityLog.length > 0 ? (
-              activityLog.map((entry) => (
+            ) : activityLog && activityLog.length > 0 ? (
+              activityLog.map((entry) => {
+                console.log("[Admin] Rendering activity entry:", entry);
+                return (
                 <div
                   key={entry.id}
                   className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-pointer"
@@ -449,12 +453,18 @@ export default function AdminDashboardPage() {
                     </Link>
                   )}
                 </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p>{t("admin.activity.noActivity")}</p>
                 <p className="text-xs mt-1">{t("admin.activity.noActivityDesc")}</p>
+                {process.env.NODE_ENV === 'development' && (
+                  <p className="text-xs mt-2 text-red-500">
+                    Debug: activityLog.length = {activityLog?.length || 0}, loadingActivity = {loadingActivity ? 'true' : 'false'}
+                  </p>
+                )}
               </div>
             )}
           </div>
