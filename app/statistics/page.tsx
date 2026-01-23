@@ -170,8 +170,13 @@ export default function StatisticsPage() {
         aVal = a.customer?.name || "";
         bVal = b.customer?.name || "";
       } else if (sortField === "faultDepartment") {
-        aVal = a.faultDepartment?.name || "";
-        bVal = b.faultDepartment?.name || "";
+        // Prefer faultDepartments (multiple) over faultDepartment (legacy single)
+        aVal = a.faultDepartments && a.faultDepartments.length > 0
+          ? a.faultDepartments.map((d) => d.name).join(", ")
+          : a.faultDepartment?.name || "";
+        bVal = b.faultDepartments && b.faultDepartments.length > 0
+          ? b.faultDepartments.map((d) => d.name).join(", ")
+          : b.faultDepartment?.name || "";
       } else if (sortField === "assignedTo") {
         aVal = a.assignedWorkerName || "";
         bVal = b.assignedWorkerName || "";

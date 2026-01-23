@@ -281,6 +281,9 @@ export async function PATCH(
       console.log(`[PATCH /api/claims/${id}] Verified claimAcceptanceStatus saved:`, verifyResult[0]?.claimAcceptanceStatus);
     }
 
+    // Track if we updated faultDepartments - we'll need to ensure it's in the response
+    let faultDepartmentsUpdated = false;
+    
     // Handle multiple fault departments update
     if (body.faultDepartmentIds !== undefined) {
       const departmentIds = Array.isArray(body.faultDepartmentIds) ? body.faultDepartmentIds : [];
@@ -294,8 +297,10 @@ export async function PATCH(
             },
           },
         });
+        console.log(`[PATCH /api/claims/${id}] Successfully updated faultDepartments:`, departmentIds);
+        faultDepartmentsUpdated = true;
       } catch (faultDeptError) {
-        console.warn(`[PATCH /api/claims/${id}] Failed to update faultDepartments:`, faultDeptError);
+        console.error(`[PATCH /api/claims/${id}] Failed to update faultDepartments:`, faultDeptError);
         // Continue without failing - the junction table might not exist yet
       }
       delete updateData.faultDepartmentIds;
@@ -455,7 +460,30 @@ export async function PATCH(
       }
     }
 
+    // If faultDepartments were updated, ensure they're in the response
+    // Re-fetch claim with faultDepartments if they were updated but not included
+    if (faultDepartmentsUpdated && claim && (!claim.faultDepartments || (Array.isArray(claim.faultDepartments) && claim.faultDepartments.length === 0))) {
+      try {
+        const refreshedClaim = await prisma.claim.findUnique({
+          where: { id },
+          include: {
+            ...baseResponseInclude,
+            faultDepartments: {
+              select: { id: true, name: true },
+            },
+          },
+        });
+        if (refreshedClaim) {
+          claim = refreshedClaim;
+          console.log(`[PATCH /api/claims/${id}] Refreshed claim with faultDepartments:`, claim.faultDepartments?.map((d: any) => d.name));
+        }
+      } catch (refreshError) {
+        console.warn(`[PATCH /api/claims/${id}] Failed to refresh claim with faultDepartments:`, refreshError);
+      }
+    }
+
     console.log(`[PATCH /api/claims/${id}] Final claim.claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
+    console.log(`[PATCH /api/claims/${id}] Final claim.faultDepartments:`, claim?.faultDepartments?.map((d: any) => d.name));
     console.log(`[PATCH /api/claims/${id}] Successfully updated claim. claimAcceptanceStatus:`, claim?.claimAcceptanceStatus);
     
     // Trigger real-time event (non-blocking)

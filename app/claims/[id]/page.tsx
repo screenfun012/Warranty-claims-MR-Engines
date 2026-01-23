@@ -263,6 +263,9 @@ export default function ClaimDetailPage() {
           const data = await res.json();
           if (data.claim) {
             queryClient.setQueryData(['claim', claimId], data.claim);
+            // Invalidate statistics cache so it reflects the updated claim
+            // This ensures faultDepartments changes appear in the statistics tab
+            queryClient.invalidateQueries({ queryKey: ['statistics'] });
           }
         } catch (error) {
           console.error("Error saving claim update:", error);
