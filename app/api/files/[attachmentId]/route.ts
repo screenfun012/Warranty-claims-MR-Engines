@@ -1,14 +1,13 @@
 /**
  * API route for serving attachment files
  * GET /api/files/[attachmentId]
- * Supports filesystem, Vercel Blob, and WebDAV storage
+ * Storage: Synology (WebDAV) or local filesystem.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { readAttachmentFile, getAttachmentFilePath } from "@/lib/files/fileStorage";
 import { existsSync } from "fs";
-import { env } from "@/lib/config/env";
 
 export async function GET(
   request: NextRequest,
@@ -26,18 +25,15 @@ export async function GET(
       return NextResponse.json({ error: "Attachment not found" }, { status: 404 });
     }
 
-    // Check storage type
     const isWebDAV = attachment.filePath.startsWith('webdav:');
-    const isBlobUrl = attachment.filePath.startsWith('http://') || attachment.filePath.startsWith('https://');
-    
-    // For Blob URLs, redirect directly to the Blob URL (it's already public)
-    if (isBlobUrl) {
+    const isRemoteUrl = attachment.filePath.startsWith('http://') || attachment.filePath.startsWith('https://');
+
+    if (isRemoteUrl) {
       return NextResponse.redirect(attachment.filePath);
     }
 
-    // For WebDAV or filesystem, read and serve the file
     try {
-      console.log(`[files/${attachmentId}] Reading file: ${attachment.filePath} (isWebDAV: ${isWebDAV}, isBlobUrl: ${isBlobUrl})`);
+      console.log(`[files/${attachmentId}] Reading file: ${attachment.filePath} (isWebDAV: ${isWebDAV})`);
       const fileBuffer = await readAttachmentFile(attachment.filePath);
       console.log(`[files/${attachmentId}] Successfully read ${fileBuffer.length} bytes`);
       return new NextResponse(new Uint8Array(fileBuffer), {
@@ -50,7 +46,7 @@ export async function GET(
     } catch (error) {
       console.error(`[files/${attachmentId}] Error reading file ${attachment.filePath}:`, error);
       // For filesystem, check if file exists
-      if (!isWebDAV && !isBlobUrl) {
+      if (!isWebDAV && !isRemoteUrl) {
         const filePath = getAttachmentFilePath(attachment.filePath);
         if (!existsSync(filePath)) {
           console.error(`[files/${attachmentId}] File not found on disk: ${filePath}`);

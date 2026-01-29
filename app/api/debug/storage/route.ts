@@ -1,6 +1,7 @@
 /**
  * Debug endpoint to check storage configuration
  * GET /api/debug/storage
+ * Storage: Synology (WebDAV) only. Fallback: local filesystem for dev.
  */
 
 import { NextResponse } from "next/server";
@@ -12,13 +13,11 @@ export async function GET() {
     const hasWebDAVUsername = !!env.WEBDAV_USERNAME;
     const hasWebDAVPassword = !!env.WEBDAV_PASSWORD;
     const useWebDAV = hasWebDAVUrl && hasWebDAVUsername && hasWebDAVPassword;
-    
-    const hasBlobToken = !!env.BLOB_READ_WRITE_TOKEN;
-    
+
     return NextResponse.json({
       storage: {
-        type: useWebDAV ? "WebDAV" : hasBlobToken ? "Vercel Blob" : "Filesystem",
-        configured: useWebDAV || hasBlobToken,
+        type: useWebDAV ? "WebDAV (Synology NAS)" : "Filesystem (dev only)",
+        configured: useWebDAV,
       },
       webdav: {
         enabled: useWebDAV,
@@ -27,14 +26,9 @@ export async function GET() {
         password: hasWebDAVPassword ? "***" : "not set",
         basePath: env.WEBDAV_BASE_PATH,
       },
-      blob: {
-        enabled: hasBlobToken && !useWebDAV,
-        token: hasBlobToken ? "***" : "not set",
-      },
       filesystem: {
-        enabled: !useWebDAV && !hasBlobToken,
+        enabled: !useWebDAV,
         path: env.FILE_ROOT_PATH,
-        warning: "Filesystem storage does not persist on Vercel serverless functions!",
       },
     });
   } catch (error) {

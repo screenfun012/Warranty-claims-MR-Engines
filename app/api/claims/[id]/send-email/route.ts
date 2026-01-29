@@ -92,7 +92,7 @@ export async function POST(
       attachments = await Promise.all(
         attachmentRecords.map(async (att) => {
           try {
-            // Read file content as buffer (works for both filesystem and Blob)
+            // Read file content as buffer (WebDAV or filesystem)
             const fileContent = await readAttachmentFile(att.filePath);
             
             return {
