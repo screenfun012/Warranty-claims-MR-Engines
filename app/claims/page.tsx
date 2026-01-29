@@ -737,7 +737,7 @@ export default function ClaimsPage() {
             { key: "claimArrival", label: t("claims.claimArrivalDate") },
             ...(isSuperAdmin ? [{ key: "actions", label: t("common.actions") }] : []),
           ]}
-          data={displayClaims.map((claim: Claim, index) => ({
+          data={displayClaims.map((claim: Claim, index: number) => ({
             claimCode: (
               <span className="font-medium transition-colors group-hover:text-primary">
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
