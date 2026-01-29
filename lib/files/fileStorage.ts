@@ -347,7 +347,9 @@ export async function saveAttachmentForClaim(params: {
 }
 
 /**
- * Save an attachment for an unassigned email thread
+ * Save an attachment for an unassigned email thread.
+ * Unassigned threads are NOT written to Synology/NAS — only claim folders go there.
+ * We use Blob or filesystem so the server never has _unassigned.
  */
 export async function saveAttachmentForUnassignedThread(params: {
   threadId: string;
@@ -359,47 +361,8 @@ export async function saveAttachmentForUnassignedThread(params: {
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_");
 
-  if (USE_WEBDAV && webdavClient) {
-    // Use WebDAV
-    const baseKey = getUnassignedThreadKey(params.threadId);
-    const relativePath = `${baseKey}/${sanitizedFileName}`;
-    const webdavPath = getWebDAVPath(relativePath);
-
-    // Ensure directory exists
-    await ensureDir(baseKey);
-
-    // Check if file exists and make unique if needed
-    let finalPath = webdavPath;
-    let counter = 1;
-    try {
-      while (await webdavClient.exists(finalPath)) {
-        const ext = path.extname(sanitizedFileName);
-        const name = path.basename(sanitizedFileName, ext);
-        const newRelativePath = `${baseKey}/${name}_${counter}${ext}`;
-        finalPath = getWebDAVPath(newRelativePath);
-        counter++;
-      }
-    } catch (error) {
-      console.warn("Could not check for existing WebDAV file:", error);
-    }
-
-    // Upload file to WebDAV
-    try {
-      console.log(`[saveAttachmentForUnassignedThread] Uploading ${params.fileBuffer.length} bytes to WebDAV: ${finalPath}`);
-      await webdavClient.putFileContents(finalPath, params.fileBuffer, {
-        overwrite: false,
-        contentLength: params.fileBuffer.length,
-      });
-      console.log(`[saveAttachmentForUnassignedThread] Successfully uploaded file to WebDAV: ${finalPath}`);
-    } catch (error) {
-      console.error(`[saveAttachmentForUnassignedThread] Error uploading to WebDAV ${finalPath}:`, error);
-      throw new Error(`Failed to upload file to WebDAV: ${error instanceof Error ? error.message : String(error)}`);
-    }
-
-    // Return relative path
-    const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
-    return `webdav:${finalRelativePath}`;
-  } else if (USE_BLOB) {
+  // Prefer Blob so we never create _unassigned on NAS
+  if (USE_BLOB) {
     // Use Vercel Blob
     const baseKey = getUnassignedThreadKey(params.threadId);
     const blobKey = `${baseKey}/${sanitizedFileName}`;
@@ -430,25 +393,24 @@ export async function saveAttachmentForUnassignedThread(params: {
     });
 
     return blob.url; // Return Blob URL
-  } else {
-    // Use filesystem
-    const basePath = getUnassignedThreadPath(params.threadId);
-    await ensureDir(basePath);
-
-    let filePath = path.join(basePath, sanitizedFileName);
-    let counter = 1;
-    while (await fileExists(filePath)) {
-      const ext = path.extname(sanitizedFileName);
-      const name = path.basename(sanitizedFileName, ext);
-      filePath = path.join(basePath, `${name}_${counter}${ext}`);
-      counter++;
-    }
-
-    await fs.writeFile(filePath, params.fileBuffer);
-
-    const relativePath = path.relative(path.resolve(env.FILE_ROOT_PATH), filePath);
-    return relativePath;
   }
+  // No WebDAV for unassigned — only claim folders go to NAS
+  const basePath = getUnassignedThreadPath(params.threadId);
+  await ensureDir(basePath);
+
+  let filePath = path.join(basePath, sanitizedFileName);
+  let counter = 1;
+  while (await fileExists(filePath)) {
+    const ext = path.extname(sanitizedFileName);
+    const name = path.basename(sanitizedFileName, ext);
+    filePath = path.join(basePath, `${name}_${counter}${ext}`);
+    counter++;
+  }
+
+  await fs.writeFile(filePath, params.fileBuffer);
+
+  const relativePath = path.relative(path.resolve(env.FILE_ROOT_PATH), filePath);
+  return relativePath;
 }
 
 /**
