@@ -257,6 +257,10 @@
       "selectCompany": "Select company",
       "selectDepartments": "Select departments",
       "serverFolderPath": "Server Folder Path",
+      "createFolder": "Create folder on Synology",
+      "createFolderHint": "Folder was not created on server. Click to create.",
+      "createFolderSuccess": "Folder created on Synology",
+      "createFolderError": "Failed to create folder",
       "email": {
         "error": "Error sending email",
         "sending": "Sending...",

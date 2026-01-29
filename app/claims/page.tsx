@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, memo } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -179,6 +179,7 @@ export default function ClaimsPage() {
       }
       if (filters.claimCode) params.append("claimCode", filters.claimCode);
       if (filters.customerId) params.append("customerId", filters.customerId);
+      if (filters.urgentOnly) params.append("urgentOnly", "true");
       // Add pagination
       params.append("page", page.toString());
       params.append("limit", limit.toString());
@@ -195,9 +196,9 @@ export default function ClaimsPage() {
     };
   }, []);
 
-  // React Query for filtered claims (displayed in table)
+  // React Query for filtered claims (displayed in table) - server returns exact page, no client-side re-filter
   const { data: claimsData, isLoading: loading, refetch: refetchClaims } = useQuery({
-    queryKey: ['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, currentPage, pageSize],
+    queryKey: ['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize],
     queryFn: async () => {
       const result = await fetchClaimsData(
         { ...filters, claimCode: filters.claimCode || textFilters.claimCode, customerId: filters.customerId || textFilters.customerId },
@@ -213,6 +214,7 @@ export default function ClaimsPage() {
     },
     staleTime: 30 * 1000, // 30 seconds - data stays fresh
     gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
+    placeholderData: keepPreviousData, // Keep showing current page while next page loads (no blank flash)
   });
   
   const claims = claimsData || [];
@@ -230,7 +232,7 @@ export default function ClaimsPage() {
   // Helper function to update claims in React Query cache
   const updateClaimInCache = useCallback((claimId: string, updates: Partial<Claim>) => {
     // Update filtered claims cache - use functional update to ensure React detects change
-    queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, currentPage, pageSize], (old) => {
+    queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize], (old) => {
       if (!old) return old;
       const updated = old.map(c => c.id === claimId ? { ...c, ...updates } : c);
       // Force re-render by creating new array reference
@@ -252,6 +254,9 @@ export default function ClaimsPage() {
       queryClient.invalidateQueries({ queryKey: ['claims', 'filtered'] });
     }, 0);
   }, [queryClient, filters, currentPage, pageSize]);
+
+  // Server returns the page; show it as-is (no client-side re-filter that would shrink the list)
+  const displayClaims = claims;
 
   // Legacy fetchClaims function for backward compatibility (now just calls refetch)
   const fetchClaims = useCallback(async (showAll = false, customFilters?: { claimCode?: string; customerId?: string }) => {
@@ -317,62 +322,6 @@ export default function ClaimsPage() {
 
   // Initial fetch only - no refresh on status change
 
-  // Real-time filtering while typing - filter locally from React Query data
-  // Note: This runs client-side for instant filtering as user types
-  const filteredClaims = useMemo(() => {
-    if (!claims || claims.length === 0) return [];
-    
-    let filtered = [...claims];
-    
-    // Apply claimCode filter in real-time with Serbian Latin support
-    if (textFilters.claimCode.trim()) {
-      const normalizedClaimCode = normalizeSerbianLatin(textFilters.claimCode);
-      filtered = filtered.filter(claim => {
-        const claimCode = normalizeSerbianLatin(claim.claimCodeRaw || "");
-        return claimCode.includes(normalizedClaimCode);
-      });
-    }
-    
-    // Apply customerId filter in real-time with Serbian Latin support - use company instead of name
-    if (textFilters.customerId.trim()) {
-      const normalizedCustomer = normalizeSerbianLatin(textFilters.customerId);
-      filtered = filtered.filter(claim => {
-        const customerCompany = normalizeSerbianLatin(claim.customer?.company || "");
-        return customerCompany.includes(normalizedCustomer);
-      });
-    }
-    
-    // Apply status filter (multi-select) - real-time filtering using unified status
-    if (filters.status.length > 0) {
-      filtered = filtered.filter(claim => {
-        return filters.status.some(selectedStatus => {
-          // All statuses use the main status field now
-          if (selectedStatus === "NEW" && claim.status === "NEW") return true;
-          if (selectedStatus === "IN_ANALYSIS" && claim.status === "IN_ANALYSIS") return true;
-          if (selectedStatus === "APPROVED" && claim.status === "APPROVED") return true;
-          if (selectedStatus === "REJECTED" && claim.status === "REJECTED") return true;
-          
-          return false;
-        });
-      });
-    }
-    
-    // Apply urgent filter - NEW or IN_ANALYSIS older than 7 days
-    if (filters.urgentOnly) {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      filtered = filtered.filter(claim => {
-        const claimDate = new Date(claim.createdAt);
-        const isOldEnough = claimDate < sevenDaysAgo;
-        const isUrgentStatus = claim.status === "NEW" || claim.status === "IN_ANALYSIS";
-        return isOldEnough && isUrgentStatus;
-      });
-    }
-    
-    // Return filtered claims - React Query will handle the state
-    return filtered;
-  }, [textFilters.claimCode, textFilters.customerId, filters.status.join(","), filters.urgentOnly, claims]);
-
   // Listen for claim updates to refresh the list
   useEffect(() => {
     const handleClaimUpdate = () => {
@@ -394,13 +343,13 @@ export default function ClaimsPage() {
       });
       if (res.ok) {
         // Optimistically remove from cache
-        queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId], (old) => {
+        queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize], (old) => {
           if (!old) return old;
           return old.filter(c => c.id !== claimId);
         });
-        queryClient.setQueryData<Claim[]>(['claims', 'all', filters.status], (old) => {
+        queryClient.setQueryData<{ claims: Claim[]; pagination: PaginationInfo | null }>(['claims', 'all', filters.status], (old) => {
           if (!old) return old;
-          return old.filter(c => c.id !== claimId);
+          return { ...old, claims: old.claims.filter(c => c.id !== claimId) };
         });
         
         setDeleteClaimId(null);
@@ -469,33 +418,6 @@ export default function ClaimsPage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showStatusDropdown]);
-
-  // Use filtered claims for display
-  const displayClaims = filteredClaims;
-
-  if (loading) {
-    return (
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-6">
-          <Skeleton className="h-9 w-32" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <Card className="p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i}>
-                <Skeleton className="h-4 w-20 mb-2" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card className="p-4">
-          <Skeleton className="h-96 w-full" />
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="p-4 sm:p-8">
@@ -751,10 +673,20 @@ export default function ClaimsPage() {
           </div>
         </div>
         
-        {/* Results count */}
+        {/* Results count - use pagination when available so total is correct */}
         <div className="mt-4 pt-4 border-t flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {t("claims.filters.showing")}: <span className="font-semibold text-foreground">{displayClaims.length}</span> {t("claims.filters.of")} <span className="font-semibold text-foreground">{allClaims.length}</span> {t("claims.filters.claims")}
+            {pagination ? (
+              <>
+                {t("claims.filters.showing")}{" "}
+                {displayClaims.length > 0
+                  ? `${((currentPage - 1) * pageSize) + 1}-${Math.min(currentPage * pageSize, pagination.total)} ${t("claims.filters.of")} ${pagination.total}`
+                  : `0 ${t("claims.filters.of")} ${pagination.total}`}{" "}
+                {t("claims.filters.claims")}
+              </>
+            ) : (
+              <>{t("claims.filters.showing")}: <span className="font-semibold text-foreground">{displayClaims.length}</span> {t("claims.filters.claims")}</>
+            )}
           </p>
           {(filters.status.length > 0 || filters.urgentOnly || textFilters.claimCode.trim() || textFilters.customerId.trim()) && (
             <Button
@@ -781,13 +713,20 @@ export default function ClaimsPage() {
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">{t("claims.list.title")}</h2>
-            {displayClaims.length > 0 && (
+            {!loading && displayClaims.length > 0 && (
               <Badge variant="secondary" className="ml-2">
                 {displayClaims.length} {t("claims.list.count")}
               </Badge>
             )}
           </div>
         </div>
+        {loading ? (
+          <div className="space-y-3">
+            {[...Array(pageSize)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-md" />
+            ))}
+          </div>
+        ) : (
         <ResponsiveTable
           headers={[
             { key: "claimCode", label: t("claims.mrNumber") },
@@ -886,6 +825,7 @@ export default function ClaimsPage() {
           }
           onRowClick={(row, index) => router.push(`/claims/${displayClaims[index].id}`)}
         />
+        )}
       </Card>
 
       {/* Pagination */}

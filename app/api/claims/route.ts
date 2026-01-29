@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
     const statusParams = searchParams.getAll("status"); // Get all status values for multi-select
     const claimCode = searchParams.get("claimCode");
     const customerName = searchParams.get("customerId"); // Keep param name for backward compatibility
-    
+    const urgentOnly = searchParams.get("urgentOnly") === "true";
+
     // Pagination parameters
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -97,6 +98,18 @@ export async function GET(request: NextRequest) {
       // If customer name provided but no matches found, return empty results
       where.customerId = {
         in: [],
+      };
+    }
+
+    // Urgent only: NEW or IN_ANALYSIS older than 7 days
+    if (urgentOnly) {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      (where as any) = {
+        AND: [
+          { ...where },
+          { status: { in: ["NEW", "IN_ANALYSIS"] } },
+          { createdAt: { lt: sevenDaysAgo } },
+        ],
       };
     }
 
