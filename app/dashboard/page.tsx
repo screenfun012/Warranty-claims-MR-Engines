@@ -235,8 +235,8 @@ export default function DashboardPage() {
       {/* Claims by Status Chart */}
       <Card className="p-6 mb-6">
         <h2 className="text-xl font-semibold mb-4">Reklamacije po statusu</h2>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-80 min-h-[300px] w-full">
+          <ResponsiveContainer width="100%" height="100%" minHeight={300}>
             <BarChart data={stats.claimsByStatus.map((item) => ({
               status: item.status === "NEW" ? "NOVO" : 
                       item.status === "IN_ANALYSIS" ? "U OBRADI" :

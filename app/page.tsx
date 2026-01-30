@@ -529,9 +529,9 @@ export default function DashboardPage() {
           <TrendingUp className="h-5 w-5" />
           {tDashboard('quickStats')}
         </h2>
-        {stats.claimsByMonth && stats.claimsByMonth.length > 0 ? (
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
+        {stats.claimsByMonth && stats.claimsByMonth.length >= 2 ? (
+          <div className="h-80 min-h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%" minHeight={300}>
               <LineChart data={stats.claimsByMonth}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
