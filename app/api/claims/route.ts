@@ -368,81 +368,92 @@ export async function POST(request: NextRequest) {
 
         console.log(`[create-claim] Processing ${allAttachments.length} attachments for new claim ${claim.id}`);
 
+        const attachmentErrors: Array<{ attachmentId: string; error: string }> = [];
+
         for (const attachment of allAttachments) {
-          // Skip if already linked to a different claim
-          if (attachment.claimId && attachment.claimId !== claim.id) {
-            console.log(`[create-claim] Skipping attachment ${attachment.id} - already linked to different claim`);
-            continue;
-          }
+          try {
+            // Skip if already linked to a different claim
+            if (attachment.claimId && attachment.claimId !== claim.id) {
+              console.log(`[create-claim] Skipping attachment ${attachment.id} - already linked to different claim`);
+              continue;
+            }
 
-          // Check if photo or document already exists
-          const existingPhoto = await prisma.photo.findFirst({
-            where: { attachmentId: attachment.id },
-          });
-          const existingDoc = await prisma.clientDocument.findFirst({
-            where: { attachmentId: attachment.id },
-          });
-
-          if (existingPhoto || existingDoc) {
-            console.log(`[create-claim] Skipping attachment ${attachment.id} - already has photo/document`);
-            continue;
-          }
-
-          // Link attachment to claim if not already linked
-          if (!attachment.claimId) {
-            await prisma.attachment.update({
-              where: { id: attachment.id },
-              data: { claimId: claim.id },
+            // Check if photo or document already exists
+            const existingPhoto = await prisma.photo.findFirst({
+              where: { attachmentId: attachment.id },
             });
-            console.log(`[create-claim] Linked attachment ${attachment.id} to claim ${claim.id}`);
-          }
+            const existingDoc = await prisma.clientDocument.findFirst({
+              where: { attachmentId: attachment.id },
+            });
 
-          const isImage = attachment.mimeType.startsWith("image/");
-          const isPdf = attachment.mimeType === "application/pdf";
-          const isDocx = attachment.mimeType.includes("wordprocessingml") || 
-                         attachment.mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml") ||
-                         attachment.fileName.toLowerCase().endsWith(".docx");
+            if (existingPhoto || existingDoc) {
+              console.log(`[create-claim] Skipping attachment ${attachment.id} - already has photo/document`);
+              continue;
+            }
 
-          console.log(`[create-claim] Attachment ${attachment.id}: isImage=${isImage}, isPdf=${isPdf}, isDocx=${isDocx}, isProbablyLogo=${attachment.isProbablyLogo}, isRelevant=${attachment.isRelevant}`);
-
-          // Create Photo for images (skip logos)
-          if (isImage) {
-            if (attachment.isProbablyLogo) {
-              console.log(`[create-claim] Skipping logo image ${attachment.id}`);
-            } else {
-              // Check if photo already exists for this attachment
-              const existingPhoto = await prisma.photo.findUnique({
-                where: { attachmentId: attachment.id },
+            // Link attachment to claim if not already linked
+            if (!attachment.claimId) {
+              await prisma.attachment.update({
+                where: { id: attachment.id },
+                data: { claimId: claim.id },
               });
-              
-              if (!existingPhoto) {
-                await prisma.photo.create({
-                  data: {
-                    claimId: claim.id,
-                    attachmentId: attachment.id,
-                    internalUpload: false,
-                  },
-                });
-                photosCreated++;
-                console.log(`[create-claim] Created photo for attachment ${attachment.id}`);
+              console.log(`[create-claim] Linked attachment ${attachment.id} to claim ${claim.id}`);
+            }
+
+            const isImage = attachment.mimeType.startsWith("image/");
+            const isPdf = attachment.mimeType === "application/pdf";
+            const isDocx = attachment.mimeType.includes("wordprocessingml") || 
+                           attachment.mimeType.includes("application/vnd.openxmlformats-officedocument.wordprocessingml") ||
+                           attachment.fileName.toLowerCase().endsWith(".docx");
+
+            console.log(`[create-claim] Attachment ${attachment.id}: isImage=${isImage}, isPdf=${isPdf}, isDocx=${isDocx}, isProbablyLogo=${attachment.isProbablyLogo}, isRelevant=${attachment.isRelevant}`);
+
+            // Create Photo for images (skip logos)
+            if (isImage) {
+              if (attachment.isProbablyLogo) {
+                console.log(`[create-claim] Skipping logo image ${attachment.id}`);
               } else {
-                console.log(`[create-claim] Photo already exists for attachment ${attachment.id}, skipping`);
+                // Check if photo already exists for this attachment
+                const existingPhoto = await prisma.photo.findUnique({
+                  where: { attachmentId: attachment.id },
+                });
+                
+                if (!existingPhoto) {
+                  await prisma.photo.create({
+                    data: {
+                      claimId: claim.id,
+                      attachmentId: attachment.id,
+                      internalUpload: false,
+                    },
+                  });
+                  photosCreated++;
+                  console.log(`[create-claim] Created photo for attachment ${attachment.id}`);
+                } else {
+                  console.log(`[create-claim] Photo already exists for attachment ${attachment.id}, skipping`);
+                }
               }
             }
-          }
 
-          // Create ClientDocument for PDFs and DOCX files
-          if (isPdf || isDocx) {
-            await prisma.clientDocument.create({
-              data: {
-                claimId: claim.id,
-                attachmentId: attachment.id,
-                textOriginal: attachment.textOriginal || "",
-                originalLanguage: "SR", // Default, can be detected later
-              },
+            // Create ClientDocument for PDFs and DOCX files
+            if (isPdf || isDocx) {
+              await prisma.clientDocument.create({
+                data: {
+                  claimId: claim.id,
+                  attachmentId: attachment.id,
+                  textOriginal: attachment.textOriginal || "",
+                  originalLanguage: "SR", // Default, can be detected later
+                },
+              });
+              documentsCreated++;
+              console.log(`[create-claim] Created document for attachment ${attachment.id}`);
+            }
+          } catch (attachmentError) {
+            console.error(`[create-claim] Error processing attachment ${attachment.id}:`, attachmentError);
+            attachmentErrors.push({
+              attachmentId: attachment.id,
+              error: attachmentError instanceof Error ? attachmentError.message : String(attachmentError),
             });
-            documentsCreated++;
-            console.log(`[create-claim] Created document for attachment ${attachment.id}`);
+            // Continue with next attachment instead of failing entire claim creation
           }
         }
 
@@ -591,8 +602,12 @@ export async function POST(request: NextRequest) {
       claim: updatedClaim,
       photosCreated,
       documentsCreated,
+      attachmentErrors: attachmentErrors.length > 0 ? attachmentErrors : undefined,
       message: photosCreated > 0 || documentsCreated > 0 
         ? `Created ${photosCreated} photo(s) and ${documentsCreated} document(s).`
+        : undefined,
+      warning: attachmentErrors.length > 0
+        ? `Claim created, but ${attachmentErrors.length} attachment(s) failed to process.`
         : undefined,
     }, { status: 201 });
   } catch (error) {
