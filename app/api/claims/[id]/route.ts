@@ -10,7 +10,7 @@ import { parseClaimCode } from "@/lib/domain/claimCode";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 import { logActivityFromRequest } from "@/lib/activity-log";
-import { createClaimFolder, claimHasProperFolderMetadata } from "@/lib/files/fileStorage";
+import { createClaimFolder, claimHasProperFolderMetadata, moveAttachmentsFromUnassignedToClaim } from "@/lib/files/fileStorage";
 
 export async function GET(
   request: NextRequest,
@@ -547,6 +547,17 @@ export async function PATCH(
           (claim as { serverFolderPath?: string | null }).serverFolderPath = folderPath;
           console.log(`[PATCH /api/claims/${id}] Created Synology folder (Firma - MR Code): ${folderPath}`);
         }
+      }
+    }
+
+    // Move _unassigned attachments to claim folder (when folder exists - new or already created)
+    if (claim && claim.serverFolderPath) {
+      const moveResult = await moveAttachmentsFromUnassignedToClaim(claim);
+      if (moveResult.moved > 0) {
+        console.log(`[PATCH /api/claims/${id}] Moved ${moveResult.moved} attachments from _unassigned to claim folder`);
+      }
+      if (moveResult.failed > 0) {
+        console.warn(`[PATCH /api/claims/${id}] Failed to move ${moveResult.failed} attachments:`, moveResult.errors);
       }
     }
 

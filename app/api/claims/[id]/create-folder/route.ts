@@ -6,7 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { createClaimFolder } from "@/lib/files/fileStorage";
+import { createClaimFolder, moveAttachmentsFromUnassignedToClaim } from "@/lib/files/fileStorage";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(
@@ -42,7 +42,13 @@ export async function POST(
       data: { serverFolderPath: folderPath },
     });
 
-    return NextResponse.json({ serverFolderPath: folderPath });
+    const moveResult = await moveAttachmentsFromUnassignedToClaim(claim);
+    return NextResponse.json({
+      serverFolderPath: folderPath,
+      movedFromUnassigned: moveResult.moved,
+      failedToMove: moveResult.failed,
+      moveErrors: moveResult.errors.length > 0 ? moveResult.errors : undefined,
+    });
   } catch (error) {
     console.error("[create-folder] Error:", error);
     const permError = createPermissionError(error);
