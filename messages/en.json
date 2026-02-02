@@ -259,6 +259,7 @@
       "serverFolderPath": "Server Folder Path",
       "createFolder": "Create folder on Synology",
       "createFolderHint": "Folder was not created on server. Click to create.",
+      "folderAutoCreateHint": "Folder will be created automatically when you fill in Firma and MR Code.",
       "createFolderSuccess": "Folder created on Synology",
       "createFolderError": "Failed to create folder",
       "email": {

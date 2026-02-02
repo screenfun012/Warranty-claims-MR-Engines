@@ -257,6 +257,7 @@
       "serverFolderPath": "Putanja foldera na serveru",
       "createFolder": "Kreiraj folder na Synology",
       "createFolderHint": "Folder na serveru nije kreiran. Klikni da kreiraš.",
+      "folderAutoCreateHint": "Folder se automatski kreira kada popuniš Firma i MR Code.",
       "createFolderSuccess": "Folder kreiran na Synology",
       "createFolderError": "Kreiranje foldera nije uspelo",
       "email": {

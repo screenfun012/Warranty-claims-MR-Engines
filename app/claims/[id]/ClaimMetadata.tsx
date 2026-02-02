@@ -153,26 +153,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [editingField, setEditingField] = useState<string | null>(null);
   const [notificationSent, setNotificationSent] = useState(!!claim.processingEmailSentAt);
   const [isSendingNotification, setIsSendingNotification] = useState(false);
-  const [creatingFolder, setCreatingFolder] = useState(false);
-  
   const prevClaimIdRef = useRef(claim.id);
-
-  const handleCreateFolder = async () => {
-    setCreatingFolder(true);
-    try {
-      const res = await fetch(`/api/claims/${claim.id}/create-folder`, { method: "POST" });
-      const data = await res.json();
-      if (res.ok && data.serverFolderPath) {
-        onUpdate({ serverFolderPath: data.serverFolderPath });
-      } else {
-        alert(t("claims.metadata.createFolderError") + (data.error ? ": " + data.error : ""));
-      }
-    } catch (err) {
-      alert(t("claims.metadata.createFolderError"));
-    } finally {
-      setCreatingFolder(false);
-    }
-  };
 
   // Load departments, workers, and companies from API
   useEffect(() => {
@@ -1014,7 +995,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           </Label>
         </div>
 
-        {/* Server Folder Path (read-only) or Create folder when missing */}
+        {/* Server Folder Path (read-only). Folder se automatski kreira kada se popune Firma i MR Code. */}
         {claim.serverFolderPath ? (
           <div>
             <Label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -1024,29 +1005,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             <Input value={claim.serverFolderPath} disabled className="h-9" />
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             <Label className="text-sm font-medium flex items-center gap-2">
-              <FolderOpen className="h-4 w-4 text-amber-500" />
+              <FolderOpen className="h-4 w-4 text-muted-foreground" />
               {t("claims.metadata.serverFolderPath")}
             </Label>
             <p className="text-sm text-muted-foreground">
-              {t("claims.metadata.createFolderHint")}
+              {t("claims.metadata.folderAutoCreateHint")}
             </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isReadOnly || creatingFolder}
-              onClick={handleCreateFolder}
-              className="w-fit gap-2"
-            >
-              {creatingFolder ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FolderOpen className="h-4 w-4" />
-              )}
-              {creatingFolder ? t("common.loading") : t("claims.metadata.createFolder")}
-            </Button>
           </div>
         )}
       </div>
