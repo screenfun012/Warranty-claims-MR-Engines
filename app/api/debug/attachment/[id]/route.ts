@@ -43,7 +43,6 @@ export async function GET(
       fileName: attachment.fileName,
       mimeType: attachment.mimeType,
       filePath: attachment.filePath,
-      fileSize: attachment.fileSize,
       claimId: attachment.claimId,
       claim: attachment.claim,
       emailMessageId: attachment.emailMessageId,
