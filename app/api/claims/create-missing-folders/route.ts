@@ -6,7 +6,7 @@
 
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { createClaimFolder } from "@/lib/files/fileStorage";
+import { createClaimFolder, moveAttachmentsFromUnassignedToClaim } from "@/lib/files/fileStorage";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST() {
@@ -19,7 +19,7 @@ export async function POST() {
       include: { customer: true },
     });
 
-    const results: { claimId: string; claimCode: string | null; ok: boolean; path?: string; error?: string }[] = [];
+    const results: { claimId: string; claimCode: string | null; ok: boolean; path?: string; error?: string; moved?: number }[] = [];
 
     for (const claim of claimsWithoutFolder) {
       try {
@@ -29,7 +29,8 @@ export async function POST() {
             where: { id: claim.id },
             data: { serverFolderPath: folderPath },
           });
-          results.push({ claimId: claim.id, claimCode: claim.claimCodeRaw, ok: true, path: folderPath });
+          const moveResult = await moveAttachmentsFromUnassignedToClaim(claim);
+          results.push({ claimId: claim.id, claimCode: claim.claimCodeRaw, ok: true, path: folderPath, moved: moveResult.moved });
         } else {
           results.push({ claimId: claim.id, claimCode: claim.claimCodeRaw, ok: false, error: "createClaimFolder returned null" });
         }

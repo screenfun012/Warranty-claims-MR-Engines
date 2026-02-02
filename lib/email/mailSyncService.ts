@@ -10,6 +10,7 @@ import { isEmailConfigured } from "@/lib/config/envLoader";
 import {
   saveAttachmentForUnassignedThread,
   saveAttachmentForClaim,
+  claimHasProperFolderMetadata,
 } from "@/lib/files/fileStorage";
 
 export interface SyncResult {
@@ -224,10 +225,16 @@ export async function syncNewEmails(): Promise<SyncResult> {
       } else {
         // OPTIMIZATION 1: Load claim once if needed (not for each attachment)
         let claim: Awaited<ReturnType<typeof getPrisma>>['claim']['findUnique'] extends (...args: any[]) => Promise<infer T> ? T : never | null = null;
+        let useClaimFolder = false;
         if (thread.claimId) {
           claim = await prisma.claim.findUnique({
             where: { id: thread.claimId },
+            include: { customer: true },
           });
+          // Only save to claim folder when Firma+MR Code are set; otherwise use _unassigned
+          if (claim) {
+            useClaimFolder = await claimHasProperFolderMetadata(claim);
+          }
         }
 
         // OPTIMIZATION 2: Process all attachments in parallel
@@ -237,8 +244,8 @@ export async function syncNewEmails(): Promise<SyncResult> {
             
             let filePath: string;
 
-            if (claim) {
-              // Save to claim folder
+            if (claim && useClaimFolder) {
+              // Save to claim folder (Firma - MR Code) - only when metadata is set
               filePath = await saveAttachmentForClaim({
                 claim,
                 fileBuffer: attachment.buffer,
@@ -247,7 +254,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
                 subfolder: "03_attachments",
               });
             } else {
-              // Save to unassigned thread folder
+              // Save to unassigned thread folder (until Firma+MR Code are set)
               filePath = await saveAttachmentForUnassignedThread({
                 threadId: thread.id,
                 fileBuffer: attachment.buffer,
