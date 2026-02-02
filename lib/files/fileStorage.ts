@@ -24,13 +24,21 @@ console.log("[FileStorage] Storage: Synology (WebDAV) only.", {
 let webdavClient: WebDAVClient | null = null;
 if (USE_WEBDAV) {
   try {
-    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    const httpsAgent = new https.Agent({ 
+      rejectUnauthorized: false,
+      timeout: 30000, // 30s timeout
+    });
     webdavClient = createClient(env.WEBDAV_URL, {
       username: env.WEBDAV_USERNAME,
       password: env.WEBDAV_PASSWORD,
       httpsAgent,
+      maxBodyLength: 100 * 1024 * 1024, // 100MB
+      maxContentLength: 100 * 1024 * 1024, // 100MB
     });
-    console.log("[FileStorage] ✓ WebDAV (Synology) initialized");
+    console.log("[FileStorage] ✓ WebDAV (Synology via proxy) initialized", {
+      url: env.WEBDAV_URL.substring(0, 30) + "...",
+      basePath: env.WEBDAV_BASE_PATH,
+    });
   } catch (error) {
     console.error("[FileStorage] ✗ WebDAV init failed:", error);
     webdavClient = null;
@@ -276,14 +284,43 @@ async function fileExists(filePath: string): Promise<boolean> {
 export async function readAttachmentFile(relativePathOrUrl: string): Promise<Buffer> {
   if (relativePathOrUrl.startsWith('webdav:')) {
     if (!webdavClient) {
+      console.error("[readAttachmentFile] WebDAV client not initialized", {
+        hasUrl: !!env.WEBDAV_URL,
+        hasUsername: !!env.WEBDAV_USERNAME,
+        hasPassword: !!env.WEBDAV_PASSWORD,
+      });
       throw new Error("WebDAV client not initialized. Check WEBDAV_URL, WEBDAV_USERNAME, WEBDAV_PASSWORD.");
     }
     const relativePath = relativePathOrUrl.replace('webdav:', '');
     const webdavPath = getWebDAVPath(relativePath);
-    const exists = await webdavClient.exists(webdavPath);
-    if (!exists) throw new Error(`File not found on NAS: ${webdavPath}`);
-    const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
-    return Buffer.from(buffer as ArrayBuffer);
+    
+    console.log("[readAttachmentFile] Reading from WebDAV", { 
+      relativePath, 
+      webdavPath,
+      webdavUrl: env.WEBDAV_URL?.substring(0, 30) + "...",
+    });
+    
+    try {
+      const exists = await webdavClient.exists(webdavPath);
+      if (!exists) {
+        console.error("[readAttachmentFile] File not found on NAS", { webdavPath });
+        throw new Error(`File not found on NAS: ${webdavPath}`);
+      }
+      const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
+      const bufferData = Buffer.from(buffer as ArrayBuffer);
+      console.log("[readAttachmentFile] Successfully read file", { 
+        webdavPath, 
+        size: bufferData.length 
+      });
+      return bufferData;
+    } catch (error) {
+      console.error("[readAttachmentFile] WebDAV error", {
+        webdavPath,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
   }
   if (relativePathOrUrl.startsWith('http://') || relativePathOrUrl.startsWith('https://')) {
     const response = await fetch(relativePathOrUrl);
