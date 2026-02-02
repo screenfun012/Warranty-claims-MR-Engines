@@ -320,6 +320,7 @@ export async function POST(request: NextRequest) {
     // Link email thread to claim if provided and process attachments
     let photosCreated = 0;
     let documentsCreated = 0;
+    const attachmentErrors: Array<{ attachmentId: string; error: string }> = [];
 
     if (emailThreadId) {
       await prisma.emailThread.update({
@@ -367,8 +368,6 @@ export async function POST(request: NextRequest) {
         const allAttachments = thread.messages.flatMap((msg) => msg.attachments || []);
 
         console.log(`[create-claim] Processing ${allAttachments.length} attachments for new claim ${claim.id}`);
-
-        const attachmentErrors: Array<{ attachmentId: string; error: string }> = [];
 
         for (const attachment of allAttachments) {
           try {
