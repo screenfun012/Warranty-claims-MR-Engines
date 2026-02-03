@@ -73,11 +73,21 @@ export async function GET(request: NextRequest) {
       })),
     });
 
-    // Parse details JSON for each activity
-    const activitiesWithDetails = activities.map((activity) => ({
-      ...activity,
-      details: activity.details ? JSON.parse(activity.details) : null,
-    }));
+    // Parse details JSON for each activity (safe parse - invalid JSON won't break the whole response)
+    const activitiesWithDetails = activities.map((activity) => {
+      let details: Record<string, unknown> | null = null;
+      if (activity.details && activity.details.trim()) {
+        try {
+          details = JSON.parse(activity.details) as Record<string, unknown>;
+        } catch {
+          details = { _raw: activity.details };
+        }
+      }
+      return {
+        ...activity,
+        details,
+      };
+    });
 
     return NextResponse.json({
       activities: activitiesWithDetails,

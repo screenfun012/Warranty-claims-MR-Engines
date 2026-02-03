@@ -442,16 +442,30 @@ export default function AdminDashboardPage() {
                       )}
                     </p>
                   </div>
-                  {entry.entityType === "CLAIM" && entry.entityId && (
-                    <Link 
-                      href={`/claims/${entry.entityId}`}
-                      onClick={(e) => e.stopPropagation()}
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedActivity(entry);
+                      }}
+                      title={t("admin.activity.details")}
                     >
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <ExternalLink className="h-3 w-3" />
-                      </Button>
-                    </Link>
-                  )}
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    {entry.entityType === "CLAIM" && entry.entityId && (
+                      <Link 
+                        href={`/claims/${entry.entityId}`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                 </div>
                 );
               })
@@ -687,17 +701,17 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
-              {selectedActivity.details && Object.keys(selectedActivity.details).length > 0 && (
+              {selectedActivity.details && typeof selectedActivity.details === "object" && !Array.isArray(selectedActivity.details) && Object.keys(selectedActivity.details).length > 0 && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">{t("admin.activity.additionalDetails")}</p>
                   <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
                     {Object.entries(selectedActivity.details).map(([key, value]) => (
-                      <div key={key} className="flex justify-between">
-                        <span className="text-muted-foreground capitalize">
+                      <div key={key} className="flex justify-between gap-2">
+                        <span className="text-muted-foreground capitalize shrink-0">
                           {key.replace(/([A-Z])/g, " $1").trim()}:
                         </span>
-                        <span className="font-medium">
-                          {typeof value === "object" ? JSON.stringify(value) : String(value)}
+                        <span className="font-medium text-right break-all">
+                          {value !== null && typeof value === "object" ? JSON.stringify(value) : String(value ?? "")}
                         </span>
                       </div>
                     ))}
