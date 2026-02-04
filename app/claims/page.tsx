@@ -212,8 +212,8 @@ export default function ClaimsPage() {
       }
       return result.claims;
     },
-    staleTime: 30 * 1000, // 30 seconds - data stays fresh
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
+    staleTime: 60 * 1000, // 1 minute - data stays fresh, less refetch when switching tabs
+    gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
     placeholderData: keepPreviousData, // Keep showing current page while next page loads (no blank flash)
   });
   
@@ -257,6 +257,26 @@ export default function ClaimsPage() {
 
   // Server returns the page; show it as-is (no client-side re-filter that would shrink the list)
   const displayClaims = claims;
+
+  // Prefetch claim detail on row hover so opening the detail page feels instant
+  const handleRowMouseEnter = useCallback(
+    (_row: Record<string, React.ReactNode>, index: number) => {
+      const claim = displayClaims[index];
+      if (!claim?.id) return;
+      queryClient.prefetchQuery({
+        queryKey: ["claim", claim.id],
+        queryFn: async () => {
+          const res = await fetch(`/api/claims/${claim.id}?light=1`);
+          if (!res.ok) throw new Error("Failed");
+          const data = await res.json();
+          if (!data.claim) throw new Error("Not found");
+          return data.claim;
+        },
+        staleTime: 60 * 1000,
+      });
+    },
+    [queryClient, displayClaims]
+  );
 
   // Legacy fetchClaims function for backward compatibility (now just calls refetch)
   const fetchClaims = useCallback(async (showAll = false, customFilters?: { claimCode?: string; customerId?: string }) => {
@@ -824,6 +844,7 @@ export default function ClaimsPage() {
             </div>
           }
           onRowClick={(row, index) => router.push(`/claims/${displayClaims[index].id}`)}
+                onRowMouseEnter={handleRowMouseEnter}
         />
         )}
       </Card>

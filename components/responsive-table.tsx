@@ -11,6 +11,7 @@ interface ResponsiveTableProps {
   data: Array<Record<string, React.ReactNode>>;
   emptyMessage?: React.ReactNode;
   onRowClick?: (row: Record<string, React.ReactNode>, index: number) => void;
+  onRowMouseEnter?: (row: Record<string, React.ReactNode>, index: number) => void;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export function ResponsiveTable({
   data,
   emptyMessage = "No data found",
   onRowClick,
+  onRowMouseEnter,
   className,
 }: ResponsiveTableProps) {
   const isMobile = useIsMobile();
@@ -41,6 +43,7 @@ export function ResponsiveTable({
               )}
               style={{ animationDelay: `${index * 50}ms` }}
               onClick={() => onRowClick?.(row, index)}
+              onMouseEnter={() => onRowMouseEnter?.(row, index)}
             >
               <div className="space-y-3">
                 {headers.map((header) => (
@@ -88,6 +91,7 @@ export function ResponsiveTable({
                 className={`${onRowClick ? "cursor-pointer group" : ""} transition-all duration-200 hover:bg-muted/50 hover:shadow-md hover:border-primary/30 animate-in fade-in slide-in-from-left-4 border-b border-border/50`}
                 style={{ animationDelay: `${index * 50}ms`, animationFillMode: "both" }}
                 onClick={() => onRowClick?.(row, index)}
+                onMouseEnter={() => onRowMouseEnter?.(row, index)}
               >
                 {headers.map((header) => (
                   <TableCell key={header.key} className={header.className}>

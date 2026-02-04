@@ -173,15 +173,19 @@ export async function GET(request: NextRequest) {
       ]);
     }
 
-    // If claimAcceptanceStatus is not being returned, explicitly fetch it using raw query
-    for (const claim of claims) {
-      if (claim.claimAcceptanceStatus === undefined) {
-        const statusResult = await prisma.$queryRawUnsafe<Array<{ claimAcceptanceStatus: string | null }>>(
-          `SELECT claimAcceptanceStatus FROM Claim WHERE id = ?`,
-          claim.id
-        );
-        if (statusResult && statusResult.length > 0) {
-          (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
+    // If claimAcceptanceStatus is not returned by Prisma, fetch in one batch
+    const missingStatus = claims.filter((c) => (c as any).claimAcceptanceStatus === undefined);
+    if (missingStatus.length > 0) {
+      const ids = missingStatus.map((c) => c.id);
+      const placeholders = ids.map(() => "?").join(",");
+      const statusRows = await prisma.$queryRawUnsafe<Array<{ id: string; claimAcceptanceStatus: string | null }>>(
+        `SELECT id, claimAcceptanceStatus FROM Claim WHERE id IN (${placeholders})`,
+        ...ids
+      );
+      const statusById = new Map(statusRows.map((r) => [r.id, r.claimAcceptanceStatus]));
+      for (const claim of claims) {
+        if ((claim as any).claimAcceptanceStatus === undefined) {
+          (claim as any).claimAcceptanceStatus = statusById.get(claim.id) ?? null;
         }
       }
     }

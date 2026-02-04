@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -92,6 +93,21 @@ export default function PlanerGeneralPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const prefetchBatch = useCallback(
+    (batchId: string) => {
+      queryClient.prefetchQuery({
+        queryKey: ["export-batch", batchId],
+        queryFn: async () => {
+          const res = await fetch(`/api/export-planner/batches/${batchId}`);
+          if (!res.ok) throw new Error("Failed");
+          return res.json();
+        },
+        staleTime: 2 * 60 * 1000,
+      });
+    },
+    [queryClient]
+  );
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-8">
@@ -138,6 +154,7 @@ export default function PlanerGeneralPage() {
           {batches.map((batch) => (
             <Card
               key={batch.id}
+              onMouseEnter={() => prefetchBatch(batch.id)}
               className={cn(
                 "transition-all duration-200 overflow-hidden flex flex-col",
                 batch.frozenAt

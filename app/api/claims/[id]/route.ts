@@ -22,10 +22,11 @@ export async function GET(
     await requirePermission(PERMISSIONS.CLAIMS_READ);
     
     const { id } = await params;
-    console.log(`[GET /api/claims/${id}] Fetching claim with ID: ${id}`);
+    const light = request.nextUrl.searchParams.get("light") === "1";
+    console.log(`[GET /api/claims/${id}] Fetching claim (light=${light})`);
 
-    // Base include options (without faultDepartments)
-    const baseInclude = {
+    // Light payload: only what overview/metadata/findings need – no emails, attachments, documents, photos
+    const lightInclude = {
       customer: true,
       faultDepartment: true,
       workOrder: {
@@ -46,6 +47,15 @@ export async function GET(
           email: true,
         },
       },
+      reportSections: {
+        orderBy: {
+          orderIndex: "asc" as const,
+        },
+      },
+    };
+
+    // Full include adds heavy relations (emails, attachments, documents, photos)
+    const heavyInclude = {
       emailThreads: {
         include: {
           messages: {
@@ -75,16 +85,18 @@ export async function GET(
           indexNo: "asc" as const,
         },
       },
-      reportSections: {
-        orderBy: {
-          orderIndex: "asc" as const,
-        },
-      },
     };
+
+    const baseInclude = light
+      ? lightInclude
+      : {
+          ...lightInclude,
+          ...heavyInclude,
+        };
 
     // Try to fetch claim - first with faultDepartments, fallback without
     let claim = null;
-    
+
     try {
       claim = await prisma.claim.findUnique({
         where: { id },
@@ -100,7 +112,6 @@ export async function GET(
       });
     } catch (faultDeptError) {
       console.warn(`[GET /api/claims/${id}] faultDepartments include failed, trying without:`, faultDeptError);
-      // Fallback without faultDepartments
       claim = await prisma.claim.findUnique({
         where: { id },
         include: baseInclude,
