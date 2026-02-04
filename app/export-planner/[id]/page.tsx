@@ -124,14 +124,11 @@ const columnAwareCollisionDetection: CollisionDetection = (args) => {
   const isColumnDrag = String(args.active.id).startsWith(COLUMN_PREFIX);
   if (isColumnDrag) {
     const columnContainers = args.droppableContainers.filter((c) => String(c.id).startsWith(COLUMN_PREFIX));
-    const columnRects = new Map(
-      columnContainers
-        .map((c) => {
-          const rect = args.droppableRects.get(c.id);
-          return rect != null ? ([c.id, rect] as const) : null;
-        })
-        .filter((x): x is [string, unknown] => x != null)
-    );
+    const columnRects = new Map<unknown, unknown>();
+    for (const c of columnContainers) {
+      const rect = args.droppableRects.get(c.id);
+      if (rect != null) columnRects.set(c.id, rect);
+    }
     return pointerWithin({ ...args, droppableContainers: columnContainers, droppableRects: columnRects as typeof args.droppableRects });
   }
   return pointerWithin(args);
