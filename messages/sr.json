@@ -71,7 +71,10 @@
     "admin": "Admin",
     "profile": "Profil",
     "logout": "Odjavi se",
-    "workOrders": "Radni nalozi"
+    "workOrders": "Radni nalozi",
+    "exportPlanner": "Planer izvoza",
+    "plannerOverview": "Pregled",
+    "plannerSettings": "Podešavanja planera"
   },
   "dashboard": {
     "title": "Početna",

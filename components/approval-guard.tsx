@@ -67,20 +67,27 @@ export function ApprovalGuard({ children }: ApprovalGuardProps) {
   const skipPaths = ['/pending-approval', '/auth', '/login'];
   const shouldSkip = skipPaths.some(path => pathname?.startsWith(path));
 
+  const warrantyPaths = ['/', '/claims', '/inbox', '/statistics', '/settings', '/admin', '/work-orders', '/profile'];
+
   const checkApproval = useCallback(async (email: string) => {
-    // First check cache
-    const cachedApproval = getApprovalCache(email);
-    if (cachedApproval !== null) {
-      if (cachedApproval) {
-        setApprovalState('approved');
-      } else {
-        setApprovalState('pending');
-        router.replace("/pending-approval");
+    // Na localhostu ne koristimo keš - omogućava SKIP_APPROVAL_CHECK da radi odmah
+    const isLocalhost = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const useCache = !isLocalhost;
+
+    if (useCache) {
+      const cachedApproval = getApprovalCache(email);
+      if (cachedApproval !== null) {
+        if (cachedApproval) {
+          setApprovalState('approved');
+        } else {
+          setApprovalState('pending');
+          router.replace("/pending-approval");
+        }
+        return;
       }
-      return;
     }
 
-    // No cache, fetch from server
+    // No cache (ili localhost), fetch from server
     try {
       const res = await fetch("/api/auth/check-approval");
       const data = await res.json();
@@ -99,6 +106,13 @@ export function ApprovalGuard({ children }: ApprovalGuardProps) {
       setApprovalState('approved');
     }
   }, [router]);
+
+  // Get user role (same logic as sidebar)
+  const userRole = (user as { role?: string; roles?: string[]; 'https://mr-engines-warranty/roles'?: string[]; app_metadata?: { roles?: string[] } })?.role
+    || (user as { roles?: string[] })?.roles?.[0]
+    || (user as { 'https://mr-engines-warranty/roles'?: string[] })['https://mr-engines-warranty/roles']?.[0]
+    || (user as { app_metadata?: { roles?: string[] } })?.app_metadata?.roles?.[0]
+    || "";
 
   useEffect(() => {
     // Skip if on exempt paths
@@ -121,6 +135,18 @@ export function ApprovalGuard({ children }: ApprovalGuardProps) {
     // Check approval status
     checkApproval(user.email);
   }, [user, userLoading, shouldSkip, checkApproval]);
+
+  // Redirect planner-only users from warranty routes to planer
+  useEffect(() => {
+    if (approvalState !== 'approved' || !pathname || shouldSkip) return;
+    if (!userRole) return;
+    const plannerOnly = userRole === "PLANNER_OPERATOR" || userRole === "PLANNER_VIEWER";
+    if (!plannerOnly) return;
+    const isOnWarrantyRoute = warrantyPaths.some(p => pathname === p || pathname.startsWith(p + "/"));
+    if (isOnWarrantyRoute) {
+      router.replace("/export-planner");
+    }
+  }, [approvalState, pathname, userRole, shouldSkip, router]);
 
   // Show loading screen while checking
   if (userLoading || approvalState === 'loading') {

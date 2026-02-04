@@ -71,7 +71,10 @@
     "admin": "Admin",
     "profile": "Profile",
     "logout": "Log out",
-    "workOrders": "Work Orders"
+    "workOrders": "Work Orders",
+    "exportPlanner": "Export Planner",
+    "plannerOverview": "Overview",
+    "plannerSettings": "Planner Settings"
   },
   "dashboard": {
     "title": "Dashboard",

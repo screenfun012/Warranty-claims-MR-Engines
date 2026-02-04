@@ -1,6 +1,7 @@
 /**
  * Role definitions and permissions
- * 4-tier role system: SUPER_ADMIN > ADMIN > OPERATOR > VIEWER
+ * Warranty: SUPER_ADMIN > ADMIN > OPERATOR > VIEWER
+ * Planner: PLANNER_OPERATOR, PLANNER_VIEWER (independent - see only planer)
  */
 
 export const ROLES = {
@@ -8,6 +9,8 @@ export const ROLES = {
   ADMIN: "ADMIN",
   OPERATOR: "OPERATOR",
   VIEWER: "VIEWER",
+  PLANNER_OPERATOR: "PLANNER_OPERATOR",
+  PLANNER_VIEWER: "PLANNER_VIEWER",
 } as const;
 
 export type Role = (typeof ROLES)[keyof typeof ROLES];
@@ -30,6 +33,9 @@ export const PERMISSIONS = {
   SETTINGS_UPDATE: "settings.update",
   // Admin permissions
   ADMIN_USERS: "admin.users",
+  // Export planner permissions
+  EXPORT_PLANNER_READ: "export-planner.read",
+  EXPORT_PLANNER_EDIT: "export-planner.edit",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -59,6 +65,8 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     PERMISSIONS.SETTINGS_READ,
     PERMISSIONS.SETTINGS_UPDATE,
     PERMISSIONS.ADMIN_USERS,
+    PERMISSIONS.EXPORT_PLANNER_READ,
+    PERMISSIONS.EXPORT_PLANNER_EDIT,
   ],
   ADMIN: [
     PERMISSIONS.CLAIMS_READ,
@@ -66,6 +74,8 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     PERMISSIONS.CLAIMS_UPDATE,
     PERMISSIONS.INBOX_READ,
     PERMISSIONS.SETTINGS_READ,
+    PERMISSIONS.EXPORT_PLANNER_READ,
+    PERMISSIONS.EXPORT_PLANNER_EDIT,
   ],
   OPERATOR: [
     PERMISSIONS.CLAIMS_READ,
@@ -76,6 +86,13 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
   VIEWER: [
     PERMISSIONS.CLAIMS_READ,
     PERMISSIONS.INBOX_READ,
+  ],
+  PLANNER_OPERATOR: [
+    PERMISSIONS.EXPORT_PLANNER_READ,
+    PERMISSIONS.EXPORT_PLANNER_EDIT,
+  ],
+  PLANNER_VIEWER: [
+    PERMISSIONS.EXPORT_PLANNER_READ,
   ],
 };
 

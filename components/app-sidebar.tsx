@@ -21,6 +21,9 @@ import {
   UserCheck,
   BarChart3,
   ChevronUp,
+  Truck,
+  LayoutDashboard,
+  Cog,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -70,15 +73,22 @@ type NavigationItem = {
 type NavigationItemWithRole = NavigationItem & {
   minRole?: "VIEWER" | "OPERATOR" | "ADMIN" | "SUPER_ADMIN";
   translationKey: string;
+  plannerOnly?: boolean;
 };
 
-const allNavigation: NavigationItemWithRole[] = [
+const warrantyNavigation: NavigationItemWithRole[] = [
   { name: "Dashboard", translationKey: "nav.dashboard", href: "/", icon: Home, minRole: "VIEWER" },
   { name: "Inbox", translationKey: "nav.inbox", href: "/inbox", icon: Inbox, showBadge: true, minRole: "VIEWER" },
   { name: "Claims", translationKey: "nav.claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
   { name: "Statistics", translationKey: "nav.statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
   { name: "Settings", translationKey: "nav.settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
   { name: "Admin", translationKey: "nav.admin", href: "/admin", icon: Shield, minRole: "SUPER_ADMIN" },
+];
+
+const plannerNavigation: NavigationItemWithRole[] = [
+  { name: "Planer", translationKey: "nav.exportPlanner", href: "/export-planner", icon: Truck },
+  { name: "Pregled", translationKey: "nav.plannerOverview", href: "/export-planner/pregled", icon: LayoutDashboard },
+  { name: "Podešavanja", translationKey: "nav.plannerSettings", href: "/export-planner/podesavanja", icon: Cog },
 ];
 
 // Role hierarchy for permission checks
@@ -89,10 +99,18 @@ const ROLE_LEVELS: Record<string, number> = {
   SUPER_ADMIN: 3,
 };
 
+const WARRANTY_ROLES = ["VIEWER", "OPERATOR", "ADMIN", "SUPER_ADMIN"] as const;
+const PLANNER_ROLES = ["PLANNER_OPERATOR", "PLANNER_VIEWER"] as const;
+
 function hasMinRole(userRole: string | undefined, minRole: string): boolean {
   const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
   const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
   return userLevel >= requiredLevel;
+}
+
+function isPlannerOnly(userRole: string | undefined): boolean {
+  if (!userRole) return false;
+  return PLANNER_ROLES.includes(userRole as any) && !WARRANTY_ROLES.includes(userRole as any);
 }
 
 const fetchUnreadCount = async (): Promise<number> => {
@@ -157,16 +175,21 @@ export function AppSidebar() {
   // Get role from various possible locations
   const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
   const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
-  
-  // Filter navigation based on user role
-  const navigation = allNavigation.filter(item => 
-    hasMinRole(userRole, item.minRole || "VIEWER")
-  );
 
-  // React Query automatski cache-uje i deduplira request-e
+  // Planner-only users see only planer nav; others see warranty nav (+ planer for ADMIN/SUPER_ADMIN)
+  const plannerOnly = isPlannerOnly(userRole);
+  const navigation = plannerOnly
+    ? plannerNavigation
+    : [
+        ...warrantyNavigation.filter(item => hasMinRole(userRole, item.minRole || "VIEWER")),
+        ...(hasMinRole(userRole, "ADMIN") ? plannerNavigation : []),
+      ];
+
+  // React Query automatski cache-uje i deduplira request-e (skip for planner-only - no inbox)
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ["unreadCount"],
     queryFn: fetchUnreadCount,
+    enabled: !plannerOnly,
     refetchInterval: 30000, // 30 sekundi umesto 10 (3x manje request-ova)
     refetchIntervalInBackground: false, // Ne refetch-uj kada je tab hidden
     staleTime: 20 * 1000, // 20 sekundi - data je fresh 20 sekundi
@@ -214,7 +237,7 @@ export function AppSidebar() {
         isCollapsed && !isMobile ? "px-2 py-2 min-h-[64px]" : "px-3 py-3 min-h-[80px]"
       )}>
         <Link 
-          href="/" 
+          href={plannerOnly ? "/export-planner" : "/"}
           className="flex items-center justify-center w-full h-full group/logo transition-all duration-200 hover:opacity-80"
         >
           {isCollapsed && !isMobile ? (
