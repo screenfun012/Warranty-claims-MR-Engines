@@ -54,6 +54,8 @@ interface ColumnDef {
 /** Za General planer: imageUrl, link, itd. */
 type GeneralCustomData = { imageUrl?: string; link?: string };
 
+type PlannerUser = { id: string; fullName: string | null; email: string };
+
 interface BatchItem {
   id: string;
   rn: string;
@@ -299,7 +301,7 @@ function SortableColumn({
         onLabelChange={onLabelChange}
         onRemoveColumn={onRemoveColumn}
         columnItemCount={columnItemCount}
-        columnDragHandleProps={canEdit ? { attributes, listeners } : undefined}
+        columnDragHandleProps={canEdit ? { attributes: attributes as unknown as Record<string, unknown>, listeners: (listeners ?? {}) as unknown as Record<string, unknown> } : undefined}
         renderCard={renderCard}
       />
     </div>
@@ -648,7 +650,7 @@ function DetailModal({
                   <SelectTrigger><SelectValue placeholder="Izaberi..." /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={SELECT_NONE}>—</SelectItem>
-                    {users.map((u) => (
+                    {users.map((u: PlannerUser) => (
                       <SelectItem key={u.id} value={u.id}>{u.fullName || u.email}</SelectItem>
                     ))}
                   </SelectContent>
@@ -1400,7 +1402,7 @@ export default function ExportBatchPage() {
                     <SelectTrigger><SelectValue placeholder="Izaberi korisnika..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={SELECT_NONE}>—</SelectItem>
-                      {users.map((u) => (
+                      {users.map((u: PlannerUser) => (
                         <SelectItem key={u.id} value={u.id}>{u.fullName || u.email}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1451,7 +1453,7 @@ export default function ExportBatchPage() {
                     <SelectTrigger><SelectValue placeholder="Izaberi..." /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={SELECT_NONE}>—</SelectItem>
-                      {users.map((u) => (
+                      {users.map((u: PlannerUser) => (
                         <SelectItem key={u.id} value={u.id}>{u.fullName || u.email}</SelectItem>
                       ))}
                     </SelectContent>
