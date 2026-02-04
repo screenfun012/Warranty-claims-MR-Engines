@@ -107,11 +107,12 @@ export function ApprovalGuard({ children }: ApprovalGuardProps) {
     }
   }, [router]);
 
-  // Get user role (same logic as sidebar)
-  const userRole = (user as { role?: string; roles?: string[]; 'https://mr-engines-warranty/roles'?: string[]; app_metadata?: { roles?: string[] } })?.role
-    || (user as { roles?: string[] })?.roles?.[0]
-    || (user as { 'https://mr-engines-warranty/roles'?: string[] })['https://mr-engines-warranty/roles']?.[0]
-    || (user as { app_metadata?: { roles?: string[] } })?.app_metadata?.roles?.[0]
+  // Get user role (same logic as sidebar) – optional chaining required when user can be undefined
+  const u = user as { role?: string; roles?: string[]; 'https://mr-engines-warranty/roles'?: string[]; app_metadata?: { roles?: string[] } } | undefined;
+  const userRole = u?.role
+    || u?.roles?.[0]
+    || u?.['https://mr-engines-warranty/roles']?.[0]
+    || u?.app_metadata?.roles?.[0]
     || "";
 
   useEffect(() => {
