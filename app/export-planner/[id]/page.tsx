@@ -17,7 +17,7 @@ import {
   pointerWithin,
 } from "@dnd-kit/core";
 import type { CollisionDetection } from "@dnd-kit/core";
-import { arrayMove, SortableContext, useSortable, horizontalListSortableStrategy } from "@dnd-kit/sortable";
+import { arrayMove, SortableContext, useSortable, horizontalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -1281,7 +1281,7 @@ export default function ExportBatchPage() {
               </Button>
             </div>
           ) : (
-            <SortableContext items={columns.map((c) => COLUMN_PREFIX + c.id)} strategy={horizontalListSortableStrategy}>
+            <SortableContext items={columns.map((c) => COLUMN_PREFIX + c.id)} strategy={horizontalListSortingStrategy}>
               {columns.map((col) => (
                 <SortableColumn
                   key={col.id}
