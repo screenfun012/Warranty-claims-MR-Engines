@@ -1,25 +1,24 @@
 /**
  * POST /api/claims/[id]/unlock
- * Unlock a claim (SUPER_ADMIN only)
- * This allows editing of closed/locked claims
+ * SUPER_ADMIN: odključa bilo koju. ADMIN/OPERATOR: samo svoje (assignedToId === current user).
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { isSuperAdmin } from "@/lib/auth/permissions";
+import { getSession } from "@/lib/auth/get-session";
 
 export async function POST(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const prisma = await getPrisma();
-    // Only SUPER_ADMIN can unlock claims
     await requirePermission(PERMISSIONS.CLAIMS_UNLOCK);
-    
+
     const { id } = await params;
 
-    // Verify claim exists
     const claim = await prisma.claim.findUnique({
       where: { id },
     });
@@ -29,6 +28,26 @@ export async function POST(
         { error: "Claim not found" },
         { status: 404 }
       );
+    }
+
+    const userIsSuperAdmin = await isSuperAdmin();
+    if (!userIsSuperAdmin) {
+      const session = await getSession();
+      const sessionEmail = (session?.user as { email?: string })?.email;
+      let currentUserId: string | null = null;
+      if (sessionEmail) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: sessionEmail },
+          select: { id: true },
+        });
+        currentUserId = dbUser?.id ?? null;
+      }
+      if (claim.assignedToId !== currentUserId) {
+        return NextResponse.json(
+          { error: "Možete odključati samo reklamacije dodeljene vama." },
+          { status: 403 }
+        );
+      }
     }
 
     // Unlock the claim by setting isLocked = false

@@ -106,6 +106,7 @@ export function getPusherClient(): PusherClient | null {
 export const CHANNELS = {
   CLAIMS: "claims",
   INBOX: "inbox",
+  EXPORT_PLANNER: "export-planner",
 } as const;
 
 // Event types
@@ -115,6 +116,7 @@ export const EVENTS = {
   CLAIM_DELETED: "claim:deleted",
   INBOX_NEW: "inbox:new",
   INBOX_READ: "inbox:read",
+  EXPORT_BATCH_CHANGED: "batch:changed",
 } as const;
 
 // Helper to trigger events from server

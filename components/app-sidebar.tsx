@@ -14,16 +14,16 @@ import {
   Shield,
   LogOut,
   User,
-  Mail,
   Crown,
   Eye,
   UserRoundCog,
   UserCheck,
   BarChart3,
   ChevronUp,
+  ChevronDown,
+  ChevronRight,
   Truck,
   LayoutDashboard,
-  Cog,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -85,10 +85,10 @@ const warrantyNavigation: NavigationItemWithRole[] = [
   { name: "Admin", translationKey: "nav.admin", href: "/admin", icon: Shield, minRole: "SUPER_ADMIN" },
 ];
 
+// Planer je nezavisan od reklamacija: Planer → Planer izvoza | General (klik vodi na tu grupaciju)
 const plannerNavigation: NavigationItemWithRole[] = [
-  { name: "Planer", translationKey: "nav.exportPlanner", href: "/export-planner", icon: Truck },
-  { name: "Pregled", translationKey: "nav.plannerOverview", href: "/export-planner/pregled", icon: LayoutDashboard },
-  { name: "Podešavanja", translationKey: "nav.plannerSettings", href: "/export-planner/podesavanja", icon: Cog },
+  { name: "Planer izvoza", translationKey: "nav.plannerExport", href: "/export-planner/izvoz", icon: Truck },
+  { name: "General", translationKey: "nav.plannerGeneral", href: "/export-planner/general", icon: LayoutDashboard },
 ];
 
 // Role hierarchy for permission checks
@@ -118,6 +118,13 @@ const fetchUnreadCount = async (): Promise<number> => {
   if (!res.ok) return 0;
   const data = await res.json();
   return data.count || 0;
+};
+
+type PlannerBatch = { id: string; customName: string | null; batchCode: string; batchType: string };
+const fetchPlannerBatches = async (batchType: string): Promise<PlannerBatch[]> => {
+  const res = await fetch(`/api/export-planner/batches?batchType=${batchType}`);
+  if (!res.ok) return [];
+  return res.json();
 };
 
 
@@ -180,6 +187,26 @@ export function AppSidebar() {
   const showWarrantyNav = !plannerOnly;
   const showPlannerNav = plannerOnly || hasMinRole(userRole, "ADMIN");
   const warrantyNavItems = warrantyNavigation.filter(item => hasMinRole(userRole, item.minRole || "VIEWER"));
+
+  const [exportPlannerOpen, setExportPlannerOpen] = useState(false);
+  const [generalPlannerOpen, setGeneralPlannerOpen] = useState(false);
+  const { data: exportBatches = [] } = useQuery({
+    queryKey: ["export-planner-batches", "MR_ENGINES"],
+    queryFn: () => fetchPlannerBatches("MR_ENGINES"),
+    enabled: showPlannerNav,
+  });
+  const { data: generalBatches = [] } = useQuery({
+    queryKey: ["export-planner-batches", "GENERIC"],
+    queryFn: () => fetchPlannerBatches("GENERIC"),
+    enabled: showPlannerNav,
+  });
+  const isExportBatchPage = pathname?.startsWith("/export-planner/") && pathname !== "/export-planner/izvoz" && pathname !== "/export-planner/general";
+  const currentBatchId = isExportBatchPage && pathname ? pathname.split("/").pop() : null;
+  useEffect(() => {
+    if (!currentBatchId) return;
+    if (exportBatches.some((b) => b.id === currentBatchId)) setExportPlannerOpen(true);
+    if (generalBatches.some((b) => b.id === currentBatchId)) setGeneralPlannerOpen(true);
+  }, [currentBatchId, exportBatches, generalBatches]);
 
   const renderNavItem = (item: NavigationItemWithRole) => {
     const isActive = Boolean(pathname === item.href || (pathname && item.href && pathname.startsWith(item.href + "/")));
@@ -254,7 +281,7 @@ export function AppSidebar() {
         isCollapsed && !isMobile ? "px-2 py-2 min-h-[64px]" : "px-3 py-3 min-h-[80px]"
       )}>
         <Link 
-          href={plannerOnly ? "/export-planner" : "/"}
+          href={plannerOnly ? "/export-planner/izvoz" : "/"}
           className="flex items-center justify-center w-full h-full group/logo transition-all duration-200 hover:opacity-80"
         >
           {isCollapsed && !isMobile ? (
@@ -311,7 +338,96 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <TooltipProvider delayDuration={0}>
-                  {plannerNavigation.map((item) => renderNavItem(item))}
+                  {!isCollapsed && (
+                    <>
+                      <SidebarMenuItem>
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            pathname === "/export-planner/izvoz" && "bg-sidebar-accent text-sidebar-accent-foreground"
+                          )}
+                          onClick={() => { setExportPlannerOpen((o) => !o); if (isMobile) setOpenMobile(false); }}
+                        >
+                          <Truck className="h-5 w-5 shrink-0" />
+                          <span className="flex-1 text-left">{t("nav.plannerExport")}</span>
+                          {exportPlannerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      </SidebarMenuItem>
+                      {exportPlannerOpen && exportBatches.length > 0 && (
+                        <div className="ml-6 mb-1 space-y-0.5 border-l border-sidebar-border pl-2">
+                          {exportBatches.map((b) => (
+                            <Link
+                              key={b.id}
+                              href={`/export-planner/${b.id}`}
+                              onClick={() => isMobile && setOpenMobile(false)}
+                              className={cn(
+                                "block truncate rounded px-2 py-1 text-sm hover:bg-sidebar-accent/80",
+                                currentBatchId === b.id && "bg-sidebar-accent font-medium"
+                              )}
+                            >
+                              {b.customName || b.batchCode}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                      <SidebarMenuItem>
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                            pathname === "/export-planner/general" && "bg-sidebar-accent text-sidebar-accent-foreground"
+                          )}
+                          onClick={() => { setGeneralPlannerOpen((o) => !o); if (isMobile) setOpenMobile(false); }}
+                        >
+                          <LayoutDashboard className="h-5 w-5 shrink-0" />
+                          <span className="flex-1 text-left">{t("nav.plannerGeneral")}</span>
+                          {generalPlannerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      </SidebarMenuItem>
+                      {generalPlannerOpen && generalBatches.length > 0 && (
+                        <div className="ml-6 mb-1 space-y-0.5 border-l border-sidebar-border pl-2">
+                          {generalBatches.map((b) => (
+                            <Link
+                              key={b.id}
+                              href={`/export-planner/${b.id}`}
+                              onClick={() => isMobile && setOpenMobile(false)}
+                              className={cn(
+                                "block truncate rounded px-2 py-1 text-sm hover:bg-sidebar-accent/80",
+                                currentBatchId === b.id && "bg-sidebar-accent font-medium"
+                              )}
+                            >
+                              {b.customName || b.batchCode}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {isCollapsed && (
+                    <>
+                      <SidebarMenuItem>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuButton asChild>
+                              <Link href="/export-planner/izvoz"><Truck className="h-5 w-5" /></Link>
+                            </SidebarMenuButton>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">{t("nav.plannerExport")}</TooltipContent>
+                        </Tooltip>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuButton asChild>
+                              <Link href="/export-planner/general"><LayoutDashboard className="h-5 w-5" /></Link>
+                            </SidebarMenuButton>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">{t("nav.plannerGeneral")}</TooltipContent>
+                        </Tooltip>
+                      </SidebarMenuItem>
+                    </>
+                  )}
                 </TooltipProvider>
               </SidebarMenu>
             </SidebarGroupContent>

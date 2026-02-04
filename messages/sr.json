@@ -73,10 +73,12 @@
     "logout": "Odjavi se",
     "workOrders": "Radni nalozi",
     "exportPlanner": "Planer izvoza",
+    "plannerExport": "Planer izvoza",
+    "plannerGeneral": "General",
     "plannerOverview": "Pregled",
     "plannerSettings": "Podešavanja planera",
     "groupWarranty": "Reklamacije",
-    "groupPlanner": "Planer izvoza"
+    "groupPlanner": "Planer"
   },
   "dashboard": {
     "title": "Početna",
@@ -741,6 +743,22 @@
     "assignedTo": "Dodeljeno",
     "freeze": "Zaključaj",
     "unfreeze": "Otključaj",
-    "subtitle": "Upravljanje listama za izvoz i planiranje"
+    "subtitle": "Upravljanje listama za izvoz i planiranje",
+    "printDado": "Lista motora",
+    "printFinal": "Finalna lista",
+    "exportCsv": "Izvezi CSV",
+    "override": "Override",
+    "overrideReason": "Razlog",
+    "rn": "RN",
+    "engineType": "Tip motora",
+    "addMotor": "Dodaj motor",
+    "noBatches": "Nema stavki",
+    "items": "motora",
+    "itemsGeneric": "stavki",
+    "exportCount": "za izvoz",
+    "statusPlanirano": "U planu",
+    "statusRad": "U radu",
+    "statusIzvoz": "Izvoz",
+    "qcOk": "OK"
   }
 }

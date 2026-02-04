@@ -1,13 +1,14 @@
 /**
  * API: Export Planner - Batch items
- * GET - List items (included in batch fetch)
  * POST - Add item
- * PATCH - Update item (status for drag-drop, details)
+ * PATCH - Update item (status, qcOk, assignedToId, etc.)
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { createBatchAudit, triggerBatchChanged } from "@/lib/export-planner/utils";
+import { getSession } from "@/lib/auth/get-session";
 
 export async function POST(
   request: NextRequest,
@@ -49,9 +50,21 @@ export async function POST(
         priority: (body.priority as string) || null,
         assignedToId: (body.assignedToId as string) || null,
         details: (body.details as string) || null,
+        startDate: body.startDate ? new Date(body.startDate as string) : null,
+        dueDate: body.dueDate ? new Date(body.dueDate as string) : null,
       },
       include: { assignedTo: { select: { id: true, fullName: true, email: true } } },
     });
+
+    const session = await getSession();
+    const userId = (session?.user as { id?: string })?.id;
+    await createBatchAudit(batchId, "ITEM_ADDED", {
+      userId,
+      userEmail: (session?.user as { email?: string })?.email,
+      entityId: item.id,
+      details: JSON.stringify({ rn, engineNo }),
+    });
+    await triggerBatchChanged(batchId);
 
     return NextResponse.json(item);
   } catch (error) {
@@ -97,12 +110,21 @@ export async function PATCH(
     if (body.customData !== undefined) updateData.customData = typeof body.customData === "string" ? body.customData : JSON.stringify(body.customData);
     if (body.startDate !== undefined) updateData.startDate = body.startDate ? new Date(body.startDate) : null;
     if (body.dueDate !== undefined) updateData.dueDate = body.dueDate ? new Date(body.dueDate) : null;
+    if (body.qcOk !== undefined) updateData.qcOk = body.qcOk;
 
     const item = await prisma.exportBatchItem.update({
       where: { id: itemId, batchId },
       data: updateData,
       include: { assignedTo: { select: { id: true, fullName: true, email: true } } },
     });
+
+    const session = await getSession();
+    const userId = (session?.user as { id?: string })?.id;
+    const userEmail = (session?.user as { email?: string })?.email;
+    if (body.status) await createBatchAudit(batchId, "STATUS_CHANGED", { userId, userEmail, entityId: itemId, details: body.status });
+    if (body.qcOk !== undefined) await createBatchAudit(batchId, "QC_CHECKED", { userId, userEmail, entityId: itemId });
+    if (body.assignedToId !== undefined) await createBatchAudit(batchId, "ITEM_ASSIGNED", { userId, userEmail, entityId: itemId });
+    await triggerBatchChanged(batchId);
 
     return NextResponse.json(item);
   } catch (error) {

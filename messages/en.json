@@ -73,6 +73,8 @@
     "logout": "Log out",
     "workOrders": "Work Orders",
     "exportPlanner": "Export Planner",
+    "plannerExport": "Export planner",
+    "plannerGeneral": "General",
     "plannerOverview": "Overview",
     "plannerSettings": "Planner Settings",
     "groupWarranty": "Claims",
@@ -743,6 +745,22 @@
     "assignedTo": "Assigned to",
     "freeze": "Lock",
     "unfreeze": "Unlock",
-    "subtitle": "Manage export lists and planning"
+    "subtitle": "Manage export lists and planning",
+    "printDado": "Motor list",
+    "printFinal": "Final list",
+    "exportCsv": "Export CSV",
+    "override": "Override",
+    "overrideReason": "Reason",
+    "rn": "RN",
+    "engineType": "Engine type",
+    "addMotor": "Add motor",
+    "noBatches": "No items",
+    "items": "motors",
+    "itemsGeneric": "items",
+    "exportCount": "for export",
+    "statusPlanirano": "Planned",
+    "statusRad": "In progress",
+    "statusIzvoz": "Export",
+    "qcOk": "OK"
   }
 }

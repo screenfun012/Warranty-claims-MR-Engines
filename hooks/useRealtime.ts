@@ -38,6 +38,13 @@ export function useRealtime(options?: {
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   }, [queryClient]);
 
+  const invalidateExportPlanner = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ["export-planner-batches"] });
+    queryClient.invalidateQueries({ queryKey: ["export-batch"] });
+    queryClient.invalidateQueries({ queryKey: ["export-planner-my-assignments"] });
+    queryClient.invalidateQueries({ queryKey: ["export-planner-activity"] });
+  }, [queryClient]);
+
   useEffect(() => {
     console.log("[useRealtime] Hook initialized");
     const pusher = getPusherClient();
@@ -69,7 +76,7 @@ export function useRealtime(options?: {
     
     console.log("[useRealtime] ✅ Pusher client available, subscribing to channels");
 
-    const channels = options?.channels || [CHANNELS.CLAIMS, CHANNELS.INBOX];
+    const channels = options?.channels || [CHANNELS.CLAIMS, CHANNELS.INBOX, CHANNELS.EXPORT_PLANNER];
     const subscriptions: any[] = [];
 
     // Subscribe to claims channel
@@ -115,13 +122,19 @@ export function useRealtime(options?: {
       subscriptions.push(inboxChannel);
     }
 
+    if (channels.includes(CHANNELS.EXPORT_PLANNER)) {
+      const plannerChannel = pusher.subscribe(CHANNELS.EXPORT_PLANNER);
+      plannerChannel.bind(EVENTS.EXPORT_BATCH_CHANGED, () => invalidateExportPlanner());
+      subscriptions.push(plannerChannel);
+    }
+
     return () => {
       subscriptions.forEach((channel) => {
         channel.unbind_all();
         pusher.unsubscribe(channel.name);
       });
     };
-  }, [invalidateClaims, invalidateInbox, options]);
+  }, [invalidateClaims, invalidateInbox, invalidateExportPlanner, options]);
 }
 
 /**

@@ -5,6 +5,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { createBatchAudit, triggerBatchChanged } from "@/lib/export-planner/utils";
+import { getSession } from "@/lib/auth/get-session";
 
 export async function DELETE(
   _request: NextRequest,
@@ -23,9 +25,20 @@ export async function DELETE(
       return NextResponse.json({ error: "Batch is frozen" }, { status: 400 });
     }
 
+    const deleted = await prisma.exportBatchItem.findUnique({ where: { id: itemId, batchId }, select: { rn: true, engineNo: true } });
     await prisma.exportBatchItem.delete({
       where: { id: itemId, batchId },
     });
+
+    const session = await getSession();
+    const userId = (session?.user as { id?: string })?.id;
+    await createBatchAudit(batchId, "ITEM_REMOVED", {
+      userId,
+      userEmail: (session?.user as { email?: string })?.email,
+      entityId: itemId,
+      details: deleted ? JSON.stringify({ rn: deleted.rn, engineNo: deleted.engineNo }) : undefined,
+    });
+    await triggerBatchChanged(batchId);
 
     return NextResponse.json({ success: true });
   } catch (error) {
