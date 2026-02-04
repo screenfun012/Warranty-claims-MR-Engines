@@ -148,13 +148,11 @@ function SidebarTriggerWithTooltip() {
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isAuthPage = pathname === "/login" || !pathname;
+  const isAuthPage = pathname === "/login" || pathname === "/auth" || !pathname;
   const isPendingApproval = pathname === "/pending-approval";
 
-  // Subscribe to real-time updates on all pages (except auth pages)
-  if (!isAuthPage && !isPendingApproval) {
-    useRealtime();
-  }
+  // Hooks must be called unconditionally – useRealtime no-ops when not needed
+  useRealtime();
 
   // Na login/register stranicama, ne prikazuj sidebar
   if (isAuthPage) {
