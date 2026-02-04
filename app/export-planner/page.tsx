@@ -92,72 +92,89 @@ export default function ExportPlannerPage() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-semibold">{tNav("exportPlanner")}</h1>
-        <Button onClick={() => setDialogOpen(true)}>
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{tNav("exportPlanner")}</h1>
+          <p className="text-muted-foreground mt-1">
+            {t("subtitle")}
+          </p>
+        </div>
+        <Button onClick={() => setDialogOpen(true)} size="lg">
           <Plus className="h-4 w-4 mr-2" />
           {t("newList")}
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse">
-              <CardHeader className="h-20" />
-              <CardContent className="h-24" />
+            <Card key={i} className="animate-pulse overflow-hidden">
+              <div className="h-24 bg-muted/50" />
+              <CardContent className="p-6 pt-4">
+                <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                <div className="h-3 bg-muted rounded w-1/2" />
+              </CardContent>
             </Card>
           ))}
         </div>
       ) : batches.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Truck className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <p className="text-muted-foreground mb-4">
-            Nema listi. Kreiraj prvu listu da započneš.
+        <Card className="p-16 text-center border-dashed">
+          <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+            <Truck className="h-8 w-8 text-primary" />
+          </div>
+          <h3 className="text-lg font-semibold mb-2">Nema listi</h3>
+          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+            Kreiraj prvu listu za izvoz motora ili generički planer.
           </p>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button onClick={() => setDialogOpen(true)} size="lg">
             <Plus className="h-4 w-4 mr-2" />
             {t("newList")}
           </Button>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {batches.map((batch) => (
-            <Card
-              key={batch.id}
-              className={`transition-colors hover:border-primary/50 ${
-                batch.frozenAt ? "border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/20" : ""
-              }`}
-            >
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
-                <div>
-                  <h3 className="font-semibold">
-                    {batch.customName || batch.batchCode}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {batch.batchType === "MR_ENGINES"
-                      ? t("typeMrEngines")
-                      : t("typeGeneric")}
-                  </p>
-                </div>
-                {batch.frozenAt ? (
-                  <Lock className="h-4 w-4 text-amber-600 shrink-0" />
-                ) : (
-                  <LockOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                )}
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
-                  {t("itemsCount", { count: batch._count.items })}
-                </p>
-                <Link href={`/export-planner/${batch.id}`}>
-                  <Button variant="outline" size="sm" className="w-full">
-                    {t("open")}
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+            <Link key={batch.id} href={`/export-planner/${batch.id}`} className="block group">
+              <Card
+                className={`transition-all duration-200 hover:shadow-lg hover:border-primary/40 group-hover:scale-[1.02] overflow-hidden ${
+                  batch.frozenAt
+                    ? "border-amber-500/60 bg-amber-50/50 dark:bg-amber-950/30"
+                    : "border-green-500/20 hover:border-green-500/40"
+                }`}
+              >
+                <div className={`h-1.5 ${batch.frozenAt ? "bg-amber-500" : "bg-green-500/60"}`} />
+                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 pt-5">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold truncate">
+                      {batch.customName || batch.batchCode}
+                    </h3>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {batch.batchType === "MR_ENGINES"
+                        ? t("typeMrEngines")
+                        : t("typeGeneric")}
+                    </p>
+                  </div>
+                  <div className="shrink-0 ml-2" title={batch.frozenAt ? t("frozen") : t("unfrozen")}>
+                    {batch.frozenAt ? (
+                      <Lock className="h-5 w-5 text-amber-600" />
+                    ) : (
+                      <LockOpen className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {t("itemsCount", { count: batch._count.items })}
+                    </span>
+                    <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background px-3 py-1.5 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary">
+                      {t("open")} →
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}

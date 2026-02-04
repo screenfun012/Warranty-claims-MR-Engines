@@ -111,29 +111,29 @@ function DroppableColumn({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   const colorMap: Record<string, string> = {
-    slate: "border-slate-400 bg-slate-50 dark:bg-slate-900/50",
-    blue: "border-blue-400 bg-blue-50 dark:bg-blue-900/20",
-    green: "border-green-400 bg-green-50 dark:bg-green-900/20",
-    amber: "border-amber-400 bg-amber-50 dark:bg-amber-900/20",
-    rose: "border-rose-400 bg-rose-50 dark:bg-rose-900/20",
+    slate: "border-slate-300 bg-slate-50/80 dark:bg-slate-900/50 dark:border-slate-700",
+    blue: "border-blue-300 bg-blue-50/80 dark:bg-blue-950/40 dark:border-blue-800",
+    green: "border-green-300 bg-green-50/80 dark:bg-green-950/40 dark:border-green-800",
+    amber: "border-amber-300 bg-amber-50/80 dark:bg-amber-950/40 dark:border-amber-800",
+    rose: "border-rose-300 bg-rose-50/80 dark:bg-rose-950/40 dark:border-rose-800",
   };
   const colClass = colorMap[color] || colorMap.slate;
 
   return (
     <div
       className={cn(
-        "flex flex-col min-w-[280px] max-w-[320px] rounded-lg border-2 transition-colors",
+        "flex flex-col min-w-[300px] w-[300px] rounded-xl border-2 shadow-sm transition-all shrink-0",
         colClass,
-        isOver && "ring-2 ring-primary ring-offset-2"
+        isOver && "ring-2 ring-primary ring-offset-2 scale-[1.02]"
       )}
     >
-      <div className="p-3 font-medium flex items-center justify-between">
+      <div className="p-4 font-semibold flex items-center justify-between border-b border-current/10">
         <span>{label}</span>
-        <span className="text-sm text-muted-foreground">{items.length}</span>
+        <span className="text-sm font-normal bg-black/5 dark:bg-white/5 px-2 py-0.5 rounded-full">{items.length}</span>
       </div>
       <div
         ref={setNodeRef}
-        className="p-2 flex-1 min-h-[120px] space-y-2"
+        className="p-3 flex-1 min-h-[200px] space-y-3"
       >
         {items.map((item) => renderCard(item))}
         {canEdit && (
@@ -163,17 +163,17 @@ function ItemCardContent({
 }) {
   const borderClass = (item.priority && PRIORITY_BORDER[item.priority]) || "";
   return (
-    <Card className={cn("transition-shadow", borderClass, className)}>
+    <Card className={cn("transition-shadow hover:shadow-md bg-card", borderClass, className)}>
       <CardContent className="p-3 flex items-start gap-2">
-        <GripVertical className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+        <GripVertical className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5 cursor-grab" />
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">
+          <div className="font-semibold truncate text-sm">
             {batchType === "MR_ENGINES" && item.mrCode
               ? `${item.mrCode} · ${item.engineNo}`
               : item.engineNo}
           </div>
           {item.assignedTo && (
-            <p className="text-xs text-muted-foreground truncate">
+            <p className="text-xs text-muted-foreground truncate mt-0.5">
               {item.assignedTo.fullName || "-"}
             </p>
           )}
@@ -353,30 +353,33 @@ export default function ExportBatchPage() {
     : null;
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" asChild>
+    <div className="p-6 min-h-screen">
+      <div className="flex items-center gap-4 mb-8">
+        <Button variant="outline" size="icon" asChild>
           <Link href="/export-planner">
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold">
+        <div className="flex-1 min-w-0">
+          <h1 className="text-2xl font-bold truncate">
             {batch.customName || batch.batchCode}
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 mt-1">
             {batch.frozenAt ? (
-              <span className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-2.5 py-0.5 text-xs font-medium">
                 <Lock className="h-3 w-3" />
                 {t("frozen")}
               </span>
             ) : (
-              <span className="flex items-center gap-1">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 px-2.5 py-0.5 text-xs font-medium">
                 <LockOpen className="h-3 w-3" />
                 {t("unfrozen")}
               </span>
             )}
-          </p>
+            <span className="text-sm text-muted-foreground">
+              {batch.items.length} stavki
+            </span>
+          </div>
         </div>
       </div>
 
@@ -385,7 +388,7 @@ export default function ExportBatchPage() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="flex gap-6 overflow-x-auto pb-6 min-h-[400px]">
           {columns.map((col) => (
             <DroppableColumn
               key={col.id}

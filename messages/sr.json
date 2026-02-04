@@ -74,7 +74,9 @@
     "workOrders": "Radni nalozi",
     "exportPlanner": "Planer izvoza",
     "plannerOverview": "Pregled",
-    "plannerSettings": "Podešavanja planera"
+    "plannerSettings": "Podešavanja planera",
+    "groupWarranty": "Reklamacije",
+    "groupPlanner": "Planer izvoza"
   },
   "dashboard": {
     "title": "Početna",
@@ -738,6 +740,7 @@
     "priorityHigh": "Visok",
     "assignedTo": "Dodeljeno",
     "freeze": "Zaključaj",
-    "unfreeze": "Otključaj"
+    "unfreeze": "Otključaj",
+    "subtitle": "Upravljanje listama za izvoz i planiranje"
   }
 }

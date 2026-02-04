@@ -176,14 +176,31 @@ export function AppSidebar() {
   const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
   const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
 
-  // Planner-only users see only planer nav; others see warranty nav (+ planer for ADMIN/SUPER_ADMIN)
   const plannerOnly = isPlannerOnly(userRole);
-  const navigation = plannerOnly
-    ? plannerNavigation
-    : [
-        ...warrantyNavigation.filter(item => hasMinRole(userRole, item.minRole || "VIEWER")),
-        ...(hasMinRole(userRole, "ADMIN") ? plannerNavigation : []),
-      ];
+  const showWarrantyNav = !plannerOnly;
+  const showPlannerNav = plannerOnly || hasMinRole(userRole, "ADMIN");
+  const warrantyNavItems = warrantyNavigation.filter(item => hasMinRole(userRole, item.minRole || "VIEWER"));
+
+  const renderNavItem = (item: NavigationItemWithRole) => {
+    const isActive = Boolean(pathname === item.href || (pathname && item.href && pathname.startsWith(item.href + "/")));
+    const showBadge = item.showBadge && unreadCount > 0;
+    const handleLinkClick = () => { if (isMobile) setOpenMobile(false); };
+    const menuButton = (
+      <SidebarMenuButton asChild isActive={isActive} className={cn("transition-all duration-200 hover:bg-sidebar-accent/80", isCollapsed && !isMobile && "justify-center")}>
+        <Link href={item.href} onClick={handleLinkClick} className={cn("flex items-center group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit", isCollapsed && !isMobile ? "justify-center" : "gap-3")} style={{ textDecoration: "none", color: "inherit" }}>
+          <item.icon className={cn("h-5 w-5 shrink-0", isActive && "scale-110")} />
+          <span className={cn(isCollapsed && !isMobile && "hidden")}>{t(item.translationKey)}</span>
+          {showBadge && !isCollapsed && <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1.5 text-xs">{unreadCount > 99 ? "99+" : unreadCount}</Badge>}
+        </Link>
+      </SidebarMenuButton>
+    );
+    const wrapped = isCollapsed && !isMobile ? (
+      <Tooltip key={item.name}><TooltipTrigger asChild><SidebarMenuItem>{menuButton}</SidebarMenuItem></TooltipTrigger><TooltipContent side="right"><span>{t(item.translationKey)}</span>{showBadge && <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">{unreadCount > 99 ? "99+" : unreadCount}</Badge>}</TooltipContent></Tooltip>
+    ) : (
+      <SidebarMenuItem key={item.name}>{menuButton}</SidebarMenuItem>
+    );
+    return wrapped;
+  };
 
   // React Query automatski cache-uje i deduplira request-e (skip for planner-only - no inbox)
   const { data: unreadCount = 0 } = useQuery({
@@ -266,104 +283,40 @@ export function AppSidebar() {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel className={cn(
-            "transition-opacity duration-200",
-            isCollapsed && "opacity-0 h-0 overflow-hidden"
-          )}>
-            Navigation
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <TooltipProvider delayDuration={0}>
-                {navigation.map((item) => {
-                  const isActive = Boolean(pathname === item.href || (pathname && item.href && pathname.startsWith(item.href + "/")));
-                  const showBadge = item.showBadge && unreadCount > 0;
-                  
-                  const handleLinkClick = () => {
-                    // Close mobile sidebar when a link is clicked
-                    if (isMobile) {
-                      setOpenMobile(false);
-                    }
-                  };
-
-                  const menuButton = (
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive} 
-                      className={cn(
-                        "transition-all duration-200 hover:bg-sidebar-accent/80",
-                        isCollapsed && !isMobile && "justify-center"
-                      )}
-                    >
-                      <Link 
-                        href={item.href}
-                        onClick={handleLinkClick}
-                        className={cn(
-                          "flex items-center group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit hover:text-inherit visited:text-inherit active:text-inherit",
-                          isCollapsed && !isMobile ? "justify-center" : "gap-3"
-                        )}
-                        style={{ 
-                          textDecoration: 'none',
-                          color: 'inherit',
-                          fontFamily: 'inherit',
-                          fontSize: 'inherit',
-                          fontWeight: 'inherit'
-                        }}
-                      >
-                        <item.icon className={cn(
-                          "h-5 w-5 transition-all duration-200 shrink-0",
-                          isActive && "scale-110"
-                        )} />
-                        <span className={cn(
-                          "transition-all duration-200",
-                          isCollapsed && !isMobile && "hidden"
-                        )}>
-                          {t(item.translationKey)}
-                        </span>
-                        {showBadge && !isCollapsed && (
-                          <Badge 
-                            variant="destructive" 
-                            className="ml-auto h-5 min-w-5 px-1.5 text-xs transition-all duration-200 animate-in fade-in zoom-in"
-                          >
-                            {unreadCount > 99 ? "99+" : unreadCount}
-                          </Badge>
-                        )}
-                      </Link>
-                    </SidebarMenuButton>
-                  );
-
-                  // On desktop, when collapsed, show tooltips. On mobile, always show without tooltips
-                  if (isCollapsed && !isMobile) {
-                    return (
-                      <Tooltip key={item.name}>
-                        <TooltipTrigger asChild>
-                          <SidebarMenuItem>
-                            {menuButton}
-                          </SidebarMenuItem>
-                        </TooltipTrigger>
-                        <TooltipContent side="right" className="flex items-center gap-2">
-                          <span>{t(item.translationKey)}</span>
-                          {showBadge && (
-                            <Badge variant="destructive" className="h-5 min-w-5 px-1.5 text-xs">
-                              {unreadCount > 99 ? "99+" : unreadCount}
-                            </Badge>
-                          )}
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  }
-
-                  return (
-                    <SidebarMenuItem key={item.name}>
-                      {menuButton}
-                    </SidebarMenuItem>
-                  );
-                })}
-              </TooltipProvider>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {showWarrantyNav && warrantyNavItems.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className={cn(
+              "transition-opacity duration-200",
+              isCollapsed && "opacity-0 h-0 overflow-hidden"
+            )}>
+              {t("nav.groupWarranty")}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <TooltipProvider delayDuration={0}>
+                  {warrantyNavItems.map((item) => renderNavItem(item))}
+                </TooltipProvider>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {showPlannerNav && (
+          <SidebarGroup>
+            <SidebarGroupLabel className={cn(
+              "transition-opacity duration-200",
+              isCollapsed && "opacity-0 h-0 overflow-hidden"
+            )}>
+              {t("nav.groupPlanner")}
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <TooltipProvider delayDuration={0}>
+                  {plannerNavigation.map((item) => renderNavItem(item))}
+                </TooltipProvider>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="border-t px-2 py-2">
         {user && (

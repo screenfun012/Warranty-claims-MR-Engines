@@ -74,7 +74,9 @@
     "workOrders": "Work Orders",
     "exportPlanner": "Export Planner",
     "plannerOverview": "Overview",
-    "plannerSettings": "Planner Settings"
+    "plannerSettings": "Planner Settings",
+    "groupWarranty": "Claims",
+    "groupPlanner": "Export Planner"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -740,6 +742,7 @@
     "priorityHigh": "High",
     "assignedTo": "Assigned to",
     "freeze": "Lock",
-    "unfreeze": "Unlock"
+    "unfreeze": "Unlock",
+    "subtitle": "Manage export lists and planning"
   }
 }
