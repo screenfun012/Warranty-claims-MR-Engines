@@ -12,11 +12,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LayoutDashboard, Plus, Lock, LockOpen } from "lucide-react";
+import { LayoutDashboard, Plus, Lock, LockOpen, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface Batch {
   id: string;
@@ -48,11 +50,20 @@ const createBatch = async (data: { batchType: string; customName?: string }) => 
   return res.json();
 };
 
+const deleteBatch = async (id: string) => {
+  const res = await fetch(`/api/export-planner/batches/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || "Failed");
+  }
+};
+
 export default function PlanerGeneralPage() {
   const tCommon = useTranslations("common");
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const { data: batches = [], isLoading } = useQuery({
     queryKey: ["export-planner-batches", "GENERIC"],
@@ -67,6 +78,16 @@ export default function PlanerGeneralPage() {
       setNewName("");
       toast.success("Planer kreiran");
       window.location.href = `/export-planner/${batch.id}`;
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteBatch,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["export-planner-batches"] });
+      setDeleteId(null);
+      toast.success("Planer je obrisan.");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -115,42 +136,68 @@ export default function PlanerGeneralPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {batches.map((batch) => (
-            <Link key={batch.id} href={`/export-planner/${batch.id}`} className="block group">
-              <Card
-                className={`transition-all duration-200 hover:shadow-lg hover:border-primary/40 group-hover:scale-[1.02] overflow-hidden ${
-                  batch.frozenAt
-                    ? "border-amber-500/60 bg-amber-50/50 dark:bg-amber-950/30"
-                    : "border-green-500/20 hover:border-green-500/40"
-                }`}
-              >
-                <div className={`h-1.5 ${batch.frozenAt ? "bg-amber-500" : "bg-green-500/60"}`} />
-                <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 pt-5">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold truncate">
-                      {batch.customName || batch.batchCode}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                      {batch._count.items} stavki
-                    </p>
-                  </div>
-                  <div className="shrink-0 ml-2">
-                    {batch.frozenAt ? (
-                      <Lock className="h-5 w-5 text-amber-600" />
-                    ) : (
-                      <LockOpen className="h-5 w-5 text-green-600" />
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-2">
-                  <span className="inline-flex items-center justify-center rounded-md text-sm font-medium border border-input bg-background px-3 py-1.5 transition-colors group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary">
+            <Card
+              key={batch.id}
+              className={cn(
+                "transition-all duration-200 overflow-hidden flex flex-col",
+                batch.frozenAt
+                  ? "border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/20 dark:border-amber-500/40"
+                  : "border-green-500/30 bg-card hover:border-green-500/50 hover:shadow-md dark:border-green-500/30"
+              )}
+            >
+              <div className={cn("h-1 shrink-0", batch.frozenAt ? "bg-amber-500" : "bg-green-500")} />
+              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 pt-4">
+                <Link
+                  href={`/export-planner/${batch.id}`}
+                  className="min-w-0 flex-1 rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                >
+                  <h3 className="font-semibold truncate hover:underline">
+                    {batch.customName || batch.batchCode}
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    {batch._count.items} stavki
+                  </p>
+                </Link>
+                <div className="flex shrink-0 items-center gap-1">
+                  {batch.frozenAt ? (
+                    <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400" aria-hidden />
+                  ) : (
+                    <LockOpen className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden />
+                  )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => { e.preventDefault(); setDeleteId(batch.id); }}
+                    aria-label="Obriši planer"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-0 pb-4">
+                <Button asChild variant="secondary" size="sm" className="w-full">
+                  <Link href={`/export-planner/${batch.id}`}>
                     Otvori →
-                  </span>
-                </CardContent>
-              </Card>
-            </Link>
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
+        title="Obriši planer?"
+        description="Cela lista i sve stavke će biti trajno obrisane. Ovu radnju nije moguće poništiti."
+        confirmText="Obriši"
+        cancelText="Odustani"
+        variant="destructive"
+      />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

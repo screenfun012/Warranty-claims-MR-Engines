@@ -341,18 +341,27 @@ export function AppSidebar() {
                   {!isCollapsed && (
                     <>
                       <SidebarMenuItem>
-                        <button
-                          type="button"
-                          className={cn(
-                            "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                            pathname === "/export-planner/izvoz" && "bg-sidebar-accent text-sidebar-accent-foreground"
-                          )}
-                          onClick={() => { setExportPlannerOpen((o) => !o); if (isMobile) setOpenMobile(false); }}
-                        >
-                          <Truck className="h-5 w-5 shrink-0" />
-                          <span className="flex-1 text-left">{t("nav.plannerExport")}</span>
-                          {exportPlannerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </button>
+                        <div className="flex w-full items-center gap-1 rounded-md px-2 py-1.5">
+                          <Link
+                            href="/export-planner/izvoz"
+                            onClick={() => isMobile && setOpenMobile(false)}
+                            className={cn(
+                              "flex flex-1 min-w-0 items-center gap-3 rounded-md py-0.5 pr-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                              pathname === "/export-planner/izvoz" && "bg-sidebar-accent text-sidebar-accent-foreground"
+                            )}
+                          >
+                            <Truck className="h-5 w-5 shrink-0" />
+                            <span className="truncate text-left">{t("nav.plannerExport")}</span>
+                          </Link>
+                          <button
+                            type="button"
+                            aria-label={exportPlannerOpen ? "Zatvori listu" : "Otvori listu planova"}
+                            className="rounded p-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            onClick={(e) => { e.preventDefault(); setExportPlannerOpen((o) => !o); if (isMobile) setOpenMobile(false); }}
+                          >
+                            {exportPlannerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </SidebarMenuItem>
                       {exportPlannerOpen && exportBatches.length > 0 && (
                         <div className="ml-6 mb-1 space-y-0.5 border-l border-sidebar-border pl-2">
@@ -372,18 +381,27 @@ export function AppSidebar() {
                         </div>
                       )}
                       <SidebarMenuItem>
-                        <button
-                          type="button"
-                          className={cn(
-                            "flex w-full items-center gap-3 rounded-md px-2 py-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                            pathname === "/export-planner/general" && "bg-sidebar-accent text-sidebar-accent-foreground"
-                          )}
-                          onClick={() => { setGeneralPlannerOpen((o) => !o); if (isMobile) setOpenMobile(false); }}
-                        >
-                          <LayoutDashboard className="h-5 w-5 shrink-0" />
-                          <span className="flex-1 text-left">{t("nav.plannerGeneral")}</span>
-                          {generalPlannerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </button>
+                        <div className="flex w-full items-center gap-1 rounded-md px-2 py-1.5">
+                          <Link
+                            href="/export-planner/general"
+                            onClick={() => isMobile && setOpenMobile(false)}
+                            className={cn(
+                              "flex flex-1 min-w-0 items-center gap-3 rounded-md py-0.5 pr-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                              pathname === "/export-planner/general" && "bg-sidebar-accent text-sidebar-accent-foreground"
+                            )}
+                          >
+                            <LayoutDashboard className="h-5 w-5 shrink-0" />
+                            <span className="truncate text-left">{t("nav.plannerGeneral")}</span>
+                          </Link>
+                          <button
+                            type="button"
+                            aria-label={generalPlannerOpen ? "Zatvori listu" : "Otvori listu planova"}
+                            className="rounded p-1 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                            onClick={(e) => { e.preventDefault(); setGeneralPlannerOpen((o) => !o); if (isMobile) setOpenMobile(false); }}
+                          >
+                            {generalPlannerOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </SidebarMenuItem>
                       {generalPlannerOpen && generalBatches.length > 0 && (
                         <div className="ml-6 mb-1 space-y-0.5 border-l border-sidebar-border pl-2">
