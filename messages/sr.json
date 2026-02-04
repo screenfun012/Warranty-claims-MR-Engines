@@ -712,5 +712,32 @@
     "login": "Prijavi se",
     "logout": "Odjavi se",
     "loggingOut": "Odjavljivanje..."
+  },
+  "exportPlanner": {
+    "title": "Planer izvoza",
+    "newList": "Nova lista",
+    "listName": "Naziv liste",
+    "type": "Tip",
+    "typeMrEngines": "MR Engines izvoz",
+    "typeGeneric": "Generički planer",
+    "itemsCount": "{count} stavki",
+    "open": "Otvori",
+    "delete": "Obriši",
+    "deleteConfirm": "Obriši ovu listu?",
+    "frozen": "Zaključano",
+    "unfrozen": "Otvoreno",
+    "columnPlaniramo": "U planu",
+    "columnRad": "U radu",
+    "columnIzvoz": "Izvoz",
+    "addItem": "Dodaj stavku",
+    "engineNo": "Broj motora",
+    "mrCode": "MR Code",
+    "priority": "Prioritet",
+    "priorityLow": "Nizak",
+    "priorityMedium": "Srednji",
+    "priorityHigh": "Visok",
+    "assignedTo": "Dodeljeno",
+    "freeze": "Zaključaj",
+    "unfreeze": "Otključaj"
   }
 }

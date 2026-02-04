@@ -714,5 +714,32 @@
     "login": "Log in",
     "logout": "Log out",
     "loggingOut": "Logging out..."
+  },
+  "exportPlanner": {
+    "title": "Export Planner",
+    "newList": "New list",
+    "listName": "List name",
+    "type": "Type",
+    "typeMrEngines": "MR Engines export",
+    "typeGeneric": "Generic planner",
+    "itemsCount": "{count} items",
+    "open": "Open",
+    "delete": "Delete",
+    "deleteConfirm": "Delete this list?",
+    "frozen": "Locked",
+    "unfrozen": "Open",
+    "columnPlaniramo": "Planned",
+    "columnRad": "In progress",
+    "columnIzvoz": "Export",
+    "addItem": "Add item",
+    "engineNo": "Engine no",
+    "mrCode": "MR Code",
+    "priority": "Priority",
+    "priorityLow": "Low",
+    "priorityMedium": "Medium",
+    "priorityHigh": "High",
+    "assignedTo": "Assigned to",
+    "freeze": "Lock",
+    "unfreeze": "Unlock"
   }
 }
