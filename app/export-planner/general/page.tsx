@@ -17,7 +17,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LayoutDashboard, Plus, Lock, LockOpen, Trash2 } from "lucide-react";
+import { LayoutDashboard, Plus, Lock, LockOpen, Trash2, ListFilter } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -33,8 +33,11 @@ interface Batch {
   createdBy: { fullName: string | null; email: string } | null;
 }
 
-const fetchBatches = async (): Promise<Batch[]> => {
-  const res = await fetch("/api/export-planner/batches?batchType=GENERIC");
+const fetchBatches = async (mineOnly?: boolean): Promise<Batch[]> => {
+  const url = mineOnly
+    ? "/api/export-planner/batches?batchType=GENERIC&mine=1"
+    : "/api/export-planner/batches?batchType=GENERIC";
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 };

@@ -946,6 +946,18 @@ export default function ExportBatchPage() {
     staleTime: 5 * 60 * 1000,
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["export-planner-me"],
+    queryFn: async () => {
+      const r = await fetch("/api/export-planner/me");
+      if (!r.ok) return { id: null };
+      return r.json();
+    },
+    enabled: !!id,
+    staleTime: 5 * 60 * 1000,
+  });
+  const currentUserDbId = meData?.id ?? null;
+
   const columns = useMemo(
     () => parseColumns(batch?.columns ?? null),
     [batch?.columns]
