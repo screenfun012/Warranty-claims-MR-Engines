@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -727,7 +728,7 @@ function DetailModal({
   );
 }
 
-/** Timeline (Gantt) prikaz: stavke po vremenu, ko radi, kašnjenje. */
+/** Timeline po kolonama: jedna traka po koloni, stavke unutar nje; hover = tooltip sa stavkom. */
 function PlannerTimelineView({
   batch,
   columns,
@@ -765,6 +766,23 @@ function PlannerTimelineView({
   const toPercent = (ts: number) => ((ts - rangeStart) / (rangeEnd - rangeStart)) * 100;
   const todayPercent = toPercent(today);
 
+  const itemsByColumn = useMemo(() => {
+    const map: Record<string, BatchItem[]> = {};
+    for (const col of columns) {
+      map[col.id] = [];
+    }
+    for (const item of items) {
+      const colId = item.status in map ? item.status : columns[0]?.id ?? "";
+      if (!map[colId]) map[colId] = [];
+      map[colId].push(item);
+    }
+    return map;
+  }, [items, columns]);
+
+  const isMr = batch.batchType === "MR_ENGINES";
+  const itemLabel = (item: BatchItem) =>
+    isMr ? (item.mrCode ? `${item.mrCode} · ` : "") + item.engineNo : item.engineNo;
+
   return (
     <div className="rounded-xl border border-border/80 bg-card shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b bg-muted/40 flex items-center gap-2">
@@ -772,97 +790,112 @@ function PlannerTimelineView({
           <CalendarRange className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-foreground">Timeline</p>
-          <p className="text-xs text-muted-foreground">Pregled stavki po vremenu · klik na red za detalje</p>
+          <p className="text-sm font-semibold text-foreground">Timeline po kolonama</p>
+          <p className="text-xs text-muted-foreground">Kolone kao trake · hover za stavku · klik za detalje</p>
         </div>
       </div>
-      <div className="w-full">
-        <div className="w-full min-w-0">
-          {/* Vremenska os */}
-          <div className="flex border-b bg-muted/20">
-            <div className="w-40 shrink-0 py-2.5 pl-3 pr-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Stavka
-            </div>
-            <div className="flex-1 relative min-h-[32px] py-2 pr-3 pl-0 min-w-0">
-              <div className="absolute inset-0 flex text-xs text-muted-foreground">
-                {[0, 0.2, 0.4, 0.6, 0.8, 1].map((p) => (
-                  <span key={p} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${p * 100}%` }}>
-                    {new Date(rangeStart + p * (rangeEnd - rangeStart)).toLocaleDateString("sr-RS", { month: "short", day: "numeric", year: "2-digit" })}
-                  </span>
-                ))}
-              </div>
-              {todayPercent >= 0 && todayPercent <= 100 && (
-                <div
-                  className="absolute top-0 bottom-0 w-px bg-green-500 z-10 shadow-sm"
-                  style={{ left: `${todayPercent}%` }}
-                  title="Danas"
-                >
-                  <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-green-600 dark:text-green-400 whitespace-nowrap">Danas</span>
-                </div>
-              )}
-            </div>
+      <div className="w-full min-w-0">
+        {/* Vremenska os */}
+        <div className="flex border-b bg-muted/20">
+          <div className="w-44 shrink-0 py-2.5 pl-3 pr-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Kolona
           </div>
-          {/* Redovi */}
-          {items.length === 0 ? (
-            <div className="py-16 text-center">
-              <CalendarRange className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-              <p className="text-sm text-muted-foreground">Nema stavki za prikaz na timeline-u.</p>
-              <p className="text-xs text-muted-foreground mt-1">Dodajte stavke u tablo prikazu.</p>
+          <div className="flex-1 relative min-h-[28px] py-2 pr-3 pl-1 min-w-0">
+            <div className="absolute inset-0 flex text-xs text-muted-foreground pointer-events-none">
+              {[0, 0.2, 0.4, 0.6, 0.8, 1].map((p) => (
+                <span key={p} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${p * 100}%` }}>
+                  {new Date(rangeStart + p * (rangeEnd - rangeStart)).toLocaleDateString("sr-RS", { month: "short", day: "numeric", year: "2-digit" })}
+                </span>
+              ))}
             </div>
-          ) : (
-            items.map((item, idx) => {
-              const startTs = item.startDate ? new Date(item.startDate).getTime() : rangeStart;
-              const endTs = item.dueDate ? new Date(item.dueDate).getTime() : rangeEnd;
-              const left = Math.max(0, toPercent(startTs));
-              const width = Math.min(100 - left, toPercent(endTs) - left);
-              const late = getDaysLate(item, columns);
-              const colLabel = columns.find((c) => c.id === item.status)?.label;
-              return (
-                <div
-                  key={item.id}
-                  className={cn(
-                    "flex border-b border-border/50 last:border-b-0 transition-colors cursor-pointer group",
-                    idx % 2 === 0 ? "bg-background" : "bg-muted/10",
-                    "hover:bg-primary/5"
-                  )}
-                  onClick={() => onItemClick(item)}
-                >
-                  <div className="w-40 shrink-0 py-2 pl-3 pr-2 flex flex-col gap-0.5 border-r border-border/50">
-                    <span className="text-sm font-medium text-foreground truncate leading-tight">
-                      {batch.batchType === "MR_ENGINES" ? (item.mrCode ? `${item.mrCode} · ` : "") + item.engineNo : item.engineNo}
-                    </span>
-                    {item.assignedTo && (
-                      <span className="text-xs text-muted-foreground truncate">{item.assignedTo.fullName}</span>
-                    )}
-                    {colLabel && (
-                      <span className="text-[10px] text-muted-foreground/80 truncate">{colLabel}</span>
-                    )}
-                    {late > 0 && (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400">
-                        <Clock className="h-3 w-3 shrink-0" /> Kasni {late} {late === 1 ? "dan" : "dana"}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 relative h-10 py-1.5 pr-3 pl-1 min-w-0">
-                    <div className="absolute inset-y-0 right-0 left-0">
-                      {todayPercent >= 0 && todayPercent <= 100 && (
-                        <div className="absolute top-0 bottom-0 w-px bg-green-500/60 z-0" style={{ left: `${todayPercent}%` }} />
-                      )}
-                      <div
-                        className={cn(
-                          "absolute top-1/2 -translate-y-1/2 h-6 rounded min-w-[6px] z-[1] shadow-sm transition-all",
-                          "bg-primary/80 group-hover:bg-primary group-hover:shadow",
-                          late > 0 && "ring-1 ring-red-400/60 bg-red-500/80 group-hover:bg-red-500/90"
-                        )}
-                        style={{ left: `${left}%`, width: `${Math.max(2, width)}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+            {todayPercent >= 0 && todayPercent <= 100 && (
+              <div
+                className="absolute top-0 bottom-0 w-px bg-green-500 z-10 shadow-sm pointer-events-none"
+                style={{ left: `${todayPercent}%` }}
+                title="Danas"
+              >
+                <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-green-600 dark:text-green-400 whitespace-nowrap">Danas</span>
+              </div>
+            )}
+          </div>
         </div>
+        {/* Jedan red po koloni */}
+        {columns.length === 0 || items.length === 0 ? (
+          <div className="py-16 text-center">
+            <CalendarRange className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
+            <p className="text-sm text-muted-foreground">Nema stavki za prikaz na timeline-u.</p>
+            <p className="text-xs text-muted-foreground mt-1">Dodajte stavke u tablo prikazu.</p>
+          </div>
+        ) : (
+          columns.map((col, colIdx) => {
+            const colItems = itemsByColumn[col.id] ?? [];
+            const colClass = colorMap[col.color] ?? colorMap.slate;
+            return (
+              <div
+                key={col.id}
+                className={cn(
+                  "flex border-b border-border/50 last:border-b-0 transition-colors",
+                  colIdx % 2 === 0 ? "bg-background" : "bg-muted/5"
+                )}
+              >
+                <div
+                  className={cn(
+                    "w-44 shrink-0 py-2 pl-3 pr-2 border-r border-border/50 flex flex-col justify-center",
+                    colClass
+                  )}
+                >
+                  <span className="text-sm font-medium text-foreground truncate leading-tight">{col.label}</span>
+                  <span className="text-xs text-muted-foreground">{colItems.length} stavki</span>
+                </div>
+                <div className="flex-1 relative h-12 py-1.5 pr-3 pl-1 min-w-0">
+                  {todayPercent >= 0 && todayPercent <= 100 && (
+                    <div className="absolute top-0 bottom-0 w-px bg-green-500/50 z-0 pointer-events-none" style={{ left: `${todayPercent}%` }} />
+                  )}
+                  {colItems.map((item) => {
+                    const startTs = item.startDate ? new Date(item.startDate).getTime() : rangeStart;
+                    const endTs = item.dueDate ? new Date(item.dueDate).getTime() : rangeEnd;
+                    const left = Math.max(0, toPercent(startTs));
+                    const width = Math.min(100 - left, Math.max(2, toPercent(endTs) - left));
+                    const late = getDaysLate(item, columns);
+                    const startStr = item.startDate ? formatDate(item.startDate) : "—";
+                    const endStr = item.dueDate ? formatDate(item.dueDate) : "—";
+                    return (
+                      <Tooltip key={item.id} delayDuration={200}>
+                        <TooltipTrigger asChild>
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            className={cn(
+                              "absolute top-1/2 -translate-y-1/2 h-7 rounded-md min-w-[8px] z-[1] shadow-sm cursor-pointer transition-all",
+                              "bg-primary/85 hover:bg-primary hover:shadow-md hover:z-[2] hover:ring-2 hover:ring-primary/50",
+                              late > 0 && "ring-1 ring-red-400/70 bg-red-500/85 hover:bg-red-500"
+                            )}
+                            style={{ left: `${left}%`, width: `${width}%` }}
+                            onClick={(e) => { e.stopPropagation(); onItemClick(item); }}
+                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onItemClick(item); } }}
+                          />
+                        </TooltipTrigger>
+                        <TooltipContent side="top" className="max-w-xs p-3 space-y-1.5 text-left">
+                          <p className="font-semibold text-background">{itemLabel(item)}</p>
+                          {item.assignedTo && (
+                            <p className="text-background/90 text-xs">Dodeljeno: {item.assignedTo.fullName}</p>
+                          )}
+                          <p className="text-background/80 text-xs">Period: {startStr} → {endStr}</p>
+                          {late > 0 && (
+                            <p className="text-red-200 text-xs font-medium flex items-center gap-1">
+                              <Clock className="h-3 w-3" /> Kasni {late} {late === 1 ? "dan" : "dana"}
+                            </p>
+                          )}
+                          <p className="text-background/70 text-[10px]">Klik za detalje</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

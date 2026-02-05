@@ -109,15 +109,27 @@ export default function PlanerGeneralPage() {
   );
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-8">
+    <div className="min-h-[calc(100vh-8rem)] relative">
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:28px_28px] opacity-30 dark:opacity-20 pointer-events-none" />
+      <div className="relative p-6 md:p-8 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">
         <div>
-          <h1 className="text-2xl font-bold">General planer</h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80 mb-1">
+            Export planner
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">
+            General planer
+          </h1>
+          <p className="text-muted-foreground mt-1.5 text-sm md:text-base max-w-xl">
             Fleksibilni planer za bilo koji projekat – prilagodi kolone, boje, dodeljuj radnike
           </p>
         </div>
-        <Button onClick={() => setDialogOpen(true)} size="lg">
+        <Button
+          onClick={() => setDialogOpen(true)}
+          size="lg"
+          className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl h-11 px-6"
+        >
           <Plus className="h-4 w-4 mr-2" />
           Novi planer
         </Button>
@@ -126,25 +138,29 @@ export default function PlanerGeneralPage() {
       {isLoading ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3].map((i) => (
-            <Card key={i} className="animate-pulse overflow-hidden">
-              <div className="h-24 bg-muted/50" />
-              <CardContent className="p-6 pt-4">
-                <div className="h-4 bg-muted rounded w-3/4 mb-2" />
-                <div className="h-3 bg-muted rounded w-1/2" />
+            <Card key={i} className="animate-pulse overflow-hidden rounded-2xl border-0 shadow-lg bg-card/50">
+              <div className="h-2 bg-muted/50 rounded-t-2xl" />
+              <CardContent className="p-6 pt-5">
+                <div className="h-5 bg-muted/50 rounded-lg w-3/4 mb-3" />
+                <div className="h-4 bg-muted/50 rounded-lg w-1/2" />
               </CardContent>
             </Card>
           ))}
         </div>
       ) : batches.length === 0 ? (
-        <Card className="p-16 text-center border-dashed">
-          <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
-            <LayoutDashboard className="h-8 w-8 text-primary" />
+        <Card className="p-16 md:p-20 text-center border-2 border-dashed rounded-2xl bg-card/50 dark:bg-card/30 shadow-sm">
+          <div className="mx-auto w-20 h-20 rounded-2xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center mb-6 shadow-inner">
+            <LayoutDashboard className="h-10 w-10 text-primary" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">Nema generalnih planera</h3>
-          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+          <h3 className="text-xl font-semibold mb-2 text-foreground">Nema generalnih planera</h3>
+          <p className="text-muted-foreground mb-8 max-w-sm mx-auto text-sm leading-relaxed">
             Kreiraj planer za bilo koji projekat – dodaj kolone, menjaj boje, dodeljuj ljude.
           </p>
-          <Button onClick={() => setDialogOpen(true)} size="lg">
+          <Button
+            onClick={() => setDialogOpen(true)}
+            size="lg"
+            className="rounded-xl shadow-md hover:shadow-lg transition-all"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Novi planer
           </Button>
@@ -156,22 +172,30 @@ export default function PlanerGeneralPage() {
               key={batch.id}
               onMouseEnter={() => prefetchBatch(batch.id)}
               className={cn(
-                "transition-all duration-200 overflow-hidden flex flex-col",
+                "group overflow-hidden flex flex-col rounded-2xl border-2 transition-all duration-300",
+                "hover:shadow-xl hover:-translate-y-0.5 focus-within:ring-2 focus-within:ring-primary/50",
                 batch.frozenAt
-                  ? "border-amber-500/50 bg-amber-50/30 dark:bg-amber-950/20 dark:border-amber-500/40"
-                  : "border-green-500/30 bg-card hover:border-green-500/50 hover:shadow-md dark:border-green-500/30"
+                  ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-500/40 dark:border-amber-500/30 shadow-md"
+                  : "bg-card dark:bg-card/80 border-green-500/20 dark:border-green-500/20 hover:border-green-500/40 dark:hover:border-green-500/40 shadow-lg shadow-black/5 dark:shadow-black/20"
               )}
             >
-              <div className={cn("h-1 shrink-0", batch.frozenAt ? "bg-amber-500" : "bg-green-500")} />
-              <CardHeader className="flex flex-row items-start justify-between gap-2 pb-2 pt-4">
+              <div
+                className={cn(
+                  "h-1.5 shrink-0",
+                  batch.frozenAt
+                    ? "bg-amber-500"
+                    : "bg-gradient-to-r from-green-500 to-emerald-500 dark:from-green-500 dark:to-emerald-600"
+                )}
+              />
+              <CardHeader className="flex flex-row items-start justify-between gap-3 pb-2 pt-5 px-5">
                 <Link
                   href={`/export-planner/${batch.id}`}
-                  className="min-w-0 flex-1 rounded focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="min-w-0 flex-1 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 focus:ring-offset-2 dark:focus:ring-offset-background"
                 >
-                  <h3 className="font-semibold truncate hover:underline">
+                  <h3 className="font-semibold text-lg truncate text-foreground group-hover:text-primary transition-colors">
                     {batch.customName || batch.batchCode}
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-0.5">
+                  <p className="text-sm text-muted-foreground mt-1">
                     {batch._count.items} stavki
                   </p>
                 </Link>
@@ -185,7 +209,7 @@ export default function PlanerGeneralPage() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     onClick={(e) => { e.preventDefault(); setDeleteId(batch.id); }}
                     aria-label="Obriši planer"
                   >
@@ -193,8 +217,13 @@ export default function PlanerGeneralPage() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="pt-0 pb-4">
-                <Button asChild variant="secondary" size="sm" className="w-full">
+              <CardContent className="pt-0 pb-5 px-5">
+                <Button
+                  asChild
+                  variant="secondary"
+                  size="sm"
+                  className="w-full rounded-xl h-10 font-medium shadow-sm hover:shadow transition-shadow border border-border/80"
+                >
                   <Link href={`/export-planner/${batch.id}`}>
                     Otvori →
                   </Link>
@@ -244,6 +273,7 @@ export default function PlanerGeneralPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }
