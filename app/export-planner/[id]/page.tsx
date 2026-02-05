@@ -313,7 +313,7 @@ function formatDate(d: string | null | undefined): string {
   if (!d) return "";
   try {
     const dt = typeof d === "string" ? new Date(d) : d;
-    return dt.toLocaleDateString("sr-RS", { day: "numeric", month: "short", year: "numeric" });
+    return dt.toLocaleDateString("sr-Latn-RS", { day: "numeric", month: "short", year: "numeric" });
   } catch {
     return "";
   }
@@ -795,13 +795,19 @@ function PlannerTimelineView({
       const end = i.dueDate ? new Date(i.dueDate).getTime() : null;
       return [start, end].filter((x): x is number => x != null);
     });
-    const pad = 30 * 86400000;
-    const min = dates.length ? Math.min(...dates) : today - pad;
-    const max = dates.length ? Math.max(...dates) : today + 90 * 86400000;
-    return {
-      rangeStart: Math.min(min, today - pad),
-      rangeEnd: Math.max(max, today + pad),
-    };
+    const day = 86400000;
+    const paddingDays = 14;
+    const minSpanDays = 31;
+    const dataMin = dates.length ? Math.min(...dates) : today;
+    const dataMax = dates.length ? Math.max(...dates) : today;
+    let rangeStart = Math.min(dataMin, today) - paddingDays * day;
+    let rangeEnd = Math.max(dataMax, today) + paddingDays * day;
+    if (rangeEnd - rangeStart < minSpanDays * day) {
+      const half = (minSpanDays * day - (rangeEnd - rangeStart)) / 2;
+      rangeStart -= half;
+      rangeEnd += half;
+    }
+    return { rangeStart, rangeEnd };
   }, [items, today]);
 
   const toPercent = (ts: number) => ((ts - rangeStart) / (rangeEnd - rangeStart)) * 100;
@@ -845,7 +851,7 @@ function PlannerTimelineView({
             <div className="absolute inset-0 flex text-xs text-muted-foreground pointer-events-none">
               {[0, 0.2, 0.4, 0.6, 0.8, 1].map((p) => (
                 <span key={p} className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${p * 100}%` }}>
-                  {new Date(rangeStart + p * (rangeEnd - rangeStart)).toLocaleDateString("sr-RS", { month: "short", day: "numeric", year: "2-digit" })}
+                  {new Date(rangeStart + p * (rangeEnd - rangeStart)).toLocaleDateString("sr-Latn-RS", { month: "short", day: "numeric", year: "2-digit" })}
                 </span>
               ))}
             </div>
@@ -905,7 +911,8 @@ function PlannerTimelineView({
                         const startTs = item.startDate ? new Date(item.startDate).getTime() : rangeStart;
                         const endTs = item.dueDate ? new Date(item.dueDate).getTime() : rangeEnd;
                         const left = Math.max(0, toPercent(startTs));
-                        const width = Math.min(100 - left, Math.max(2, toPercent(endTs) - left));
+                        const widthPct = toPercent(endTs) - left;
+                    const width = Math.min(100 - left, Math.max(4, widthPct));
                         const late = getDaysLate(item, columns);
                         const lane = laneByItemId.get(item.id) ?? 0;
                         const top = 6 + lane * (barHeight + gap);
