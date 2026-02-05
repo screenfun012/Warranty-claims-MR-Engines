@@ -39,9 +39,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange, Truck, Package, CheckCircle, ListTodo, Circle, Eye, EyeOff } from "lucide-react";
+import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,19 +50,7 @@ interface ColumnDef {
   label: string;
   order: number;
   color: string;
-  icon?: string;
 }
-
-const COLUMN_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  truck: Truck,
-  package: Package,
-  "check-circle": CheckCircle,
-  "list-todo": ListTodo,
-  trash: Trash2,
-  circle: Circle,
-  clock: Clock,
-  calendar: Calendar,
-};
 
 /** Za General planer: imageUrl, link, itd. */
 type GeneralCustomData = { imageUrl?: string; link?: string };
@@ -102,8 +89,6 @@ interface Batch {
   batchType: string;
   customName: string | null;
   frozenAt: string | null;
-  isPrivate?: boolean;
-  createdById?: string | null;
   columns: string | null;
   items: BatchItem[];
 }
@@ -165,7 +150,6 @@ function DroppableColumn({
   id,
   label,
   color,
-  icon: iconName,
   items,
   canEdit,
   onAddClick,
@@ -179,7 +163,6 @@ function DroppableColumn({
   id: string;
   label: string;
   color: string;
-  icon?: string;
   items: BatchItem[];
   canEdit: boolean;
   onAddClick: () => void;
@@ -194,7 +177,6 @@ function DroppableColumn({
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(label);
   const colClass = colorMap[color] || colorMap.slate;
-  const ColumnIcon = iconName ? COLUMN_ICONS[iconName] : null;
 
   useEffect(() => {
     setLabelValue(label);
@@ -235,11 +217,10 @@ function DroppableColumn({
             type="button"
             onClick={() => canEdit && onLabelChange && setEditingLabel(true)}
             className={cn(
-              "text-sm uppercase tracking-wide text-muted-foreground truncate text-left flex-1 min-w-0 flex items-center gap-1.5",
+              "text-sm uppercase tracking-wide text-muted-foreground truncate text-left flex-1 min-w-0",
               canEdit && onLabelChange && "hover:text-foreground cursor-pointer"
             )}
           >
-            {ColumnIcon && <ColumnIcon className="h-4 w-4 shrink-0" />}
             {label}
           </button>
         )}
@@ -314,7 +295,6 @@ function SortableColumn({
         id={col.id}
         label={col.label}
         color={col.color}
-        icon={col.icon}
         items={items}
         canEdit={canEdit}
         onAddClick={onAddClick}
@@ -748,6 +728,47 @@ function DetailModal({
   );
 }
 
+/** Dodeljuje "trake" (lane) stavkama tako da se preklapajuće stavke ne crtaju jedna preko druge. */
+function assignLanes(
+  colItems: BatchItem[],
+  rangeStart: number,
+  rangeEnd: number
+): { laneByItemId: Map<string, number>; maxLane: number } {
+  const getStart = (i: BatchItem) => (i.startDate ? new Date(i.startDate).getTime() : rangeStart);
+  const getEnd = (i: BatchItem) => (i.dueDate ? new Date(i.dueDate).getTime() : rangeEnd);
+  const sorted = [...colItems].sort((a, b) => getStart(a) - getStart(b));
+  const laneByItemId = new Map<string, number>();
+  const laneEnd: number[] = []; // laneEnd[l] = max end time of any item in lane l
+
+  for (const item of sorted) {
+    const start = getStart(item);
+    const end = getEnd(item);
+    let lane = 0;
+    while (lane < laneEnd.length && laneEnd[lane] > start) lane++;
+    if (lane === laneEnd.length) laneEnd.push(end);
+    else laneEnd[lane] = Math.max(laneEnd[lane], end);
+    laneByItemId.set(item.id, lane);
+  }
+  const maxLane = laneEnd.length ? Math.max(...Array.from(laneByItemId.values())) : 0;
+  return { laneByItemId, maxLane };
+}
+
+/** Boje traka za timeline barove (ciklus po traci da preklapajuće budu različite). */
+const timelineBarColors = [
+  "bg-primary/90 hover:bg-primary",
+  "bg-blue-500/90 hover:bg-blue-500",
+  "bg-amber-500/90 hover:bg-amber-500",
+  "bg-emerald-500/90 hover:bg-emerald-500",
+  "bg-violet-500/90 hover:bg-violet-500",
+] as const;
+const timelineBarColorsLate = [
+  "bg-red-500/90 hover:bg-red-500",
+  "bg-red-600/90 hover:bg-red-600",
+  "bg-rose-500/90 hover:bg-rose-500",
+  "bg-orange-500/90 hover:bg-orange-500",
+  "bg-amber-600/90 hover:bg-amber-600",
+] as const;
+
 /** Timeline po kolonama: jedna traka po koloni, stavke unutar nje; hover = tooltip sa stavkom. */
 function PlannerTimelineView({
   batch,
@@ -867,51 +888,67 @@ function PlannerTimelineView({
                   <span className="text-sm font-medium text-foreground truncate leading-tight">{col.label}</span>
                   <span className="text-xs text-muted-foreground">{colItems.length} stavki</span>
                 </div>
-                <div className="flex-1 relative h-12 py-1.5 pr-3 pl-1 min-w-0">
-                  {todayPercent >= 0 && todayPercent <= 100 && (
-                    <div className="absolute top-0 bottom-0 w-px bg-green-500/50 z-0 pointer-events-none" style={{ left: `${todayPercent}%` }} />
-                  )}
-                  {colItems.map((item) => {
-                    const startTs = item.startDate ? new Date(item.startDate).getTime() : rangeStart;
-                    const endTs = item.dueDate ? new Date(item.dueDate).getTime() : rangeEnd;
-                    const left = Math.max(0, toPercent(startTs));
-                    const width = Math.min(100 - left, Math.max(2, toPercent(endTs) - left));
-                    const late = getDaysLate(item, columns);
-                    const startStr = item.startDate ? formatDate(item.startDate) : "—";
-                    const endStr = item.dueDate ? formatDate(item.dueDate) : "—";
-                    return (
-                      <Tooltip key={item.id} delayDuration={200}>
-                        <TooltipTrigger asChild>
-                          <div
-                            role="button"
-                            tabIndex={0}
-                            className={cn(
-                              "absolute top-1/2 -translate-y-1/2 h-7 rounded-md min-w-[8px] z-[1] shadow-sm cursor-pointer transition-all",
-                              "bg-primary/85 hover:bg-primary hover:shadow-md hover:z-[2] hover:ring-2 hover:ring-primary/50",
-                              late > 0 && "ring-1 ring-red-400/70 bg-red-500/85 hover:bg-red-500"
-                            )}
-                            style={{ left: `${left}%`, width: `${width}%` }}
-                            onClick={(e) => { e.stopPropagation(); onItemClick(item); }}
-                            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onItemClick(item); } }}
-                          />
-                        </TooltipTrigger>
-                        <TooltipContent side="top" className="max-w-xs p-3 space-y-1.5 text-left">
-                          <p className="font-semibold text-background">{itemLabel(item)}</p>
-                          {item.assignedTo && (
-                            <p className="text-background/90 text-xs">Dodeljeno: {item.assignedTo.fullName}</p>
-                          )}
-                          <p className="text-background/80 text-xs">Period: {startStr} → {endStr}</p>
-                          {late > 0 && (
-                            <p className="text-red-200 text-xs font-medium flex items-center gap-1">
-                              <Clock className="h-3 w-3" /> Kasni {late} {late === 1 ? "dan" : "dana"}
-                            </p>
-                          )}
-                          <p className="text-background/70 text-[10px]">Klik za detalje</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    );
-                  })}
-                </div>
+                {(() => {
+                  const { laneByItemId, maxLane } = assignLanes(colItems, rangeStart, rangeEnd);
+                  const barHeight = 28;
+                  const gap = 4;
+                  const rowHeight = Math.max(48, (maxLane + 1) * barHeight + (maxLane + 1) * gap + 12);
+                  return (
+                    <div
+                      className="relative py-1.5 pr-3 pl-1 min-w-0"
+                      style={{ minHeight: rowHeight }}
+                    >
+                      {todayPercent >= 0 && todayPercent <= 100 && (
+                        <div className="absolute top-0 bottom-0 w-px bg-green-500/50 z-0 pointer-events-none" style={{ left: `${todayPercent}%` }} />
+                      )}
+                      {colItems.map((item) => {
+                        const startTs = item.startDate ? new Date(item.startDate).getTime() : rangeStart;
+                        const endTs = item.dueDate ? new Date(item.dueDate).getTime() : rangeEnd;
+                        const left = Math.max(0, toPercent(startTs));
+                        const width = Math.min(100 - left, Math.max(2, toPercent(endTs) - left));
+                        const late = getDaysLate(item, columns);
+                        const lane = laneByItemId.get(item.id) ?? 0;
+                        const top = 6 + lane * (barHeight + gap);
+                        const colorClass = late > 0
+                          ? timelineBarColorsLate[lane % timelineBarColorsLate.length]
+                          : timelineBarColors[lane % timelineBarColors.length];
+                        const startStr = item.startDate ? formatDate(item.startDate) : "—";
+                        const endStr = item.dueDate ? formatDate(item.dueDate) : "—";
+                        return (
+                          <Tooltip key={item.id} delayDuration={200}>
+                            <TooltipTrigger asChild>
+                              <div
+                                role="button"
+                                tabIndex={0}
+                                className={cn(
+                                  "absolute rounded-md min-w-[8px] h-7 z-[1] shadow-sm cursor-pointer transition-all hover:shadow-md hover:z-[2] hover:ring-2 hover:ring-offset-1",
+                                  colorClass,
+                                  late > 0 && "ring-1 ring-red-400/70"
+                                )}
+                                style={{ left: `${left}%`, width: `${width}%`, top: `${top}px` }}
+                                onClick={(e) => { e.stopPropagation(); onItemClick(item); }}
+                                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onItemClick(item); } }}
+                              />
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-xs p-3 space-y-1.5 text-left">
+                              <p className="font-semibold text-background">{itemLabel(item)}</p>
+                              {item.assignedTo && (
+                                <p className="text-background/90 text-xs">Dodeljeno: {item.assignedTo.fullName}</p>
+                              )}
+                              <p className="text-background/80 text-xs">Period: {startStr} → {endStr}</p>
+                              {late > 0 && (
+                                <p className="text-red-200 text-xs font-medium flex items-center gap-1">
+                                  <Clock className="h-3 w-3" /> Kasni {late} {late === 1 ? "dan" : "dana"}
+                                </p>
+                              )}
+                              <p className="text-background/70 text-[10px]">Klik za detalje</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })
@@ -945,7 +982,6 @@ export default function ExportBatchPage() {
   const [addColumnDialogOpen, setAddColumnDialogOpen] = useState(false);
   const [newColumnLabel, setNewColumnLabel] = useState("");
   const [newColumnColor, setNewColumnColor] = useState("slate");
-  const [newColumnIcon, setNewColumnIcon] = useState("");
   const [boardFilter, setBoardFilter] = useState<"all" | "mine" | "late" | "thisMonth">("all");
 
   const { data: batch, isLoading } = useQuery({
@@ -979,26 +1015,10 @@ export default function ExportBatchPage() {
   });
   const currentUserDbId = meData?.id ?? null;
 
-  const { data: columnPref } = useQuery({
-    queryKey: ["export-planner-column-pref", batch?.batchType],
-    queryFn: async () => {
-      if (!batch?.batchType) return { columnOrder: null };
-      const r = await fetch(`/api/export-planner/column-preferences?batchType=${batch.batchType}`);
-      if (!r.ok) return { columnOrder: null };
-      return r.json();
-    },
-    enabled: !!id && !!batch?.batchType,
-    staleTime: 2 * 60 * 1000,
-  });
-
-  const columns = useMemo(() => {
-    const parsed = parseColumns(batch?.columns ?? null);
-    const order = columnPref?.columnOrder as string[] | undefined;
-    if (!order?.length) return parsed;
-    const ordered = order.map((id) => parsed.find((c) => c.id === id)).filter(Boolean) as ColumnDef[];
-    const rest = parsed.filter((c) => !order.includes(c.id));
-    return [...ordered, ...rest];
-  }, [batch?.columns, columnPref?.columnOrder]);
+  const columns = useMemo(
+    () => parseColumns(batch?.columns ?? null),
+    [batch?.columns]
+  );
 
   const filteredItems = useMemo(() => {
     const items = batch?.items ?? [];
@@ -1199,42 +1219,6 @@ export default function ExportBatchPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const saveColumnOrderMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/export-planner/column-preferences", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          batchType: batch?.batchType,
-          columnOrder: columns.map((c) => c.id),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to save");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["export-planner-column-pref", batch?.batchType] });
-      toast.success("Redosled kolona sačuvan kao tvoj podrazumevani");
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const patchIsPrivateMutation = useMutation({
-    mutationFn: async (isPrivate: boolean) => {
-      const res = await fetch(`/api/export-planner/batches/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isPrivate }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      return res.json();
-    },
-    onSuccess: (data: Batch) => {
-      queryClient.setQueryData(["export-batch", id], data);
-      toast.success(data.isPrivate ? "Lista je sada privatna" : "Lista je sada javna");
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -1361,22 +1345,6 @@ export default function ExportBatchPage() {
                 ? `${batch.items.length} ${t("items")} • ${batch.items.filter((i) => i.status === "IZVOZ").length} ${t("exportCount")}`
                 : `${batch.items.length} ${t("itemsGeneric")}`}
             </span>
-            {canEdit && (batch.createdById === currentUserDbId || batch.isPrivate !== undefined) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center gap-2">
-                    {batch.isPrivate ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
-                    <Switch
-                      checked={!!batch.isPrivate}
-                      onCheckedChange={(checked) => patchIsPrivateMutation.mutate(!!checked)}
-                      disabled={patchIsPrivateMutation.isPending}
-                    />
-                    <span className="text-xs text-muted-foreground">Privatna</span>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>Samo ti vidiš ovu listu u pregledu</TooltipContent>
-              </Tooltip>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1384,17 +1352,8 @@ export default function ExportBatchPage() {
             <>
               <Button
                 size="sm"
-                variant="ghost"
-                onClick={() => saveColumnOrderMutation.mutate()}
-                disabled={saveColumnOrderMutation.isPending || columns.length === 0}
-                title="Sačuvaj trenutni redosled kolona kao svoj podrazumevani"
-              >
-                {saveColumnOrderMutation.isPending ? "..." : "Sačuvaj redosled"}
-              </Button>
-              <Button
-                size="sm"
                 variant="outline"
-                onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setNewColumnIcon(""); setAddColumnDialogOpen(true); }}
+                onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setAddColumnDialogOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Dodaj novu kolonu
@@ -1732,42 +1691,17 @@ export default function ExportBatchPage() {
                 ))}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Ikona (opciono)</Label>
-              <Select value={newColumnIcon || "none"} onValueChange={(v) => setNewColumnIcon(v === "none" ? "" : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Bez ikone" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Bez ikone</SelectItem>
-                  <SelectItem value="truck">Kamion (Izvoz)</SelectItem>
-                  <SelectItem value="package">Paket</SelectItem>
-                  <SelectItem value="check-circle">Završeno</SelectItem>
-                  <SelectItem value="list-todo">Lista</SelectItem>
-                  <SelectItem value="trash">Kanta</SelectItem>
-                  <SelectItem value="clock">Sat</SelectItem>
-                  <SelectItem value="calendar">Kalendar</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddColumnDialogOpen(false)}>{tCommon("cancel")}</Button>
             <Button
               onClick={() => {
                 const label = newColumnLabel.trim() || "Nova kolona";
-                const newCol: ColumnDef = {
-                  id: `COL_${Date.now()}`,
-                  label,
-                  order: columns.length,
-                  color: newColumnColor,
-                  ...(newColumnIcon ? { icon: newColumnIcon } : {}),
-                };
+                const newCol: ColumnDef = { id: `COL_${Date.now()}`, label, order: columns.length, color: newColumnColor };
                 updateColumnsMutation.mutate([...columns, newCol]);
                 setAddColumnDialogOpen(false);
                 setNewColumnLabel("");
                 setNewColumnColor("slate");
-                setNewColumnIcon("");
               }}
               disabled={updateColumnsMutation.isPending}
             >
