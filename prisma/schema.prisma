@@ -33,6 +33,7 @@ model User {
   // Export Planner
   exportBatchesCreated          ExportBatch[]  @relation("ExportBatchCreatedBy")
   exportBatchItemsAssigned      ExportBatchItem[] @relation("ExportBatchItemAssignedTo")
+  exportPlannerSavedViews        ExportPlannerSavedView[]
   createdAt                     DateTime    @default(now())
   updatedAt                     DateTime    @updatedAt
 }
@@ -368,6 +369,19 @@ model ExportBatchAudit {
 
   @@index([batchId])
   @@index([createdAt])
+}
+
+model ExportPlannerSavedView {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  batchType String?  // MR_ENGINES | GENERIC | null = sve
+  mineOnly  Boolean  @default(false)
+  sortBy    String   @default("dateDesc") // dateDesc | dateAsc | nameAsc
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // Activity Log for tracking user actions

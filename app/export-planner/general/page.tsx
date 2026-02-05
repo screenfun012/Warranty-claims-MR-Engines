@@ -13,11 +13,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LayoutDashboard, Plus, Lock, LockOpen, Trash2, ListFilter } from "lucide-react";
+import { LayoutDashboard, Plus, Lock, LockOpen, Trash2, ListFilter, BookmarkPlus, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -33,13 +40,36 @@ interface Batch {
   createdBy: { fullName: string | null; email: string } | null;
 }
 
-const fetchBatches = async (mineOnly?: boolean): Promise<Batch[]> => {
-  const url = mineOnly
-    ? "/api/export-planner/batches?batchType=GENERIC&mine=1"
-    : "/api/export-planner/batches?batchType=GENERIC";
-  const res = await fetch(url);
+type SortBy = "dateDesc" | "dateAsc" | "nameAsc";
+const fetchBatches = async (mineOnly?: boolean, sortBy: SortBy = "dateDesc"): Promise<Batch[]> => {
+  const params = new URLSearchParams({ batchType: "GENERIC", sortBy });
+  if (mineOnly) params.set("mine", "1");
+  const res = await fetch(`/api/export-planner/batches?${params}`);
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
+};
+
+type SavedView = { id: string; name: string; batchType: string | null; mineOnly: boolean; sortBy: string };
+const fetchSavedViews = async (): Promise<SavedView[]> => {
+  const res = await fetch("/api/export-planner/saved-views");
+  if (!res.ok) return [];
+  return res.json();
+};
+const createSavedView = async (data: { name: string; batchType: string | null; mineOnly: boolean; sortBy: string }) => {
+  const res = await fetch("/api/export-planner/saved-views", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...data, batchType: data.batchType || null }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Failed");
+  }
+  return res.json();
+};
+const deleteSavedView = async (id: string) => {
+  const res = await fetch(`/api/export-planner/saved-views/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed");
 };
 
 const createBatch = async (data: { batchType: string; customName?: string; template?: string }) => {
@@ -71,10 +101,33 @@ export default function PlanerGeneralPage() {
   const [newTemplate, setNewTemplate] = useState<"empty" | "kanban3">("empty");
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showMineOnly, setShowMineOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<SortBy>("dateDesc");
+  const [saveViewOpen, setSaveViewOpen] = useState(false);
+  const [savedViewName, setSavedViewName] = useState("");
 
   const { data: batches = [], isLoading } = useQuery({
-    queryKey: ["export-planner-batches", "GENERIC", showMineOnly],
-    queryFn: () => fetchBatches(showMineOnly),
+    queryKey: ["export-planner-batches", "GENERIC", showMineOnly, sortBy],
+    queryFn: () => fetchBatches(showMineOnly, sortBy),
+  });
+
+  const { data: savedViews = [], refetch: refetchSavedViews } = useQuery({
+    queryKey: ["export-planner-saved-views", "GENERIC"],
+    queryFn: fetchSavedViews,
+  });
+  const saveViewMutation = useMutation({
+    mutationFn: createSavedView,
+    onSuccess: () => {
+      refetchSavedViews();
+      setSaveViewOpen(false);
+      setSavedViewName("");
+      toast.success("Prikaz sačuvan");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const deleteSavedViewMutation = useMutation({
+    mutationFn: deleteSavedView,
+    onSuccess: () => refetchSavedViews(),
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const createMutation = useMutation({
@@ -149,6 +202,46 @@ export default function PlanerGeneralPage() {
               Samo moje
             </button>
           </div>
+          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Sortiraj" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dateDesc">Datum ↓</SelectItem>
+              <SelectItem value="dateAsc">Datum ↑</SelectItem>
+              <SelectItem value="nameAsc">Naziv A–Ž</SelectItem>
+            </SelectContent>
+          </Select>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <BookmarkPlus className="h-4 w-4" />
+                Sačuvani prikazi
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              {savedViews.filter((v: SavedView) => v.batchType === "GENERIC" || !v.batchType).map((v: SavedView) => (
+                <DropdownMenuItem
+                  key={v.id}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setShowMineOnly(v.mineOnly);
+                    setSortBy((v.sortBy as SortBy) || "dateDesc");
+                  }}
+                >
+                  <span className="flex-1">{v.name}</span>
+                </DropdownMenuItem>
+              ))}
+              {savedViews.filter((v: SavedView) => v.batchType === "GENERIC" || !v.batchType).length === 0 && (
+                <DropdownMenuItem disabled>Nema sačuvanih prikaza</DropdownMenuItem>
+              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setSaveViewOpen(true)}>
+                Sačuvaj trenutni prikaz…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button
             onClick={() => setDialogOpen(true)}
             size="lg"
@@ -306,6 +399,38 @@ export default function PlanerGeneralPage() {
               disabled={createMutation.isPending}
             >
               {createMutation.isPending ? "..." : "Kreiraj"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={saveViewOpen} onOpenChange={setSaveViewOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Sačuvaj prikaz</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>Naziv prikaza</Label>
+              <Input
+                placeholder="npr. Moj izvoz, Sve aktivno..."
+                value={savedViewName}
+                onChange={(e) => setSavedViewName(e.target.value)}
+              />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Trenutno: {showMineOnly ? "Samo moje" : "Sve liste"}, sort: {sortBy === "dateDesc" ? "Datum ↓" : sortBy === "dateAsc" ? "Datum ↑" : "Naziv A–Ž"}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveViewOpen(false)}>
+              {tCommon("cancel")}
+            </Button>
+            <Button
+              onClick={() => saveViewMutation.mutate({ name: savedViewName.trim(), batchType: "GENERIC", mineOnly: showMineOnly, sortBy })}
+              disabled={!savedViewName.trim() || saveViewMutation.isPending}
+            >
+              {saveViewMutation.isPending ? "..." : "Sačuvaj"}
             </Button>
           </DialogFooter>
         </DialogContent>

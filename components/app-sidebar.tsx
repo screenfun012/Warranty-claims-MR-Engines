@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Truck,
   LayoutDashboard,
+  LayoutList,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -127,6 +128,12 @@ const fetchPlannerBatches = async (batchType: string): Promise<PlannerBatch[]> =
   return res.json();
 };
 
+type PlannerSummary = { assignedCount: number; lateCount: number };
+const fetchPlannerSummary = async (): Promise<PlannerSummary> => {
+  const res = await fetch("/api/export-planner/my-summary");
+  if (!res.ok) return { assignedCount: 0, lateCount: 0 };
+  return res.json();
+};
 
 export function AppSidebar() {
   const pathname = usePathname();
@@ -200,7 +207,13 @@ export function AppSidebar() {
     queryFn: () => fetchPlannerBatches("GENERIC"),
     enabled: showPlannerNav,
   });
-  const isExportBatchPage = pathname?.startsWith("/export-planner/") && pathname !== "/export-planner/izvoz" && pathname !== "/export-planner/general";
+  const { data: plannerSummary = { assignedCount: 0, lateCount: 0 } } = useQuery({
+    queryKey: ["export-planner-my-summary"],
+    queryFn: fetchPlannerSummary,
+    enabled: showPlannerNav,
+    staleTime: 60 * 1000,
+  });
+  const isExportBatchPage = pathname?.startsWith("/export-planner/") && pathname !== "/export-planner/izvoz" && pathname !== "/export-planner/general" && pathname !== "/export-planner/pregled";
   const currentBatchId = isExportBatchPage && pathname ? pathname.split("/").pop() : null;
   useEffect(() => {
     if (!currentBatchId) return;
@@ -341,6 +354,23 @@ export function AppSidebar() {
                   {!isCollapsed && (
                     <>
                       <SidebarMenuItem>
+                        <SidebarMenuButton asChild isActive={pathname === "/export-planner/pregled"} className={cn("transition-all duration-200 hover:bg-sidebar-accent/80")}>
+                          <Link
+                            href="/export-planner/pregled"
+                            onClick={() => isMobile && setOpenMobile(false)}
+                            className="flex flex-1 min-w-0 items-center gap-3 rounded-md py-2 pr-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground no-underline"
+                          >
+                            <LayoutList className="h-5 w-5 shrink-0" />
+                            <span className="truncate text-left">{t("nav.plannerOverview")}</span>
+                            {plannerSummary.lateCount > 0 && (
+                              <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
+                                {plannerSummary.lateCount > 99 ? "99+" : plannerSummary.lateCount}
+                              </Badge>
+                            )}
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                      <SidebarMenuItem>
                         <div className="flex w-full items-center gap-1 rounded-md px-2 py-1.5">
                           <Link
                             href="/export-planner/izvoz"
@@ -424,6 +454,30 @@ export function AppSidebar() {
                   )}
                   {isCollapsed && (
                     <>
+                      <SidebarMenuItem>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuButton asChild>
+                              <Link href="/export-planner/pregled" className="relative flex items-center justify-center">
+                                <LayoutList className="h-5 w-5" />
+                                {plannerSummary.lateCount > 0 && (
+                                  <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+                                    {plannerSummary.lateCount > 99 ? "99+" : plannerSummary.lateCount}
+                                  </span>
+                                )}
+                              </Link>
+                            </SidebarMenuButton>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            {t("nav.plannerOverview")}
+                            {plannerSummary.lateCount > 0 && (
+                              <Badge variant="destructive" className="ml-1 h-5 min-w-5 px-1.5 text-xs">
+                                {plannerSummary.lateCount}
+                              </Badge>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </SidebarMenuItem>
                       <SidebarMenuItem>
                         <Tooltip>
                           <TooltipTrigger asChild>

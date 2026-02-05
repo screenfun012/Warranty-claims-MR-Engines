@@ -1,10 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { List, Activity, FolderPlus, UserCheck } from "lucide-react";
+import { List, Activity, FolderPlus, UserCheck, AlertTriangle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { sr } from "date-fns/locale";
 
@@ -89,6 +90,29 @@ export default function PlannerOverviewPage() {
   const items = assignments?.items ?? [];
   const activity = activityData?.activity ?? [];
 
+  const todayStart = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+
+  const lateItems = useMemo(() => {
+    return items.filter((item: AssignedItem) => {
+      if (!item.dueDate) return false;
+      const due = new Date(item.dueDate);
+      due.setHours(0, 0, 0, 0);
+      return due.getTime() < todayStart;
+    });
+  }, [items, todayStart]);
+
+  const getDaysLate = (dueDate: string | null): number => {
+    if (!dueDate) return 0;
+    const due = new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+    const diff = todayStart - due.getTime();
+    return Math.floor(diff / (24 * 60 * 60 * 1000));
+  };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(to_bottom_right,var(--muted)/0.15,transparent_50%)]">
       <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0/.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0/.02)_1px,transparent_1px)] bg-size-[24px_24px] pointer-events-none" />
@@ -155,6 +179,44 @@ export default function PlannerOverviewPage() {
                         {b.frozenAt && " · Zaključano"}
                       </span>
                     </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Kasne stavke */}
+        <Card className="border shadow-sm rounded-xl overflow-hidden border-destructive/30 bg-destructive/5">
+          <CardHeader>
+            <h2 className="font-semibold flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Kasne stavke
+            </h2>
+          </CardHeader>
+          <CardContent>
+            {assignmentsLoading ? (
+              <p className="text-muted-foreground">Učitavanje...</p>
+            ) : lateItems.length === 0 ? (
+              <p className="text-muted-foreground">Nema kasnih stavki dodeljenih tebi.</p>
+            ) : (
+              <div className="space-y-2 max-h-[280px] overflow-y-auto">
+                {lateItems.map((item: AssignedItem) => (
+                  <Link
+                    key={item.id}
+                    href={`/export-planner/${item.batch.id}`}
+                    className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg border border-destructive/20 hover:bg-destructive/10 transition-colors text-sm"
+                  >
+                    <span className="font-medium truncate">
+                      {item.engineNo || item.rn}
+                      {item.details ? ` · ${item.details}` : ""}
+                    </span>
+                    <span className="text-destructive shrink-0 font-medium">
+                      {getDaysLate(item.dueDate)} {getDaysLate(item.dueDate) === 1 ? "dan" : "dana"} kasni
+                    </span>
+                    <span className="text-muted-foreground shrink-0 hidden sm:inline">
+                      {item.batch.customName || item.batch.batchCode}
+                    </span>
                   </Link>
                 ))}
               </div>

@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     const prisma = await getPrisma();
     const batchType = request.nextUrl.searchParams.get("batchType"); // MR_ENGINES | GENERIC
     const mine = request.nextUrl.searchParams.get("mine") === "1";
+    const sortBy = request.nextUrl.searchParams.get("sortBy") || "dateDesc"; // dateDesc | dateAsc | nameAsc
 
     let createdById: string | null = null;
     if (mine) {
@@ -59,9 +60,16 @@ export async function GET(request: NextRequest) {
     if (batchType) where.batchType = batchType as string;
     if (mine && createdById) where.createdById = createdById;
 
+    const orderBy =
+      sortBy === "dateAsc"
+        ? [{ exportDate: "asc" as const }, { createdAt: "asc" as const }]
+        : sortBy === "nameAsc"
+          ? [{ customName: "asc" as const }, { batchCode: "asc" as const }]
+          : [{ exportDate: "desc" as const }, { createdAt: "desc" as const }];
+
     const batches = await prisma.exportBatch.findMany({
       where: Object.keys(where).length ? where : undefined,
-      orderBy: [{ exportDate: "desc" }, { createdAt: "desc" }],
+      orderBy,
       include: {
         _count: { select: { items: true } },
         createdBy: { select: { fullName: true, email: true } },
