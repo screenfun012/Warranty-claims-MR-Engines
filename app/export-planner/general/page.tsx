@@ -24,6 +24,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { LayoutDashboard, Plus, Lock, LockOpen, Trash2, ListFilter, BookmarkPlus, ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -72,7 +73,7 @@ const deleteSavedView = async (id: string) => {
   if (!res.ok) throw new Error("Failed");
 };
 
-const createBatch = async (data: { batchType: string; customName?: string; template?: string }) => {
+const createBatch = async (data: { batchType: string; customName?: string; template?: string; isPrivate?: boolean }) => {
   const res = await fetch("/api/export-planner/batches", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -99,6 +100,7 @@ export default function PlanerGeneralPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTemplate, setNewTemplate] = useState<"empty" | "kanban3">("empty");
+  const [newIsPrivate, setNewIsPrivate] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showMineOnly, setShowMineOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("dateDesc");
@@ -389,13 +391,17 @@ export default function PlanerGeneralPage() {
                 </SelectContent>
               </Select>
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="new-private" checked={newIsPrivate} onCheckedChange={(c) => setNewIsPrivate(!!c)} />
+              <Label htmlFor="new-private" className="text-sm font-normal cursor-pointer">Privatna lista (samo ja vidim)</Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {tCommon("cancel")}
             </Button>
             <Button
-              onClick={() => createMutation.mutate({ batchType: "GENERIC", customName: newName.trim() || undefined, template: newTemplate })}
+              onClick={() => createMutation.mutate({ batchType: "GENERIC", customName: newName.trim() || undefined, template: newTemplate, isPrivate: newIsPrivate })}
               disabled={createMutation.isPending}
             >
               {createMutation.isPending ? "..." : "Kreiraj"}

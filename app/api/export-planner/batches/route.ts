@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { requirePermission, createPermissionError, PERMISSIONS, userHasPermission } from "@/lib/auth/permissions";
 import { createBatchAudit, triggerBatchChanged } from "@/lib/export-planner/utils";
 import { getSession } from "@/lib/auth/get-session";
 
@@ -56,9 +56,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    const where: { batchType?: string; createdById?: string } = {};
+    let currentUserId: string | null = createdById;
+    if (!currentUserId) {
+      const session = await getSession();
+      const sessionEmail = (session?.user as { email?: string })?.email;
+      if (sessionEmail) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: sessionEmail },
+          select: { id: true },
+        });
+        currentUserId = dbUser?.id ?? null;
+      }
+    }
+    const hasPlannerAdmin = await userHasPermission(PERMISSIONS.EXPORT_PLANNER_ADMIN);
+    const visibilityClause =
+      hasPlannerAdmin ? {} : { OR: [{ isPrivate: false }, ...(currentUserId ? [{ createdById: currentUserId }] : [])] };
+
+    const where: Record<string, unknown> = {};
     if (batchType) where.batchType = batchType as string;
     if (mine && createdById) where.createdById = createdById;
+    if (Object.keys(visibilityClause).length > 0) where.AND = [visibilityClause];
 
     const orderBy =
       sortBy === "dateAsc"
@@ -132,6 +149,8 @@ export async function POST(request: NextRequest) {
       createdById = dbUser?.id ?? null;
     }
 
+    const isPrivate = Boolean(body.isPrivate);
+
     const batch = await prisma.exportBatch.create({
       data: {
         batchCode,
@@ -140,6 +159,7 @@ export async function POST(request: NextRequest) {
         customFields: batchType === "GENERIC" ? body.customFields ?? null : null,
         columns,
         exportDate: new Date(),
+        isPrivate,
         createdById,
       },
       include: {

@@ -34,6 +34,7 @@ model User {
   exportBatchesCreated          ExportBatch[]  @relation("ExportBatchCreatedBy")
   exportBatchItemsAssigned      ExportBatchItem[] @relation("ExportBatchItemAssignedTo")
   exportPlannerSavedViews        ExportPlannerSavedView[]
+  exportPlannerColumnPreferences ExportPlannerColumnPreference[]
   createdAt                     DateTime    @default(now())
   updatedAt                     DateTime    @updatedAt
 }
@@ -299,13 +300,14 @@ model ExportBatch {
   batchCode    String   @unique
   batchType    String   @default("MR_ENGINES")
   customName   String?
-  customFields String?
+  customFields String?  // JSON: [{ key, label, type }] za General – custom polja
   columns      String?
   exportDate   DateTime @default(now())
   loadTime     DateTime?
   notes        String?
   frozenAt     DateTime?
   frozenById   String?
+  isPrivate    Boolean  @default(false) // samo kreator vidi listu
   createdById  String?
   createdBy    User?    @relation("ExportBatchCreatedBy", fields: [createdById], references: [id])
   createdAt    DateTime @default(now())
@@ -314,6 +316,7 @@ model ExportBatch {
   overrides    ExportBatchOverride[]
 
   @@index([batchType])
+  @@index([isPrivate, createdById])
 }
 
 model ExportBatchItem {
@@ -381,6 +384,18 @@ model ExportPlannerSavedView {
   sortBy    String   @default("dateDesc") // dateDesc | dateAsc | nameAsc
   createdAt DateTime @default(now())
 
+  @@index([userId])
+}
+
+model ExportPlannerColumnPreference {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  batchType   String   // MR_ENGINES | GENERIC
+  columnOrder String   // JSON array of column ids
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, batchType])
   @@index([userId])
 }
 

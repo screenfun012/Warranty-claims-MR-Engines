@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,7 +74,7 @@ const deleteSavedView = async (id: string) => {
   if (!res.ok) throw new Error("Failed");
 };
 
-const createBatch = async (data: { batchType: string; customName?: string }) => {
+const createBatch = async (data: { batchType: string; customName?: string; isPrivate?: boolean }) => {
   const res = await fetch("/api/export-planner/batches", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -100,6 +101,7 @@ export default function PlanerIzvozPage() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newIsPrivate, setNewIsPrivate] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showMineOnly, setShowMineOnly] = useState(false);
   const [sortBy, setSortBy] = useState<SortBy>("dateDesc");
@@ -374,13 +376,17 @@ export default function PlanerIzvozPage() {
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox id="new-private-izvoz" checked={newIsPrivate} onCheckedChange={(c) => setNewIsPrivate(!!c)} />
+              <Label htmlFor="new-private-izvoz" className="text-sm font-normal cursor-pointer">Privatna lista (samo ja vidim)</Label>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {tCommon("cancel")}
             </Button>
             <Button
-              onClick={() => createMutation.mutate({ batchType: "MR_ENGINES", customName: newName.trim() || undefined })}
+              onClick={() => createMutation.mutate({ batchType: "MR_ENGINES", customName: newName.trim() || undefined, isPrivate: newIsPrivate })}
               disabled={createMutation.isPending}
             >
               {createMutation.isPending ? "..." : "Kreiraj"}

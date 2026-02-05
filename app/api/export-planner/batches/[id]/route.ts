@@ -7,8 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
-import { isSuperAdmin } from "@/lib/auth/permissions";
+import { requirePermission, createPermissionError, PERMISSIONS, userHasPermission } from "@/lib/auth/permissions";
 import { getSession } from "@/lib/auth/get-session";
 import { createBatchAudit, triggerBatchChanged } from "@/lib/export-planner/utils";
 
@@ -35,6 +34,20 @@ export async function GET(
     if (!batch) {
       return NextResponse.json({ error: "Batch not found" }, { status: 404 });
     }
+    const session = await getSession();
+    const sessionEmail = (session?.user as { email?: string })?.email;
+    let currentUserId: string | null = null;
+    if (sessionEmail) {
+      const dbUser = await prisma.user.findUnique({
+        where: { email: sessionEmail },
+        select: { id: true },
+      });
+      currentUserId = dbUser?.id ?? null;
+    }
+    const hasPlannerAdmin = await userHasPermission(PERMISSIONS.EXPORT_PLANNER_ADMIN);
+    if (batch.isPrivate && batch.createdById !== currentUserId && !hasPlannerAdmin) {
+      return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+    }
 
     return NextResponse.json(batch);
   } catch (error) {
@@ -57,6 +70,7 @@ export async function PATCH(
     if (body.customName !== undefined) updateData.customName = body.customName;
     if (body.notes !== undefined) updateData.notes = body.notes;
     if (body.columns !== undefined) updateData.columns = typeof body.columns === "string" ? body.columns : JSON.stringify(body.columns);
+    if (body.customFields !== undefined) updateData.customFields = body.customFields == null ? null : (typeof body.customFields === "string" ? body.customFields : JSON.stringify(body.customFields));
     if (body.frozenAt !== undefined) {
       updateData.frozenAt = body.frozenAt ? new Date(body.frozenAt) : null;
       if (body.frozenAt) {
@@ -67,6 +81,24 @@ export async function PATCH(
       }
     } else if (body.frozenById !== undefined) {
       updateData.frozenById = body.frozenById;
+    }
+    if (body.isPrivate !== undefined) {
+      const batchForAuth = await prisma.exportBatch.findUnique({ where: { id }, select: { createdById: true } });
+      const session = await getSession();
+      const sessionEmail = (session?.user as { email?: string })?.email;
+      let currentUserId: string | null = null;
+      if (sessionEmail) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: sessionEmail },
+          select: { id: true },
+        });
+        currentUserId = dbUser?.id ?? null;
+      }
+      const hasPlannerAdmin = await userHasPermission(PERMISSIONS.EXPORT_PLANNER_ADMIN);
+      if (batchForAuth?.createdById !== currentUserId && !hasPlannerAdmin) {
+        return NextResponse.json({ error: "Samo vlasnik ili admin mogu menjati privatnost." }, { status: 403 });
+      }
+      updateData.isPrivate = Boolean(body.isPrivate);
     }
 
     const batch = await prisma.exportBatch.update({
@@ -114,8 +146,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Batch not found" }, { status: 404 });
     }
 
-    const userIsSuperAdmin = await isSuperAdmin();
-    if (!userIsSuperAdmin) {
+    const hasPlannerAdmin = await userHasPermission(PERMISSIONS.EXPORT_PLANNER_ADMIN);
+    if (!hasPlannerAdmin) {
       const session = await getSession();
       const sessionEmail = (session?.user as { email?: string })?.email;
       let currentUserId: string | null = null;
@@ -128,7 +160,7 @@ export async function DELETE(
       }
       if (batch.createdById !== currentUserId) {
         return NextResponse.json(
-          { error: "Možete obrisati samo svoj plan." },
+          { error: "Možete obrisati samo svoj plan (ili imajte planer admin)." },
           { status: 403 }
         );
       }

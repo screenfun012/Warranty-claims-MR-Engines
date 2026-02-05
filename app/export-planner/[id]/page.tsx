@@ -39,8 +39,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange } from "lucide-react";
+import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange, Truck, Package, CheckCircle, ListTodo, Circle, Eye, EyeOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -50,7 +51,19 @@ interface ColumnDef {
   label: string;
   order: number;
   color: string;
+  icon?: string;
 }
+
+const COLUMN_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  truck: Truck,
+  package: Package,
+  "check-circle": CheckCircle,
+  "list-todo": ListTodo,
+  trash: Trash2,
+  circle: Circle,
+  clock: Clock,
+  calendar: Calendar,
+};
 
 /** Za General planer: imageUrl, link, itd. */
 type GeneralCustomData = { imageUrl?: string; link?: string };
@@ -89,6 +102,8 @@ interface Batch {
   batchType: string;
   customName: string | null;
   frozenAt: string | null;
+  isPrivate?: boolean;
+  createdById?: string | null;
   columns: string | null;
   items: BatchItem[];
 }
@@ -150,6 +165,7 @@ function DroppableColumn({
   id,
   label,
   color,
+  icon: iconName,
   items,
   canEdit,
   onAddClick,
@@ -163,6 +179,7 @@ function DroppableColumn({
   id: string;
   label: string;
   color: string;
+  icon?: string;
   items: BatchItem[];
   canEdit: boolean;
   onAddClick: () => void;
@@ -177,6 +194,7 @@ function DroppableColumn({
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(label);
   const colClass = colorMap[color] || colorMap.slate;
+  const ColumnIcon = iconName ? COLUMN_ICONS[iconName] : null;
 
   useEffect(() => {
     setLabelValue(label);
@@ -217,10 +235,11 @@ function DroppableColumn({
             type="button"
             onClick={() => canEdit && onLabelChange && setEditingLabel(true)}
             className={cn(
-              "text-sm uppercase tracking-wide text-muted-foreground truncate text-left flex-1 min-w-0",
+              "text-sm uppercase tracking-wide text-muted-foreground truncate text-left flex-1 min-w-0 flex items-center gap-1.5",
               canEdit && onLabelChange && "hover:text-foreground cursor-pointer"
             )}
           >
+            {ColumnIcon && <ColumnIcon className="h-4 w-4 shrink-0" />}
             {label}
           </button>
         )}
@@ -295,6 +314,7 @@ function SortableColumn({
         id={col.id}
         label={col.label}
         color={col.color}
+        icon={col.icon}
         items={items}
         canEdit={canEdit}
         onAddClick={onAddClick}
@@ -925,6 +945,7 @@ export default function ExportBatchPage() {
   const [addColumnDialogOpen, setAddColumnDialogOpen] = useState(false);
   const [newColumnLabel, setNewColumnLabel] = useState("");
   const [newColumnColor, setNewColumnColor] = useState("slate");
+  const [newColumnIcon, setNewColumnIcon] = useState("");
   const [boardFilter, setBoardFilter] = useState<"all" | "mine" | "late" | "thisMonth">("all");
 
   const { data: batch, isLoading } = useQuery({
@@ -958,10 +979,26 @@ export default function ExportBatchPage() {
   });
   const currentUserDbId = meData?.id ?? null;
 
-  const columns = useMemo(
-    () => parseColumns(batch?.columns ?? null),
-    [batch?.columns]
-  );
+  const { data: columnPref } = useQuery({
+    queryKey: ["export-planner-column-pref", batch?.batchType],
+    queryFn: async () => {
+      if (!batch?.batchType) return { columnOrder: null };
+      const r = await fetch(`/api/export-planner/column-preferences?batchType=${batch.batchType}`);
+      if (!r.ok) return { columnOrder: null };
+      return r.json();
+    },
+    enabled: !!id && !!batch?.batchType,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const columns = useMemo(() => {
+    const parsed = parseColumns(batch?.columns ?? null);
+    const order = columnPref?.columnOrder as string[] | undefined;
+    if (!order?.length) return parsed;
+    const ordered = order.map((id) => parsed.find((c) => c.id === id)).filter(Boolean) as ColumnDef[];
+    const rest = parsed.filter((c) => !order.includes(c.id));
+    return [...ordered, ...rest];
+  }, [batch?.columns, columnPref?.columnOrder]);
 
   const filteredItems = useMemo(() => {
     const items = batch?.items ?? [];
@@ -1162,6 +1199,42 @@ export default function ExportBatchPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const saveColumnOrderMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/export-planner/column-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchType: batch?.batchType,
+          columnOrder: columns.map((c) => c.id),
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["export-planner-column-pref", batch?.batchType] });
+      toast.success("Redosled kolona sačuvan kao tvoj podrazumevani");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const patchIsPrivateMutation = useMutation({
+    mutationFn: async (isPrivate: boolean) => {
+      const res = await fetch(`/api/export-planner/batches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPrivate }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: (data: Batch) => {
+      queryClient.setQueryData(["export-batch", id], data);
+      toast.success(data.isPrivate ? "Lista je sada privatna" : "Lista je sada javna");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 8 },
@@ -1288,6 +1361,22 @@ export default function ExportBatchPage() {
                 ? `${batch.items.length} ${t("items")} • ${batch.items.filter((i) => i.status === "IZVOZ").length} ${t("exportCount")}`
                 : `${batch.items.length} ${t("itemsGeneric")}`}
             </span>
+            {canEdit && (batch.createdById === currentUserDbId || batch.isPrivate !== undefined) && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-2">
+                    {batch.isPrivate ? <EyeOff className="h-3.5 w-3.5 text-muted-foreground" /> : <Eye className="h-3.5 w-3.5 text-muted-foreground" />}
+                    <Switch
+                      checked={!!batch.isPrivate}
+                      onCheckedChange={(checked) => patchIsPrivateMutation.mutate(!!checked)}
+                      disabled={patchIsPrivateMutation.isPending}
+                    />
+                    <span className="text-xs text-muted-foreground">Privatna</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>Samo ti vidiš ovu listu u pregledu</TooltipContent>
+              </Tooltip>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1295,8 +1384,17 @@ export default function ExportBatchPage() {
             <>
               <Button
                 size="sm"
+                variant="ghost"
+                onClick={() => saveColumnOrderMutation.mutate()}
+                disabled={saveColumnOrderMutation.isPending || columns.length === 0}
+                title="Sačuvaj trenutni redosled kolona kao svoj podrazumevani"
+              >
+                {saveColumnOrderMutation.isPending ? "..." : "Sačuvaj redosled"}
+              </Button>
+              <Button
+                size="sm"
                 variant="outline"
-                onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setAddColumnDialogOpen(true); }}
+                onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setNewColumnIcon(""); setAddColumnDialogOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Dodaj novu kolonu
@@ -1634,17 +1732,42 @@ export default function ExportBatchPage() {
                 ))}
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Ikona (opciono)</Label>
+              <Select value={newColumnIcon || "none"} onValueChange={(v) => setNewColumnIcon(v === "none" ? "" : v)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Bez ikone" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Bez ikone</SelectItem>
+                  <SelectItem value="truck">Kamion (Izvoz)</SelectItem>
+                  <SelectItem value="package">Paket</SelectItem>
+                  <SelectItem value="check-circle">Završeno</SelectItem>
+                  <SelectItem value="list-todo">Lista</SelectItem>
+                  <SelectItem value="trash">Kanta</SelectItem>
+                  <SelectItem value="clock">Sat</SelectItem>
+                  <SelectItem value="calendar">Kalendar</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddColumnDialogOpen(false)}>{tCommon("cancel")}</Button>
             <Button
               onClick={() => {
                 const label = newColumnLabel.trim() || "Nova kolona";
-                const newCol: ColumnDef = { id: `COL_${Date.now()}`, label, order: columns.length, color: newColumnColor };
+                const newCol: ColumnDef = {
+                  id: `COL_${Date.now()}`,
+                  label,
+                  order: columns.length,
+                  color: newColumnColor,
+                  ...(newColumnIcon ? { icon: newColumnIcon } : {}),
+                };
                 updateColumnsMutation.mutate([...columns, newCol]);
                 setAddColumnDialogOpen(false);
                 setNewColumnLabel("");
                 setNewColumnColor("slate");
+                setNewColumnIcon("");
               }}
               disabled={updateColumnsMutation.isPending}
             >

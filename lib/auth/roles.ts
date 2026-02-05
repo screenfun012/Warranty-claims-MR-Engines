@@ -36,6 +36,7 @@ export const PERMISSIONS = {
   // Export planner permissions
   EXPORT_PLANNER_READ: "export-planner.read",
   EXPORT_PLANNER_EDIT: "export-planner.edit",
+  EXPORT_PLANNER_ADMIN: "export-planner.admin", // briše bilo koji plan, vidi privatne
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -67,6 +68,7 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     PERMISSIONS.ADMIN_USERS,
     PERMISSIONS.EXPORT_PLANNER_READ,
     PERMISSIONS.EXPORT_PLANNER_EDIT,
+    PERMISSIONS.EXPORT_PLANNER_ADMIN,
   ],
   ADMIN: [
     PERMISSIONS.CLAIMS_READ,
@@ -78,6 +80,7 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     PERMISSIONS.SETTINGS_READ,
     PERMISSIONS.EXPORT_PLANNER_READ,
     PERMISSIONS.EXPORT_PLANNER_EDIT,
+    PERMISSIONS.EXPORT_PLANNER_ADMIN,
   ],
   OPERATOR: [
     PERMISSIONS.CLAIMS_READ,
