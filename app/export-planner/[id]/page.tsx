@@ -925,6 +925,7 @@ export default function ExportBatchPage() {
   const [addColumnDialogOpen, setAddColumnDialogOpen] = useState(false);
   const [newColumnLabel, setNewColumnLabel] = useState("");
   const [newColumnColor, setNewColumnColor] = useState("slate");
+  const [boardFilter, setBoardFilter] = useState<"all" | "mine" | "late" | "thisMonth">("all");
 
   const { data: batch, isLoading } = useQuery({
     queryKey: ["export-batch", id],
@@ -950,12 +951,34 @@ export default function ExportBatchPage() {
     [batch?.columns]
   );
 
+  const filteredItems = useMemo(() => {
+    const items = batch?.items ?? [];
+    if (boardFilter === "all") return items;
+    if (boardFilter === "mine" && currentUserDbId) {
+      return items.filter((i) => i.assignedTo?.id === currentUserDbId);
+    }
+    if (boardFilter === "late") {
+      return items.filter((i) => getDaysLate(i, columns) > 0);
+    }
+    if (boardFilter === "thisMonth") {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = now.getMonth();
+      return items.filter((i) => {
+        if (!i.dueDate) return false;
+        const d = new Date(i.dueDate);
+        return d.getFullYear() === y && d.getMonth() === m;
+      });
+    }
+    return items;
+  }, [batch?.items, boardFilter, currentUserDbId, columns]);
+
   const itemsByColumn = useMemo(() => {
     const map: Record<string, BatchItem[]> = {};
     for (const col of columns) {
       map[col.id] = [];
     }
-    for (const item of batch?.items ?? []) {
+    for (const item of filteredItems) {
       const colId = item.status in map ? item.status : columns[0]?.id ?? "PLANIRANO";
       if (!map[colId]) map[colId] = [];
       map[colId].push(item);
@@ -965,7 +988,7 @@ export default function ExportBatchPage() {
       map[col.id].sort((a, b) => a.sortOrder - b.sortOrder);
     }
     return map;
-  }, [batch?.items, columns]);
+  }, [filteredItems, columns]);
 
   const canEdit = !batch?.frozenAt;
 
@@ -1295,6 +1318,31 @@ export default function ExportBatchPage() {
             </a>
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-sm text-muted-foreground mr-1">Filter:</span>
+        {(["all", "mine", "late", "thisMonth"] as const).map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => setBoardFilter(f)}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
+              boardFilter === f ? "bg-primary text-primary-foreground" : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {f === "all" && "Sve stavke"}
+            {f === "mine" && "Samo moje"}
+            {f === "late" && "Samo kasne"}
+            {f === "thisMonth" && "Ovaj mesec"}
+          </button>
+        ))}
+        {boardFilter !== "all" && (
+          <span className="text-xs text-muted-foreground">
+            ({filteredItems.length} od {batch?.items?.length ?? 0})
+          </span>
+        )}
       </div>
 
       <DndContext

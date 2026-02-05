@@ -16,6 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LayoutDashboard, Plus, Lock, LockOpen, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -38,11 +39,11 @@ const fetchBatches = async (): Promise<Batch[]> => {
   return res.json();
 };
 
-const createBatch = async (data: { batchType: string; customName?: string }) => {
+const createBatch = async (data: { batchType: string; customName?: string; template?: string }) => {
   const res = await fetch("/api/export-planner/batches", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, batchType: "GENERIC" }),
+    body: JSON.stringify({ ...data, batchType: "GENERIC", template: data.template || "empty" }),
   });
   if (!res.ok) {
     const err = await res.json();
@@ -64,11 +65,13 @@ export default function PlanerGeneralPage() {
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newTemplate, setNewTemplate] = useState<"empty" | "kanban3">("empty");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showMineOnly, setShowMineOnly] = useState(false);
 
   const { data: batches = [], isLoading } = useQuery({
-    queryKey: ["export-planner-batches", "GENERIC"],
-    queryFn: fetchBatches,
+    queryKey: ["export-planner-batches", "GENERIC", showMineOnly],
+    queryFn: () => fetchBatches(showMineOnly),
   });
 
   const createMutation = useMutation({
@@ -125,14 +128,33 @@ export default function PlanerGeneralPage() {
             Fleksibilni planer za bilo koji projekat – prilagodi kolone, boje, dodeljuj radnike
           </p>
         </div>
-        <Button
-          onClick={() => setDialogOpen(true)}
-          size="lg"
-          className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl h-11 px-6"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Novi planer
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-2 py-1.5">
+            <ListFilter className="h-4 w-4 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => setShowMineOnly(false)}
+              className={cn("rounded-md px-2.5 py-1 text-sm font-medium transition-colors", !showMineOnly && "bg-background shadow text-foreground")}
+            >
+              Sve liste
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMineOnly(true)}
+              className={cn("rounded-md px-2.5 py-1 text-sm font-medium transition-colors", showMineOnly && "bg-background shadow text-foreground")}
+            >
+              Samo moje
+            </button>
+          </div>
+          <Button
+            onClick={() => setDialogOpen(true)}
+            size="lg"
+            className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl h-11 px-6"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Novi planer
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -259,13 +281,25 @@ export default function PlanerGeneralPage() {
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
+            <div className="grid gap-2">
+              <Label>Šablon kolona</Label>
+              <Select value={newTemplate} onValueChange={(v) => setNewTemplate(v as "empty" | "kanban3")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="empty">Prazan – bez kolona (dodaš sam)</SelectItem>
+                  <SelectItem value="kanban3">To Do · In progress · Done</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               {tCommon("cancel")}
             </Button>
             <Button
-              onClick={() => createMutation.mutate({ batchType: "GENERIC", customName: newName.trim() || undefined })}
+              onClick={() => createMutation.mutate({ batchType: "GENERIC", customName: newName.trim() || undefined, template: newTemplate })}
               disabled={createMutation.isPending}
             >
               {createMutation.isPending ? "..." : "Kreiraj"}

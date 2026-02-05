@@ -16,7 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Truck, Plus, Lock, LockOpen, Trash2 } from "lucide-react";
+import { Truck, Plus, Lock, LockOpen, Trash2, ListFilter } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -33,8 +33,9 @@ interface Batch {
   createdBy: { fullName: string | null; email: string } | null;
 }
 
-const fetchBatches = async (): Promise<Batch[]> => {
-  const res = await fetch("/api/export-planner/batches?batchType=MR_ENGINES");
+const fetchBatches = async (mine?: boolean): Promise<Batch[]> => {
+  const url = mine ? "/api/export-planner/batches?batchType=MR_ENGINES&mine=1" : "/api/export-planner/batches?batchType=MR_ENGINES";
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 };
@@ -67,10 +68,11 @@ export default function PlanerIzvozPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [showMineOnly, setShowMineOnly] = useState(false);
 
   const { data: batches = [], isLoading } = useQuery({
-    queryKey: ["export-planner-batches", "MR_ENGINES"],
-    queryFn: fetchBatches,
+    queryKey: ["export-planner-batches", "MR_ENGINES", showMineOnly],
+    queryFn: () => fetchBatches(showMineOnly),
   });
 
   const createMutation = useMutation({
@@ -128,14 +130,33 @@ export default function PlanerIzvozPage() {
             MR Engines Global – motori, liste za izvoz
           </p>
         </div>
-        <Button
-          onClick={() => setDialogOpen(true)}
-          size="lg"
-          className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl h-11 px-6"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Kreiraj novi izvoz
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-lg border bg-muted/30 px-2 py-1.5">
+            <ListFilter className="h-4 w-4 text-muted-foreground" />
+            <button
+              type="button"
+              onClick={() => setShowMineOnly(false)}
+              className={cn("rounded-md px-2.5 py-1 text-sm font-medium transition-colors", !showMineOnly && "bg-background shadow text-foreground")}
+            >
+              Sve liste
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMineOnly(true)}
+              className={cn("rounded-md px-2.5 py-1 text-sm font-medium transition-colors", showMineOnly && "bg-background shadow text-foreground")}
+            >
+              Samo moje
+            </button>
+          </div>
+          <Button
+            onClick={() => setDialogOpen(true)}
+            size="lg"
+            className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl h-11 px-6"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Kreiraj novi izvoz
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (

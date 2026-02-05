@@ -10,11 +10,18 @@ import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/aut
 import { createBatchAudit, triggerBatchChanged } from "@/lib/export-planner/utils";
 import { getSession } from "@/lib/auth/get-session";
 
-// Šablon izvoza: Planirano plavo, U radu narančasto, Izvoz zeleno
+// Šabloni kolona
 const MR_ENGINES_COLUMNS = [
   { id: "PLANIRANO", label: "Planirano", order: 0, color: "blue" },
   { id: "RAD", label: "U radu", order: 1, color: "amber" },
   { id: "IZVOZ", label: "Izvoz", order: 2, color: "green" },
+];
+
+const GENERIC_EMPTY: typeof MR_ENGINES_COLUMNS = [];
+const GENERIC_KANBAN3 = [
+  { id: "TODO", label: "To Do", order: 0, color: "slate" },
+  { id: "IN_PROGRESS", label: "In progress", order: 1, color: "amber" },
+  { id: "DONE", label: "Done", order: 2, color: "green" },
 ];
 
 function generateBatchCode(batchType: string): string {
@@ -29,9 +36,31 @@ export async function GET(request: NextRequest) {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_READ);
     const prisma = await getPrisma();
     const batchType = request.nextUrl.searchParams.get("batchType"); // MR_ENGINES | GENERIC
+    const mine = request.nextUrl.searchParams.get("mine") === "1";
+
+    let createdById: string | null = null;
+    if (mine) {
+      const session = await getSession();
+      const sessionEmail = (session?.user as { email?: string })?.email;
+      if (sessionEmail) {
+        const dbUser = await prisma.user.findUnique({
+          where: { email: sessionEmail },
+          select: { id: true },
+        });
+        createdById = dbUser?.id ?? null;
+      }
+    }
+
+    if (mine && !createdById) {
+      return NextResponse.json([]);
+    }
+
+    const where: { batchType?: string; createdById?: string } = {};
+    if (batchType) where.batchType = batchType as string;
+    if (mine && createdById) where.createdById = createdById;
 
     const batches = await prisma.exportBatch.findMany({
-      where: batchType ? { batchType: batchType as string } : undefined,
+      where: Object.keys(where).length ? where : undefined,
       orderBy: [{ exportDate: "desc" }, { createdAt: "desc" }],
       include: {
         _count: { select: { items: true } },
@@ -67,13 +96,21 @@ export async function POST(request: NextRequest) {
 
     const batchType = (body.batchType as string) || "MR_ENGINES";
     const customName = (body.customName as string) || null;
+    const template = (body.template as string) || "default"; // default | empty | kanban3
 
     const batchCode = generateBatchCode(batchType);
-    // General: nema kolona u startu – korisnik dodaje koje hoće
-    const columns =
-      batchType === "MR_ENGINES"
-        ? JSON.stringify(MR_ENGINES_COLUMNS)
-        : (body.columns != null ? (typeof body.columns === "string" ? body.columns : JSON.stringify(body.columns)) : "[]");
+    let columns: string;
+    if (batchType === "MR_ENGINES") {
+      columns = JSON.stringify(MR_ENGINES_COLUMNS);
+    } else {
+      if (template === "kanban3") {
+        columns = JSON.stringify(GENERIC_KANBAN3);
+      } else if (body.columns != null) {
+        columns = typeof body.columns === "string" ? body.columns : JSON.stringify(body.columns);
+      } else {
+        columns = JSON.stringify(GENERIC_EMPTY);
+      }
+    }
 
     const session = await getSession();
     // createdById must reference User.id (cuid), not Auth0 sub – resolve by email or leave null

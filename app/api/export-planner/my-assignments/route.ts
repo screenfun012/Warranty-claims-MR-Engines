@@ -10,14 +10,21 @@ import { getSession } from "@/lib/auth/get-session";
 export async function GET(request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_READ);
+    const prisma = await getPrisma();
 
     const session = await getSession();
-    const userId = (session?.user as { id?: string })?.id;
+    const sessionEmail = (session?.user as { email?: string })?.email;
+    let userId: string | null = null;
+    if (sessionEmail) {
+      const dbUser = await prisma.user.findUnique({
+        where: { email: sessionEmail },
+        select: { id: true },
+      });
+      userId = dbUser?.id ?? null;
+    }
     if (!userId) {
       return NextResponse.json({ batches: [], items: [] });
     }
-
-    const prisma = await getPrisma();
     const items = await prisma.exportBatchItem.findMany({
       where: { assignedToId: userId },
       include: {
