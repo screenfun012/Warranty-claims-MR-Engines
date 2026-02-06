@@ -105,7 +105,7 @@ function parseColumns(cols: string | null): ColumnDef[] {
     const arr = JSON.parse(cols);
     return Array.isArray(arr) ? arr.sort((a: ColumnDef, b: ColumnDef) => a.order - b.order) : [];
   } catch {
-    return [
+      return [
       { id: "PLANIRANO", label: "U planu", order: 0, color: "slate" },
       { id: "RAD", label: "U radu", order: 1, color: "blue" },
       { id: "IZVOZ", label: "Izvoz", order: 2, color: "green" },
@@ -173,6 +173,7 @@ function DroppableColumn({
   columnItemCount?: number;
   columnDragHandleProps?: { attributes: Record<string, unknown>; listeners: Record<string, unknown> };
 }) {
+  const t = useTranslations("exportPlanner");
   const { setNodeRef, isOver } = useDroppable({ id });
   const [editingLabel, setEditingLabel] = useState(false);
   const [labelValue, setLabelValue] = useState(label);
@@ -192,7 +193,7 @@ function DroppableColumn({
   return (
     <div
       className={cn(
-        "flex flex-col min-w-[280px] w-[280px] rounded-lg border bg-card/50 shadow-sm shrink-0 overflow-visible transition-all duration-300 ease-out",
+        "flex flex-col min-w-[260px] w-[260px] sm:min-w-[280px] sm:w-[280px] rounded-lg border bg-card/50 shadow-sm shrink-0 overflow-visible transition-all duration-300 ease-out",
         colClass,
         isOver && "z-40 ring-2 ring-primary/50 ring-offset-2 scale-[1.02]"
       )}
@@ -233,7 +234,7 @@ function DroppableColumn({
               className="h-6 w-6 text-muted-foreground hover:text-destructive"
               disabled={columnItemCount > 0}
               onClick={onRemoveColumn}
-              title={columnItemCount > 0 ? "Prvo premesti stavke" : "Ukloni kolonu"}
+              title={columnItemCount > 0 ? t("removeColumnTooltip") : t("removeColumnTooltipEmpty")}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -351,6 +352,7 @@ function ItemCardContent({
   onRemove?: () => void;
   daysLate?: number;
 }) {
+  const t = useTranslations("exportPlanner");
   const borderClass = (item.priority && PRIORITY_BORDER[item.priority]) || "";
   const dueStr = formatDate(item.dueDate);
   const isMr = batchType === "MR_ENGINES";
@@ -398,9 +400,9 @@ function ItemCardContent({
             </p>
           )}
           {daysLate != null && daysLate > 0 && (
-            <p className="text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1" title="Rok je prošao, stavka nije u završnoj koloni">
+            <p className="text-xs text-red-600 dark:text-red-400 font-medium flex items-center gap-1" title={t("lateDaysPlural", { count: daysLate })}>
               <Clock className="h-3 w-3 shrink-0" />
-              Kasni {daysLate} {daysLate === 1 ? "dan" : "dana"}
+              {daysLate === 1 ? t("lateDays", { count: daysLate }) : t("lateDaysPlural", { count: daysLate })}
             </p>
           )}
         </div>
@@ -415,7 +417,7 @@ function ItemCardContent({
                 item.qcOk ? "bg-green-500 text-white border-green-600" : "bg-muted border-border",
                 canEdit && "cursor-pointer hover:ring-2 hover:ring-primary/30"
               )}
-              title={item.qcOk ? "QC OK (klik da ukloniš)" : "QC (klik da potvrdiš)"}
+              title={item.qcOk ? t("qcTooltipOk") : t("qcTooltipClick")}
             >
               {item.qcOk ? "✓" : "—"}
             </button>
@@ -427,7 +429,7 @@ function ItemCardContent({
               size="icon"
               className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
               onClick={(e) => { e.stopPropagation(); onRemove(); }}
-              title="Ukloni stavku"
+              title={t("removeItemTooltip")}
             >
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -581,7 +583,7 @@ function DetailModal({
           {batch.batchType === "GENERIC" ? (
             <div className="space-y-2">
               <Label>Naslov</Label>
-              <Input value={engineNo} onChange={(e) => setEngineNo(e.target.value)} disabled={!canEdit} placeholder="Naslov stavke" />
+              <Input value={engineNo} onChange={(e) => setEngineNo(e.target.value)} disabled={!canEdit} placeholder={t("itemTitle")} />
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
@@ -590,7 +592,7 @@ function DetailModal({
                 <Input value={rn} onChange={(e) => setRn(e.target.value)} disabled={!canEdit} />
               </div>
               <div className="space-y-2">
-                <Label>{t("engineNo")} (Kod motora)</Label>
+                <Label>{t("engineNo")} ({t("engineCodeLabel")})</Label>
                 <Input value={engineNo} onChange={(e) => setEngineNo(e.target.value)} disabled={!canEdit} />
               </div>
             </div>
@@ -602,7 +604,7 @@ function DetailModal({
                 <Input value={mrCode} onChange={(e) => setMrCode(e.target.value)} disabled={!canEdit} />
               </div>
               <div className="space-y-2">
-                <Label>{t("engineType")} (Tip motora)</Label>
+                <Label>{t("engineType")}</Label>
                 <Input value={engineType} onChange={(e) => setEngineType(e.target.value)} disabled={!canEdit} />
               </div>
               {(canEdit || item.qcOk) && (
@@ -616,7 +618,7 @@ function DetailModal({
           {/* Datumi – uvek vidljivi */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="flex items-center gap-1"><Calendar className="h-4 w-4" /> Početak</Label>
+              <Label className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {t("startDate")}</Label>
               {canEdit ? (
                 <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
               ) : (
@@ -624,7 +626,7 @@ function DetailModal({
               )}
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-1"><Calendar className="h-4 w-4" /> Rok</Label>
+              <Label className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {t("dueDate")}</Label>
               {canEdit ? (
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               ) : (
@@ -648,7 +650,7 @@ function DetailModal({
               <div className="space-y-2">
                 <Label>{t("assignedTo")}</Label>
                 <Select value={assignedToId || SELECT_NONE} onValueChange={(v) => setAssignedToId(v === SELECT_NONE ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="Izaberi..." /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t("selectUserPlaceholder")} /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value={SELECT_NONE}>—</SelectItem>
                     {users.map((u: PlannerUser) => (
@@ -671,7 +673,7 @@ function DetailModal({
               </div>
               <div className="space-y-2">
                 <Label>Napomene</Label>
-                <Input value={details} onChange={(e) => setDetails(e.target.value)} placeholder="Detalji..." />
+                <Input value={details} onChange={(e) => setDetails(e.target.value)} placeholder={t("detailsPlaceholder")} />
               </div>
               {batch.batchType === "GENERIC" && (
                 <>
@@ -700,7 +702,7 @@ function DetailModal({
           )}
           {batch.batchType === "GENERIC" && !canEdit && (imageUrl.trim() || linkUrl.trim()) && (
             <div className="space-y-2 pt-4 border-t">
-              <Label className="text-muted-foreground">Prilozi</Label>
+              <Label className="text-muted-foreground">{t("attachments")}</Label>
               {imageUrl.trim() && (
                 <div className="rounded-lg border overflow-hidden bg-muted/30 max-w-xs">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -783,6 +785,7 @@ function PlannerTimelineView({
   onItemClick: (item: BatchItem) => void;
   getDaysLate: (item: BatchItem, cols: ColumnDef[]) => number;
 }) {
+  const t = useTranslations("exportPlanner");
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -837,15 +840,15 @@ function PlannerTimelineView({
           <CalendarRange className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <p className="text-sm font-semibold text-foreground">Timeline po kolonama</p>
-          <p className="text-xs text-muted-foreground">Kolone kao trake · hover za stavku · klik za detalje</p>
+          <p className="text-sm font-semibold text-foreground">{t("timelineTitle")}</p>
+          <p className="text-xs text-muted-foreground">{t("timelineSubtitle")}</p>
         </div>
       </div>
       <div className="w-full min-w-0">
         {/* Vremenska os */}
         <div className="flex border-b bg-muted/20">
-          <div className="w-44 shrink-0 py-2.5 pl-3 pr-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Kolona
+          <div className="w-28 sm:w-44 shrink-0 py-2.5 pl-2 sm:pl-3 pr-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            {t("columnLabel")}
           </div>
           <div className="flex-1 relative min-h-[28px] py-2 pr-3 pl-1 min-w-0">
             <div className="absolute inset-0 flex text-xs text-muted-foreground pointer-events-none">
@@ -859,9 +862,9 @@ function PlannerTimelineView({
               <div
                 className="absolute top-0 bottom-0 w-px bg-green-500 z-10 shadow-sm pointer-events-none"
                 style={{ left: `${todayPercent}%` }}
-                title="Danas"
+                title={t("today")}
               >
-                <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-green-600 dark:text-green-400 whitespace-nowrap">Danas</span>
+                <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] font-medium text-green-600 dark:text-green-400 whitespace-nowrap">{t("today")}</span>
               </div>
             )}
           </div>
@@ -870,8 +873,8 @@ function PlannerTimelineView({
         {columns.length === 0 || items.length === 0 ? (
           <div className="py-16 text-center">
             <CalendarRange className="mx-auto h-10 w-10 text-muted-foreground/50 mb-3" />
-            <p className="text-sm text-muted-foreground">Nema stavki za prikaz na timeline-u.</p>
-            <p className="text-xs text-muted-foreground mt-1">Dodajte stavke u tablo prikazu.</p>
+            <p className="text-sm text-muted-foreground">{t("noItemsTimeline")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("addItemsInBoard")}</p>
           </div>
         ) : (
           columns.map((col, colIdx) => {
@@ -887,12 +890,12 @@ function PlannerTimelineView({
               >
                 <div
                   className={cn(
-                    "w-44 shrink-0 py-2 pl-3 pr-2 border-r border-border/50 flex flex-col justify-center",
+                    "w-28 sm:w-44 shrink-0 py-2 pl-2 sm:pl-3 pr-2 border-r border-border/50 flex flex-col justify-center min-w-0",
                     colClass
                   )}
                 >
                   <span className="text-sm font-medium text-foreground truncate leading-tight">{col.label}</span>
-                  <span className="text-xs text-muted-foreground">{colItems.length} stavki</span>
+                  <span className="text-xs text-muted-foreground">{colItems.length} {t("itemsCountShort")}</span>
                 </div>
                 {(() => {
                   const { laneByItemId, maxLane } = assignLanes(colItems, rangeStart, rangeEnd);
@@ -940,15 +943,15 @@ function PlannerTimelineView({
                             <TooltipContent side="top" className="max-w-xs p-3 space-y-1.5 text-left">
                               <p className="font-semibold text-background">{itemLabel(item)}</p>
                               {item.assignedTo && (
-                                <p className="text-background/90 text-xs">Dodeljeno: {item.assignedTo.fullName}</p>
+                                <p className="text-background/90 text-xs">{t("assignedLabel")}: {item.assignedTo.fullName}</p>
                               )}
-                              <p className="text-background/80 text-xs">Period: {startStr} → {endStr}</p>
+                              <p className="text-background/80 text-xs">{t("periodLabel")}: {startStr} → {endStr}</p>
                               {late > 0 && (
                                 <p className="text-red-200 text-xs font-medium flex items-center gap-1">
-                                  <Clock className="h-3 w-3" /> Kasni {late} {late === 1 ? "dan" : "dana"}
+                                  <Clock className="h-3 w-3" /> {late === 1 ? t("lateDays", { count: late }) : t("lateDaysPlural", { count: late })}
                                 </p>
                               )}
-                              <p className="text-background/70 text-[10px]">Klik za detalje</p>
+                              <p className="text-background/70 text-[10px]">{t("clickForDetails")}</p>
                             </TooltipContent>
                           </Tooltip>
                         );
@@ -1324,18 +1327,19 @@ export default function ExportBatchPage() {
     : null;
 
   return (
-    <div className="p-6 min-h-screen">
-      <div className="flex items-center gap-4 mb-8">
-        <Button variant="outline" size="icon" asChild>
-          <Link href={batch.batchType === "MR_ENGINES" ? "/export-planner/izvoz" : "/export-planner/general"}>
-            <ChevronLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate">
-            {batch.customName || batch.batchCode}
-          </h1>
-          <div className="flex items-center gap-2 mt-1 flex-wrap">
+    <div className="p-4 sm:p-6 min-h-screen overflow-x-hidden">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-4 mb-6 md:mb-8">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="outline" size="icon" className="shrink-0" asChild>
+            <Link href={batch.batchType === "MR_ENGINES" ? "/export-planner/izvoz" : "/export-planner/general"}>
+              <ChevronLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold truncate">
+              {batch.customName || batch.batchCode}
+            </h1>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
             {batch.frozenAt ? (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-2.5 py-0.5 text-xs font-medium">
                 <Lock className="h-3 w-3" />
@@ -1353,8 +1357,9 @@ export default function ExportBatchPage() {
                 : `${batch.items.length} ${t("itemsGeneric")}`}
             </span>
           </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
           {canEdit && (
             <>
               <Button
@@ -1363,7 +1368,7 @@ export default function ExportBatchPage() {
                 onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setAddColumnDialogOpen(true); }}
               >
                 <Plus className="h-4 w-4 mr-1" />
-                Dodaj novu kolonu
+                {t("addNewColumn")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => freezeMutation.mutate()} disabled={freezeMutation.isPending}>
                 <Lock className="h-4 w-4 mr-1" />
@@ -1397,7 +1402,7 @@ export default function ExportBatchPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <span className="text-sm text-muted-foreground mr-1">Filter:</span>
+        <span className="text-sm text-muted-foreground mr-1">{t("filterLabel")}:</span>
         {(["all", "mine", "late", "thisMonth"] as const).map((f) => (
           <button
             key={f}
@@ -1408,15 +1413,15 @@ export default function ExportBatchPage() {
               boardFilter === f ? "bg-primary text-primary-foreground" : "bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground"
             )}
           >
-            {f === "all" && "Sve stavke"}
-            {f === "mine" && "Samo moje"}
-            {f === "late" && "Samo kasne"}
-            {f === "thisMonth" && "Ovaj mesec"}
+            {f === "all" && t("filterAll")}
+            {f === "mine" && t("filterMine")}
+            {f === "late" && t("filterLate")}
+            {f === "thisMonth" && t("filterThisMonth")}
           </button>
         ))}
         {boardFilter !== "all" && (
           <span className="text-xs text-muted-foreground">
-            ({filteredItems.length} od {batch?.items?.length ?? 0})
+            ({t("ofCount", { count: filteredItems.length, total: batch?.items?.length ?? 0 })})
           </span>
         )}
       </div>
@@ -1427,13 +1432,13 @@ export default function ExportBatchPage() {
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-6 overflow-x-auto pb-6 min-h-[400px]">
+        <div className="flex gap-4 sm:gap-6 overflow-x-auto overflow-y-visible pb-6 min-h-[320px] md:min-h-[400px] -mx-4 px-4 sm:mx-0 sm:px-0 overscroll-x-auto touch-pan-x">
           {columns.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center min-h-[320px] rounded-xl border-2 border-dashed bg-muted/30 p-8">
-              <p className="text-muted-foreground mb-4">Nema kolona. Dodaj prvu kolonu da kreneš.</p>
+              <p className="text-muted-foreground mb-4">{t("noColumnsHint")}</p>
               <Button onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setAddColumnDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-2" />
-                Dodaj novu kolonu
+                {t("addNewColumn")}
               </Button>
             </div>
           ) : (
@@ -1476,7 +1481,7 @@ export default function ExportBatchPage() {
             return (
               <div
                 className={cn(
-                  "flex flex-col min-w-[280px] w-[280px] rounded-lg border-2 border-primary shadow-2xl cursor-grabbing opacity-95 scale-[1.02] ring-4 ring-primary/20",
+                  "flex flex-col min-w-[260px] w-[260px] sm:min-w-[280px] sm:w-[280px] rounded-lg border-2 border-primary shadow-2xl cursor-grabbing opacity-95 scale-[1.02] ring-4 ring-primary/20",
                   colClass
                 )}
               >
@@ -1496,7 +1501,8 @@ export default function ExportBatchPage() {
         </DragOverlay>
       </DndContext>
 
-      <div className="mt-8">
+      <div className="mt-6 md:mt-8 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="min-w-[480px] w-full">
         <PlannerTimelineView
           batch={batch}
           columns={columns}
@@ -1504,6 +1510,7 @@ export default function ExportBatchPage() {
           onItemClick={setDetailItem}
           getDaysLate={getDaysLate}
         />
+        </div>
       </div>
 
       {/* Add item dialog – MR: MR Code, RN, Kod, Tip, datumi, opis, dodela; General: naslov, prioritet, opis, dodela */}
@@ -1531,32 +1538,32 @@ export default function ExportBatchPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>{t("engineNo")} (Kod motora)</Label>
-                    <Input value={addEngineNo} onChange={(e) => setAddEngineNo(e.target.value)} placeholder="Kod motora" />
+                    <Label>{t("engineNo")} ({t("engineCodeLabel")})</Label>
+                    <Input value={addEngineNo} onChange={(e) => setAddEngineNo(e.target.value)} placeholder={t("engineCodePlaceholder")} />
                   </div>
                   <div className="space-y-2">
-                    <Label>{t("engineType")} (Tip motora)</Label>
-                    <Input value={addEngineType} onChange={(e) => setAddEngineType(e.target.value)} placeholder="Tip motora" />
+                    <Label>{t("engineType")}</Label>
+                    <Input value={addEngineType} onChange={(e) => setAddEngineType(e.target.value)} placeholder={t("engineType")} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Datum početka</Label>
+                    <Label>{t("startDateLabel")}</Label>
                     <Input type="date" value={addStartDate} onChange={(e) => setAddStartDate(e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Datum završetka</Label>
+                    <Label>{t("dueDateLabel")}</Label>
                     <Input type="date" value={addDueDate} onChange={(e) => setAddDueDate(e.target.value)} />
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Opis / napomene</Label>
-                  <Textarea value={addDetails} onChange={(e) => setAddDetails(e.target.value)} placeholder="Dodatni opis..." rows={2} />
+                  <Label>{t("detailsLabel")}</Label>
+                  <Textarea value={addDetails} onChange={(e) => setAddDetails(e.target.value)} placeholder={t("detailsPlaceholder")} rows={2} />
                 </div>
                 <div className="space-y-2">
                   <Label>{t("assignedTo")}</Label>
                   <Select value={addAssignedToId || SELECT_NONE} onValueChange={(v) => setAddAssignedToId(v === SELECT_NONE ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Izaberi korisnika..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t("selectUserPlaceholder")} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={SELECT_NONE}>—</SelectItem>
                       {users.map((u: PlannerUser) => (
@@ -1569,8 +1576,8 @@ export default function ExportBatchPage() {
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label>Naslov stavke</Label>
-                  <Input value={addEngineNo} onChange={(e) => setAddEngineNo(e.target.value)} placeholder="npr. Zadatak 1" />
+                  <Label>{t("itemTitle")}</Label>
+                  <Input value={addEngineNo} onChange={(e) => setAddEngineNo(e.target.value)} placeholder={t("itemTitlePlaceholder")} />
                 </div>
                 <div className="space-y-2">
                   <Label>Prioritet</Label>
@@ -1585,8 +1592,8 @@ export default function ExportBatchPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Opis</Label>
-                  <Textarea value={addDetails} onChange={(e) => setAddDetails(e.target.value)} placeholder="Opis zadatka..." rows={3} />
+                  <Label>{t("notesLabel")}</Label>
+                  <Textarea value={addDetails} onChange={(e) => setAddDetails(e.target.value)} placeholder={t("detailsPlaceholder")} rows={3} />
                 </div>
                 <div className="space-y-2">
                   <Label>Slika (URL)</Label>
@@ -1607,7 +1614,7 @@ export default function ExportBatchPage() {
                 <div className="space-y-2">
                   <Label>{t("assignedTo")}</Label>
                   <Select value={addAssignedToId || SELECT_NONE} onValueChange={(v) => setAddAssignedToId(v === SELECT_NONE ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="Izaberi..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={tCommon("select") + "..."} /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value={SELECT_NONE}>—</SelectItem>
                       {users.map((u: PlannerUser) => (
@@ -1662,7 +1669,7 @@ export default function ExportBatchPage() {
           onInteractOutside={() => setAddColumnDialogOpen(false)}
         >
           <DialogHeader>
-            <DialogTitle>Dodaj novu kolonu</DialogTitle>
+            <DialogTitle>{t("addNewColumn")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-2">
             <div className="space-y-2">

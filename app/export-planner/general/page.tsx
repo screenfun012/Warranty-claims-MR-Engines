@@ -13,19 +13,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { LayoutDashboard, Plus, Lock, LockOpen, Trash2, ListFilter, BookmarkPlus, ChevronDown } from "lucide-react";
+import { LayoutDashboard, Plus, Lock, LockOpen, Trash2, ListFilter } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -41,39 +33,16 @@ interface Batch {
   createdBy: { fullName: string | null; email: string } | null;
 }
 
-type SortBy = "dateDesc" | "dateAsc" | "nameAsc";
-const fetchBatches = async (mineOnly?: boolean, sortBy: SortBy = "dateDesc"): Promise<Batch[]> => {
-  const params = new URLSearchParams({ batchType: "GENERIC", sortBy });
-  if (mineOnly) params.set("mine", "1");
-  const res = await fetch(`/api/export-planner/batches?${params}`);
+const fetchBatches = async (mineOnly?: boolean): Promise<Batch[]> => {
+  const url = mineOnly
+    ? "/api/export-planner/batches?batchType=GENERIC&mine=1"
+    : "/api/export-planner/batches?batchType=GENERIC";
+  const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 };
 
-type SavedView = { id: string; name: string; batchType: string | null; mineOnly: boolean; sortBy: string };
-const fetchSavedViews = async (): Promise<SavedView[]> => {
-  const res = await fetch("/api/export-planner/saved-views");
-  if (!res.ok) return [];
-  return res.json();
-};
-const createSavedView = async (data: { name: string; batchType: string | null; mineOnly: boolean; sortBy: string }) => {
-  const res = await fetch("/api/export-planner/saved-views", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, batchType: data.batchType || null }),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Failed");
-  }
-  return res.json();
-};
-const deleteSavedView = async (id: string) => {
-  const res = await fetch(`/api/export-planner/saved-views/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error("Failed");
-};
-
-const createBatch = async (data: { batchType: string; customName?: string; template?: string; isPrivate?: boolean }) => {
+const createBatch = async (data: { batchType: string; customName?: string; template?: string }) => {
   const res = await fetch("/api/export-planner/batches", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -95,41 +64,18 @@ const deleteBatch = async (id: string) => {
 };
 
 export default function PlanerGeneralPage() {
+  const t = useTranslations("exportPlanner");
   const tCommon = useTranslations("common");
   const queryClient = useQueryClient();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTemplate, setNewTemplate] = useState<"empty" | "kanban3">("empty");
-  const [newIsPrivate, setNewIsPrivate] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showMineOnly, setShowMineOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<SortBy>("dateDesc");
-  const [saveViewOpen, setSaveViewOpen] = useState(false);
-  const [savedViewName, setSavedViewName] = useState("");
 
   const { data: batches = [], isLoading } = useQuery({
-    queryKey: ["export-planner-batches", "GENERIC", showMineOnly, sortBy],
-    queryFn: () => fetchBatches(showMineOnly, sortBy),
-  });
-
-  const { data: savedViews = [], refetch: refetchSavedViews } = useQuery({
-    queryKey: ["export-planner-saved-views", "GENERIC"],
-    queryFn: fetchSavedViews,
-  });
-  const saveViewMutation = useMutation({
-    mutationFn: createSavedView,
-    onSuccess: () => {
-      refetchSavedViews();
-      setSaveViewOpen(false);
-      setSavedViewName("");
-      toast.success("Prikaz sačuvan");
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-  const deleteSavedViewMutation = useMutation({
-    mutationFn: deleteSavedView,
-    onSuccess: () => refetchSavedViews(),
-    onError: (err: Error) => toast.error(err.message),
+    queryKey: ["export-planner-batches", "GENERIC", showMineOnly],
+    queryFn: () => fetchBatches(showMineOnly),
   });
 
   const createMutation = useMutation({
@@ -138,7 +84,7 @@ export default function PlanerGeneralPage() {
       queryClient.invalidateQueries({ queryKey: ["export-planner-batches"] });
       setDialogOpen(false);
       setNewName("");
-      toast.success("Planer kreiran");
+      toast.success(t("planerCreated"));
       window.location.href = `/export-planner/${batch.id}`;
     },
     onError: (err: Error) => toast.error(err.message),
@@ -149,7 +95,7 @@ export default function PlanerGeneralPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["export-planner-batches"] });
       setDeleteId(null);
-      toast.success("Planer je obrisan.");
+      toast.success(t("planerDeleted"));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -170,20 +116,20 @@ export default function PlanerGeneralPage() {
   );
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] relative">
+    <div className="min-h-[calc(100vh-8rem)] relative overflow-x-hidden">
       <div className="absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] bg-[size:28px_28px] opacity-30 dark:opacity-20 pointer-events-none" />
-      <div className="relative p-6 md:p-8 max-w-6xl mx-auto">
+      <div className="relative p-4 sm:p-6 md:p-8 max-w-6xl mx-auto min-w-0">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-10">
         <div>
           <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground/80 mb-1">
-            Export planner
+            {t("title")}
           </p>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            General planer
+            {t("generalTitle")}
           </h1>
           <p className="text-muted-foreground mt-1.5 text-sm md:text-base max-w-xl">
-            Fleksibilni planer za bilo koji projekat – prilagodi kolone, boje, dodeljuj radnike
+            {t("generalSubtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -194,63 +140,23 @@ export default function PlanerGeneralPage() {
               onClick={() => setShowMineOnly(false)}
               className={cn("rounded-md px-2.5 py-1 text-sm font-medium transition-colors", !showMineOnly && "bg-background shadow text-foreground")}
             >
-              Sve liste
+              {t("allLists")}
             </button>
             <button
               type="button"
               onClick={() => setShowMineOnly(true)}
               className={cn("rounded-md px-2.5 py-1 text-sm font-medium transition-colors", showMineOnly && "bg-background shadow text-foreground")}
             >
-              Samo moje
+              {t("myLists")}
             </button>
           </div>
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Sortiraj" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dateDesc">Datum ↓</SelectItem>
-              <SelectItem value="dateAsc">Datum ↑</SelectItem>
-              <SelectItem value="nameAsc">Naziv A–Ž</SelectItem>
-            </SelectContent>
-          </Select>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2">
-                <BookmarkPlus className="h-4 w-4" />
-                Sačuvani prikazi
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {savedViews.filter((v: SavedView) => v.batchType === "GENERIC" || !v.batchType).map((v: SavedView) => (
-                <DropdownMenuItem
-                  key={v.id}
-                  onSelect={(e) => {
-                    e.preventDefault();
-                    setShowMineOnly(v.mineOnly);
-                    setSortBy((v.sortBy as SortBy) || "dateDesc");
-                  }}
-                >
-                  <span className="flex-1">{v.name}</span>
-                </DropdownMenuItem>
-              ))}
-              {savedViews.filter((v: SavedView) => v.batchType === "GENERIC" || !v.batchType).length === 0 && (
-                <DropdownMenuItem disabled>Nema sačuvanih prikaza</DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setSaveViewOpen(true)}>
-                Sačuvaj trenutni prikaz…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
           <Button
             onClick={() => setDialogOpen(true)}
             size="lg"
             className="shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 rounded-xl h-11 px-6"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Novi planer
+            {t("newPlanner")}
           </Button>
         </div>
       </div>
@@ -272,9 +178,9 @@ export default function PlanerGeneralPage() {
           <div className="mx-auto w-20 h-20 rounded-2xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center mb-6 shadow-inner">
             <LayoutDashboard className="h-10 w-10 text-primary" />
           </div>
-          <h3 className="text-xl font-semibold mb-2 text-foreground">Nema generalnih planera</h3>
+          <h3 className="text-xl font-semibold mb-2 text-foreground">{t("noGeneralPlanners")}</h3>
           <p className="text-muted-foreground mb-8 max-w-sm mx-auto text-sm leading-relaxed">
-            Kreiraj planer za bilo koji projekat – dodaj kolone, menjaj boje, dodeljuj ljude.
+            {t("noGeneralPlannersHint")}
           </p>
           <Button
             onClick={() => setDialogOpen(true)}
@@ -282,7 +188,7 @@ export default function PlanerGeneralPage() {
             className="rounded-xl shadow-md hover:shadow-lg transition-all"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Novi planer
+            {t("newPlanner")}
           </Button>
         </Card>
       ) : (
@@ -316,7 +222,7 @@ export default function PlanerGeneralPage() {
                     {batch.customName || batch.batchCode}
                   </h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {batch._count.items} stavki
+                    {batch._count.items} {t("itemsCountShort")}
                   </p>
                 </Link>
                 <div className="flex shrink-0 items-center gap-1">
@@ -331,7 +237,7 @@ export default function PlanerGeneralPage() {
                     size="icon"
                     className="h-9 w-9 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     onClick={(e) => { e.preventDefault(); setDeleteId(batch.id); }}
-                    aria-label="Obriši planer"
+                    aria-label={t("delete")}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -345,7 +251,7 @@ export default function PlanerGeneralPage() {
                   className="w-full rounded-xl h-10 font-medium shadow-sm hover:shadow transition-shadow border border-border/80"
                 >
                   <Link href={`/export-planner/${batch.id}`}>
-                    Otvori →
+                    {t("openArrow")}
                   </Link>
                 </Button>
               </CardContent>
@@ -358,42 +264,38 @@ export default function PlanerGeneralPage() {
         open={!!deleteId}
         onOpenChange={(open) => !open && setDeleteId(null)}
         onConfirm={() => deleteId && deleteMutation.mutate(deleteId)}
-        title="Obriši planer?"
-        description="Cela lista i sve stavke će biti trajno obrisane. Ovu radnju nije moguće poništiti."
-        confirmText="Obriši"
-        cancelText="Odustani"
+        title={t("deletePlanerConfirmTitle")}
+        description={t("deletePlanerConfirmDesc")}
+        confirmText={t("delete")}
+        cancelText={tCommon("cancel")}
         variant="destructive"
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Novi general planer</DialogTitle>
+            <DialogTitle>{t("newGeneralPlanner")}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label>Naziv planera</Label>
+              <Label>{t("planerName")}</Label>
               <Input
-                placeholder="npr. Projekat X, Nedeljni plan..."
+                placeholder={t("planerNamePlaceholder")}
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
-              <Label>Šablon kolona</Label>
+              <Label>{t("columnTemplate")}</Label>
               <Select value={newTemplate} onValueChange={(v) => setNewTemplate(v as "empty" | "kanban3")}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="empty">Prazan – bez kolona (dodaš sam)</SelectItem>
-                  <SelectItem value="kanban3">To Do · In progress · Done</SelectItem>
+                  <SelectItem value="empty">{t("templateEmpty")}</SelectItem>
+                  <SelectItem value="kanban3">{t("templateKanban3")}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox id="new-private" checked={newIsPrivate} onCheckedChange={(c) => setNewIsPrivate(!!c)} />
-              <Label htmlFor="new-private" className="text-sm font-normal cursor-pointer">Privatna lista (samo ja vidim)</Label>
             </div>
           </div>
           <DialogFooter>
@@ -401,42 +303,10 @@ export default function PlanerGeneralPage() {
               {tCommon("cancel")}
             </Button>
             <Button
-              onClick={() => createMutation.mutate({ batchType: "GENERIC", customName: newName.trim() || undefined, template: newTemplate, isPrivate: newIsPrivate })}
+              onClick={() => createMutation.mutate({ batchType: "GENERIC", customName: newName.trim() || undefined, template: newTemplate })}
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "..." : "Kreiraj"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={saveViewOpen} onOpenChange={setSaveViewOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Sačuvaj prikaz</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label>Naziv prikaza</Label>
-              <Input
-                placeholder="npr. Moj izvoz, Sve aktivno..."
-                value={savedViewName}
-                onChange={(e) => setSavedViewName(e.target.value)}
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Trenutno: {showMineOnly ? "Samo moje" : "Sve liste"}, sort: {sortBy === "dateDesc" ? "Datum ↓" : sortBy === "dateAsc" ? "Datum ↑" : "Naziv A–Ž"}
-            </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSaveViewOpen(false)}>
-              {tCommon("cancel")}
-            </Button>
-            <Button
-              onClick={() => saveViewMutation.mutate({ name: savedViewName.trim(), batchType: "GENERIC", mineOnly: showMineOnly, sortBy })}
-              disabled={!savedViewName.trim() || saveViewMutation.isPending}
-            >
-              {saveViewMutation.isPending ? "..." : "Sačuvaj"}
+              {createMutation.isPending ? "..." : t("createButton")}
             </Button>
           </DialogFooter>
         </DialogContent>
