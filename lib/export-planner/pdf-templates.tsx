@@ -12,30 +12,16 @@ const styles = StyleSheet.create({
   table: { display: "flex", flexDirection: "column" },
   row: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#eee", paddingVertical: 4 },
   headerRow: { flexDirection: "row", borderBottomWidth: 2, borderBottomColor: "#333", paddingVertical: 6, fontWeight: "bold" },
-  cellCheck: { width: 24, marginRight: 8 },
   cellRn: { width: 80 },
   cellEngine: { width: 100 },
   cellType: { width: 80 },
   cellMr: { width: 60 },
   cellStatus: { width: 70 },
-  // Pravougaonik za čekiranje / potpis kontrole na kraju liste
-  signBlock: {
-    marginTop: 28,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#333",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  signField: { flexDirection: "row", alignItems: "center", gap: 8 },
-  signLabel: { fontSize: 10 },
-  signLine: {
-    width: 140,
-    borderBottomWidth: 1,
-    borderBottomColor: "#333",
-    paddingBottom: 2,
-  },
+  cellOk: { width: 32, alignItems: "center" },
+  // Na kraju: "OK" i ispod pravougaonik za čekiranje na štampanoj listi
+  okBlock: { marginTop: 28, alignItems: "flex-start" },
+  okLabel: { fontSize: 11, fontWeight: "bold", marginBottom: 6 },
+  okBox: { width: 28, height: 28, borderWidth: 1.5, borderColor: "#333" },
 });
 
 type BatchProp = {
@@ -57,33 +43,27 @@ export function DadoListPdf({ batch }: BatchProp): React.ReactElement {
         <Text style={styles.meta}>Šifra: {batch.batchCode} · Datum: {batch.exportDate.slice(0, 10)}</Text>
         <View style={styles.table}>
           <View style={styles.headerRow}>
-            <View style={styles.cellCheck}><Text>☐</Text></View>
             <View style={styles.cellRn}><Text>RN</Text></View>
             <View style={styles.cellEngine}><Text>Engine No</Text></View>
             <View style={styles.cellType}><Text>Type</Text></View>
             <View style={styles.cellMr}><Text>MR</Text></View>
             <View style={styles.cellStatus}><Text>Status</Text></View>
+            <View style={styles.cellOk}><Text>OK</Text></View>
           </View>
           {batch.items.map((i) => (
             <View key={i.id} style={styles.row}>
-              <View style={styles.cellCheck}><Text>☐</Text></View>
               <View style={styles.cellRn}><Text>{i.rn}</Text></View>
               <View style={styles.cellEngine}><Text>{i.engineNo}</Text></View>
               <View style={styles.cellType}><Text>{i.engineType ?? ""}</Text></View>
               <View style={styles.cellMr}><Text>{i.mrCode ?? ""}</Text></View>
               <View style={styles.cellStatus}><Text>{i.status}</Text></View>
+              <View style={styles.cellOk}><Text>☐</Text></View>
             </View>
           ))}
         </View>
-        <View style={styles.signBlock}>
-          <View style={styles.signField}>
-            <Text style={styles.signLabel}>Kontrola:</Text>
-            <View style={styles.signLine} />
-          </View>
-          <View style={styles.signField}>
-            <Text style={styles.signLabel}>Datum:</Text>
-            <View style={styles.signLine} />
-          </View>
+        <View style={styles.okBlock}>
+          <Text style={styles.okLabel}>OK</Text>
+          <View style={styles.okBox} />
         </View>
       </Page>
     </Document>

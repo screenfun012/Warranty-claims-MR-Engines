@@ -1165,6 +1165,23 @@ export default function ExportBatchPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const unfreezeMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/export-planner/batches/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ frozenAt: null }),
+      });
+      if (!res.ok) throw new Error("Failed to unlock");
+      return res.json();
+    },
+    onSuccess: (data: Batch) => {
+      queryClient.setQueryData(["export-batch", id], data);
+      toast.success(t("unfrozen"));
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   const updateItemMutation = useMutation({
     mutationFn: async ({ itemId, data }: { itemId: string; data: Record<string, unknown> }) => {
       const res = await fetch(
@@ -1376,6 +1393,12 @@ export default function ExportBatchPage() {
                 {t("freeze")}
               </Button>
             </>
+          )}
+          {batch.frozenAt && (
+            <Button size="sm" variant="outline" onClick={() => unfreezeMutation.mutate()} disabled={unfreezeMutation.isPending}>
+              <LockOpen className="h-4 w-4 mr-1" />
+              {t("unfreeze")}
+            </Button>
           )}
           {batch.batchType === "MR_ENGINES" && (
             <>
