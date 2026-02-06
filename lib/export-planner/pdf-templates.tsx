@@ -18,6 +18,24 @@ const styles = StyleSheet.create({
   cellType: { width: 80 },
   cellMr: { width: 60 },
   cellStatus: { width: 70 },
+  // Pravougaonik za čekiranje / potpis kontrole na kraju liste
+  signBlock: {
+    marginTop: 28,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#333",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+  signField: { flexDirection: "row", alignItems: "center", gap: 8 },
+  signLabel: { fontSize: 10 },
+  signLine: {
+    width: 140,
+    borderBottomWidth: 1,
+    borderBottomColor: "#333",
+    paddingBottom: 2,
+  },
 });
 
 type BatchProp = {
@@ -56,6 +74,16 @@ export function DadoListPdf({ batch }: BatchProp): React.ReactElement {
               <View style={styles.cellStatus}><Text>{i.status}</Text></View>
             </View>
           ))}
+        </View>
+        <View style={styles.signBlock}>
+          <View style={styles.signField}>
+            <Text style={styles.signLabel}>Kontrola:</Text>
+            <View style={styles.signLine} />
+          </View>
+          <View style={styles.signField}>
+            <Text style={styles.signLabel}>Datum:</Text>
+            <View style={styles.signLine} />
+          </View>
         </View>
       </Page>
     </Document>
