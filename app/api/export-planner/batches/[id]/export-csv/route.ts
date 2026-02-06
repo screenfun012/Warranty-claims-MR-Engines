@@ -22,7 +22,7 @@ export async function GET(
 
     const prisma = await getPrisma();
     const { id } = await params;
-    const batch = await (prisma as any).exportBatch.findUnique({
+    const batch = await prisma.exportBatch.findUnique({
       where: { id },
       include: {
         items: {

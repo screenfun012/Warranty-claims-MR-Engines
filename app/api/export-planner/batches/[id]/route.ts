@@ -42,10 +42,9 @@ export async function GET(
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_READ);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id } = await params;
 
-    const batch = await db.exportBatch.findUnique({
+    const batch = await prisma.exportBatch.findUnique({
       where: { id },
       include: {
         items: {
@@ -70,10 +69,9 @@ export async function PATCH(
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id } = await params;
 
-    const batch = await db.exportBatch.findUnique({
+    const batch = await prisma.exportBatch.findUnique({
       where: { id },
       include: {
         items: {
@@ -94,7 +92,7 @@ export async function PATCH(
     }
     if (body.columns !== undefined) updateData.columns = typeof body.columns === "string" ? body.columns : JSON.stringify(body.columns ?? []);
 
-    const updated = await db.exportBatch.update({
+    const updated = await prisma.exportBatch.update({
       where: { id },
       data: updateData,
       include: {
@@ -128,13 +126,12 @@ export async function DELETE(
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id } = await params;
 
-    const batch = await db.exportBatch.findUnique({ where: { id } });
+    const batch = await prisma.exportBatch.findUnique({ where: { id } });
     if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
 
-    await db.exportBatch.delete({ where: { id } });
+    await prisma.exportBatch.delete({ where: { id } });
 
     const session = await getSession();
     await createBatchAudit(id, "BATCH_DELETED", {

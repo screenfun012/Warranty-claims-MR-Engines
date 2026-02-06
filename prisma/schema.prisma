@@ -31,6 +31,11 @@ model User {
   claimsAssigned                Claim[]     @relation("ClaimAssignedTo")
   workOrders                    WorkOrder[]
   notifications                 Notification[]
+  // Export Planner
+  exportBatchesCreated          ExportBatch[]           @relation("ExportBatchCreatedBy")
+  exportBatchesFrozen           ExportBatch[]           @relation("ExportBatchFrozenBy")
+  exportBatchItemsAssigned      ExportBatchItem[]       @relation("ExportBatchItemAssignedTo")
+  exportBatchOverrides          ExportBatchOverride[]
   createdAt                     DateTime    @default(now())
   updatedAt                     DateTime    @updatedAt
 }
@@ -324,4 +329,86 @@ model Notification {
 
   @@index([userId])
   @@index([userId, readAt])
+}
+
+// Export Planner (tabele kreirane migracijom 20260204000000_add_export_planner)
+model ExportBatch {
+  id           String    @id
+  batchCode    String    @unique
+  batchType    String    @default("MR_ENGINES")
+  customName   String?
+  customFields String?
+  columns      String?
+  exportDate   DateTime  @default(now())
+  loadTime     DateTime?
+  notes        String?
+  frozenAt     DateTime?
+  frozenById   String?
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime
+  createdBy    User?     @relation("ExportBatchCreatedBy", fields: [createdById], references: [id])
+  frozenBy     User?     @relation("ExportBatchFrozenBy", fields: [frozenById], references: [id])
+  items        ExportBatchItem[]
+  overrides    ExportBatchOverride[]
+  audit        ExportBatchAudit[]
+
+  @@index([batchType])
+}
+
+model ExportBatchItem {
+  id           String       @id
+  batchId      String
+  rn           String
+  engineNo     String
+  engineType   String?
+  status       String       @default("PLANIRANO")
+  qcOk         Boolean      @default(false)
+  qcNote       String?
+  qcCheckedAt  DateTime?
+  sortOrder    Int          @default(0)
+  details      String?
+  customData   String?
+  priority     String?
+  dueDate      DateTime?
+  assignedToId String?
+  startDate    DateTime?
+  mrCode       String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime
+  batch        ExportBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  assignedTo   User?        @relation("ExportBatchItemAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@unique([batchId, rn])
+  @@index([batchId])
+  @@index([batchId, status])
+}
+
+model ExportBatchOverride {
+  id            String      @id
+  batchId       String
+  performedById String
+  reason        String
+  changeType    String
+  details       String?
+  createdAt     DateTime    @default(now())
+  batch         ExportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  performedBy   User        @relation(fields: [performedById], references: [id], onDelete: Restrict)
+
+  @@index([batchId])
+}
+
+model ExportBatchAudit {
+  id        String     @id @default(cuid())
+  batchId   String
+  action    String
+  entityId  String?
+  userId    String?
+  userEmail String?
+  details   String?
+  createdAt DateTime   @default(now())
+  batch     ExportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+  @@index([createdAt])
 }

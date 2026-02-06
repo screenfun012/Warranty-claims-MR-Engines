@@ -17,15 +17,14 @@ export async function GET(_request: NextRequest) {
     }
 
     const prisma = await getPrisma();
-    const db = prisma as any;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const assigned = await db.exportBatchItem.count({
+    const assigned = await prisma.exportBatchItem.count({
       where: { assignedToId: userId },
     });
 
-    const late = await db.exportBatchItem.count({
+    const late = await prisma.exportBatchItem.count({
       where: {
         assignedToId: userId,
         dueDate: { lt: today },

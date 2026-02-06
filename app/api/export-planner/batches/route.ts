@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_READ);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { searchParams } = new URL(request.url);
     const batchType = searchParams.get("batchType") ?? "GENERIC";
     const mine = searchParams.get("mine") === "1";
@@ -29,7 +28,7 @@ export async function GET(request: NextRequest) {
     const where: { batchType: string; createdById?: string } = { batchType };
     if (mine && userId) where.createdById = userId;
 
-    const batches = await db.exportBatch.findMany({
+    const batches = await prisma.exportBatch.findMany({
       where,
       orderBy: { exportDate: "desc" },
       include: {
@@ -38,7 +37,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const list = batches.map((b: any) => ({
+    const list = batches.map((b) => ({
       id: b.id,
       batchCode: b.batchCode,
       batchType: b.batchType,
@@ -60,7 +59,6 @@ export async function POST(request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const body = await request.json();
     const batchType = body.batchType ?? "GENERIC";
     const customName = body.customName?.trim() || null;
@@ -70,17 +68,17 @@ export async function POST(request: NextRequest) {
     const userId = (session?.user as { id?: string })?.id ?? null;
 
     let batchCode = nextBatchCode(batchType);
-    let exists = await db.exportBatch.findUnique({ where: { batchCode } });
+    let exists = await prisma.exportBatch.findUnique({ where: { batchCode } });
     while (exists) {
       batchCode = nextBatchCode(batchType);
-      exists = await db.exportBatch.findUnique({ where: { batchCode } });
+      exists = await prisma.exportBatch.findUnique({ where: { batchCode } });
     }
 
     const columns = template === "kanban3" ? defaultColumns : [];
     const now = new Date();
     const id = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
-    const batch = await db.exportBatch.create({
+    const batch = await prisma.exportBatch.create({
       data: {
         id,
         batchCode,

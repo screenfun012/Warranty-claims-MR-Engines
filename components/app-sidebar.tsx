@@ -282,7 +282,7 @@ export function AppSidebar() {
 
   const plannerOnly = isPlannerOnly(userRole);
   const showWarrantyNav = !plannerOnly;
-  const showPlannerNav = plannerOnly || hasMinRole(userRole, "ADMIN");
+  const showPlannerNav = plannerOnly || hasMinRole(userRole, "OPERATOR");
   const warrantyNavItems = warrantyNavigation.filter(item => hasMinRole(userRole, item.minRole || "VIEWER"));
 
   const [exportPlannerOpen, setExportPlannerOpen] = useState(false);

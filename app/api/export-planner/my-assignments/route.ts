@@ -15,9 +15,8 @@ export async function GET(_request: NextRequest) {
     if (!userId) return NextResponse.json({ items: [] });
 
     const prisma = await getPrisma();
-    const db = prisma as any;
 
-    const items = await db.exportBatchItem.findMany({
+    const items = await prisma.exportBatchItem.findMany({
       where: { assignedToId: userId },
       orderBy: [{ dueDate: "asc" }, { sortOrder: "asc" }],
       select: {
@@ -31,7 +30,7 @@ export async function GET(_request: NextRequest) {
       },
     });
 
-    const list = items.map((i: any) => ({
+    const list = items.map((i) => ({
       id: i.id,
       rn: i.rn,
       engineNo: i.engineNo,

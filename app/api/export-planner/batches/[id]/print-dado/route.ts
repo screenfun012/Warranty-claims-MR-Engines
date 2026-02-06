@@ -16,9 +16,8 @@ export async function GET(
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_READ);
 
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id } = await params;
-    const batch = await db.exportBatch.findUnique({
+    const batch = await prisma.exportBatch.findUnique({
       where: { id },
       include: { items: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] } },
     });
@@ -34,7 +33,7 @@ export async function GET(
         customName: batch.customName,
         exportDate,
         loadTime,
-        items: batch.items.map((i: any) => ({ id: i.id, rn: i.rn, engineNo: i.engineNo, engineType: i.engineType, mrCode: i.mrCode, status: i.status, qcOk: i.qcOk })),
+        items: batch.items.map((i) => ({ id: i.id, rn: i.rn, engineNo: i.engineNo, engineType: i.engineType, mrCode: i.mrCode, status: i.status, qcOk: i.qcOk })),
       },
     });
 

@@ -15,10 +15,9 @@ export async function POST(
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id: batchId } = await params;
 
-    const batch = await db.exportBatch.findUnique({ where: { id: batchId } });
+    const batch = await prisma.exportBatch.findUnique({ where: { id: batchId } });
     if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
     if (batch.frozenAt) return NextResponse.json({ error: "Batch is frozen" }, { status: 400 });
 
@@ -27,13 +26,13 @@ export async function POST(
     const engineNo = (body.engineNo ?? body.rn ?? rn).trim();
     if (!engineNo) return NextResponse.json({ error: "engineNo required" }, { status: 400 });
 
-    const maxOrder = await db.exportBatchItem.aggregate({
+    const maxOrder = await prisma.exportBatchItem.aggregate({
       where: { batchId },
       _max: { sortOrder: true },
     });
     const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1;
 
-    const item = await db.exportBatchItem.create({
+    const item = await prisma.exportBatchItem.create({
       data: {
         id: `item_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
         batchId,
@@ -92,13 +91,12 @@ export async function PATCH(
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id: batchId } = await params;
     const { searchParams } = new URL(request.url);
     const itemId = searchParams.get("itemId");
     if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
 
-    const batch = await db.exportBatch.findUnique({ where: { id: batchId } });
+    const batch = await prisma.exportBatch.findUnique({ where: { id: batchId } });
     if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
     if (batch.frozenAt) return NextResponse.json({ error: "Batch is frozen" }, { status: 400 });
 
@@ -117,7 +115,7 @@ export async function PATCH(
     if (body.qcOk !== undefined) updateData.qcOk = !!body.qcOk;
     if (body.customData !== undefined) updateData.customData = body.customData != null ? (typeof body.customData === "string" ? body.customData : JSON.stringify(body.customData)) : null;
 
-    const item = await db.exportBatchItem.update({
+    const item = await prisma.exportBatchItem.update({
       where: { id: itemId, batchId },
       data: updateData,
       include: { assignedTo: { select: { id: true, fullName: true } } },

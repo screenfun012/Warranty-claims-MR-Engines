@@ -15,10 +15,9 @@ export async function DELETE(
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
     const prisma = await getPrisma();
-    const db = prisma as any;
     const { id: batchId, itemId } = await params;
 
-    const batch = await db.exportBatch.findUnique({ where: { id: batchId } });
+    const batch = await prisma.exportBatch.findUnique({ where: { id: batchId } });
     if (!batch) {
       return NextResponse.json({ error: "Batch not found" }, { status: 404 });
     }
@@ -26,8 +25,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Batch is frozen" }, { status: 400 });
     }
 
-    const deleted = await db.exportBatchItem.findUnique({ where: { id: itemId, batchId }, select: { rn: true, engineNo: true } });
-    await db.exportBatchItem.delete({
+    const deleted = await prisma.exportBatchItem.findUnique({ where: { id: itemId, batchId }, select: { rn: true, engineNo: true } });
+    await prisma.exportBatchItem.delete({
       where: { id: itemId, batchId },
     });
 
