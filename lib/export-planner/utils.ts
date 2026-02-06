@@ -12,7 +12,8 @@ export async function createBatchAudit(
 ): Promise<void> {
   try {
     const prisma = await getPrisma();
-    await prisma.exportBatchAudit.create({
+    const db = prisma as any;
+    await db.exportBatchAudit.create({
       data: {
         batchId,
         action,
