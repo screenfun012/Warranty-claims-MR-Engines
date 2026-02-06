@@ -30,11 +30,7 @@ model User {
   // Existing relations
   claimsAssigned                Claim[]     @relation("ClaimAssignedTo")
   workOrders                    WorkOrder[]
-  // Export Planner
-  exportBatchesCreated          ExportBatch[]  @relation("ExportBatchCreatedBy")
-  exportBatchItemsAssigned      ExportBatchItem[] @relation("ExportBatchItemAssignedTo")
-  exportPlannerSavedViews        ExportPlannerSavedView[]
-  exportPlannerColumnPreferences ExportPlannerColumnPreference[]
+  notifications                 Notification[]
   createdAt                     DateTime    @default(now())
   updatedAt                     DateTime    @updatedAt
 }
@@ -294,111 +290,6 @@ model PredefinedCompany {
   updatedAt DateTime @updatedAt
 }
 
-// Export Planner - Kanban lists
-model ExportBatch {
-  id           String   @id @default(cuid())
-  batchCode    String   @unique
-  batchType    String   @default("MR_ENGINES")
-  customName   String?
-  customFields String?  // JSON: [{ key, label, type }] za General – custom polja
-  columns      String?
-  exportDate   DateTime @default(now())
-  loadTime     DateTime?
-  notes        String?
-  frozenAt     DateTime?
-  frozenById   String?
-  isPrivate    Boolean  @default(false) // samo kreator vidi listu
-  createdById  String?
-  createdBy    User?    @relation("ExportBatchCreatedBy", fields: [createdById], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  items        ExportBatchItem[]
-  overrides    ExportBatchOverride[]
-
-  @@index([batchType])
-  @@index([isPrivate, createdById])
-}
-
-model ExportBatchItem {
-  id           String      @id @default(cuid())
-  batchId      String
-  batch        ExportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  rn           String
-  engineNo     String
-  engineType   String?
-  status       String      @default("PLANIRANO")
-  qcOk         Boolean     @default(false)
-  qcNote       String?
-  qcCheckedAt  DateTime?
-  sortOrder    Int         @default(0)
-  details      String?
-  customData   String?
-  priority     String?
-  dueDate      DateTime?
-  assignedToId String?
-  assignedTo   User?       @relation("ExportBatchItemAssignedTo", fields: [assignedToId], references: [id])
-  startDate    DateTime?
-  mrCode       String?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  @@unique([batchId, rn])
-  @@index([batchId])
-  @@index([batchId, status])
-}
-
-model ExportBatchOverride {
-  id            String      @id @default(cuid())
-  batchId       String
-  batch         ExportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  performedById String
-  reason        String
-  changeType    String
-  details       String?
-  createdAt     DateTime    @default(now())
-
-  @@index([batchId])
-}
-
-model ExportBatchAudit {
-  id        String   @id @default(cuid())
-  batchId   String
-  action    String
-  entityId  String?
-  userId    String?
-  userEmail String?
-  details   String?
-  createdAt DateTime @default(now())
-
-  @@index([batchId])
-  @@index([createdAt])
-}
-
-model ExportPlannerSavedView {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  batchType String?  // MR_ENGINES | GENERIC | null = sve
-  mineOnly  Boolean  @default(false)
-  sortBy    String   @default("dateDesc") // dateDesc | dateAsc | nameAsc
-  createdAt DateTime @default(now())
-
-  @@index([userId])
-}
-
-model ExportPlannerColumnPreference {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  batchType   String   // MR_ENGINES | GENERIC
-  columnOrder String   // JSON array of column ids
-  updatedAt   DateTime @updatedAt
-
-  @@unique([userId, batchType])
-  @@index([userId])
-}
-
 // Activity Log for tracking user actions
 model ActivityLog {
   id          String   @id @default(cuid())
@@ -417,4 +308,20 @@ model ActivityLog {
   @@index([action])
   @@index([entityType])
   @@index([createdAt])
+}
+
+// In-app notifications (planer assignment, claim assignment, etc.)
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    // User who receives the notification
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    // PLANNER_ASSIGNED, CLAIM_ASSIGNED, etc.
+  title     String
+  body      String?   // Optional longer text
+  link      String?   // Optional URL to open (e.g. /export-planner/123)
+  readAt    DateTime? // When the user read it (null = unread)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([userId, readAt])
 }

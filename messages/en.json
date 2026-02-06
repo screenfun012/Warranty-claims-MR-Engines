@@ -801,6 +801,10 @@
     "noGeneralPlanners": "No general planners",
     "noGeneralPlannersHint": "Create a planner for any project – add columns, change colors, assign people.",
     "newGeneralPlanner": "New general planner",
+    "izvozSubtitle": "Lists for MR Engines export – motors, RN, columns, timeline.",
+    "noExportPlanners": "No export planners",
+    "noExportPlannersHint": "Create a list for export – add motors, set dates, assign people.",
+    "newExportPlanner": "New export list",
     "planerName": "Planner name",
     "planerNamePlaceholder": "e.g. Project X, Weekly plan...",
     "columnTemplate": "Column template",
@@ -820,6 +824,22 @@
     "notesLabel": "Description / notes",
     "assignedLabel": "Assigned",
     "periodLabel": "Period",
-    "clickForDetails": "Click for details"
+    "clickForDetails": "Click for details",
+    "itemRemoved": "Item removed",
+    "saved": "Saved",
+    "error": "Error",
+    "moveError": "Error moving item",
+    "columnsSaved": "Columns saved",
+    "izvozSubtitle": "Lists for MR Engines export – motors, RN, columns, timeline",
+    "noExportPlanners": "No export planners",
+    "noExportPlannersHint": "Create a list to plan and track motors for export.",
+    "newExportPlanner": "New export list"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "markRead": "Mark as read",
+    "plannerAssigned": "You were added to a planner",
+    "itemAssigned": "You were assigned to an item"
   }
 }

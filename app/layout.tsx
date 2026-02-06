@@ -82,7 +82,7 @@ export default async function RootLayout({
             <IntlProvider locale={locale} messages={messages}>
               <IdleSyncStarter />
               <MainLayout>{children}</MainLayout>
-              <Toaster position="top-right" richColors />
+              <Toaster position="top-right" richColors closeButton duration={4000} />
             </IntlProvider>
           </QueryProvider>
         </SessionProvider>

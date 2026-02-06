@@ -41,6 +41,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1142,7 +1143,7 @@ export default function ExportBatchPage() {
         if (!old) return old;
         return { ...old, items: old.items.filter((i) => i.id !== itemId) };
       });
-      toast.success("Stavka uklonjena");
+      toast.success(t("itemRemoved"));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -1182,9 +1183,9 @@ export default function ExportBatchPage() {
         };
       });
       setDetailItem((prev) => (prev?.id === updatedItem.id ? updatedItem : prev));
-      toast.success("Sačuvano");
+      toast.success(t("saved"));
     },
-    onError: () => toast.error("Greška"),
+    onError: () => toast.error(t("error")),
   });
 
   const updateStatusMutation = useMutation({
@@ -1209,7 +1210,7 @@ export default function ExportBatchPage() {
         };
       });
     },
-    onError: () => toast.error("Greška pri premeštanju"),
+    onError: () => toast.error(t("moveError")),
   });
 
   const updateColumnsMutation = useMutation({
@@ -1224,7 +1225,7 @@ export default function ExportBatchPage() {
     },
     onSuccess: (data: Batch) => {
       queryClient.setQueryData(["export-batch", id], data);
-      toast.success("Kolone sačuvane");
+      toast.success(t("columnsSaved"));
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -1435,7 +1436,10 @@ export default function ExportBatchPage() {
         <div className="flex gap-4 sm:gap-6 overflow-x-auto overflow-y-visible pb-6 min-h-[320px] md:min-h-[400px] -mx-4 px-4 sm:mx-0 sm:px-0 overscroll-x-auto touch-pan-x">
           {columns.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center min-h-[320px] rounded-xl border-2 border-dashed bg-muted/30 p-8">
-              <p className="text-muted-foreground mb-4">{t("noColumnsHint")}</p>
+              <Alert variant="warning" className="mb-4 max-w-md">
+                <AlertTitle>{t("noColumnsHint")}</AlertTitle>
+                <AlertDescription>{t("addNewColumn")}</AlertDescription>
+              </Alert>
               <Button onClick={() => { setNewColumnLabel(""); setNewColumnColor("slate"); setAddColumnDialogOpen(true); }}>
                 <Plus className="h-4 w-4 mr-2" />
                 {t("addNewColumn")}

@@ -25,6 +25,7 @@ import {
   Truck,
   LayoutDashboard,
   LayoutList,
+  Bell,
 } from "lucide-react";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { cn } from "@/lib/utils";
@@ -112,6 +113,95 @@ function hasMinRole(userRole: string | undefined, minRole: string): boolean {
 function isPlannerOnly(userRole: string | undefined): boolean {
   if (!userRole) return false;
   return PLANNER_ROLES.includes(userRole as any) && !WARRANTY_ROLES.includes(userRole as any);
+}
+
+type NotificationItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+};
+
+const fetchNotifications = async (): Promise<{ notifications: NotificationItem[]; unreadCount: number }> => {
+  const res = await fetch("/api/notifications");
+  if (!res.ok) return { notifications: [], unreadCount: 0 };
+  return res.json();
+};
+
+function NotificationsDropdown({ isCollapsed, isMobile }: { isCollapsed: boolean; isMobile: boolean }) {
+  const t = useTranslations("notifications");
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const { data, isLoading } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: fetchNotifications,
+    staleTime: 60 * 1000,
+  });
+  const notifications = data?.notifications ?? [];
+  const unreadCount = data?.unreadCount ?? 0;
+
+  const markRead = React.useCallback(
+    async (id: string, link: string | null) => {
+      try {
+        await fetch(`/api/notifications/${id}`, { method: "PATCH" });
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        if (link) router.push(link);
+      } catch {
+        if (link) router.push(link);
+      }
+    },
+    [queryClient, router]
+  );
+
+  return (
+    <SidebarMenuItem>
+      <DropdownMenu>
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuButton
+                  size={isCollapsed ? "default" : "lg"}
+                  className={cn("relative", isCollapsed && "justify-center")}
+                >
+                  <Bell className={cn("h-5 w-5 shrink-0", !isCollapsed && "mr-2")} />
+                  {!isCollapsed && <span className="truncate">{t("title")}</span>}
+                  {unreadCount > 0 && (
+                    <Badge variant="destructive" className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px]">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </Badge>
+                  )}
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="right">{t("title")}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <DropdownMenuContent align="end" className="w-80 max-h-[70vh] overflow-y-auto">
+          <div className="px-2 py-1.5 text-sm font-semibold text-foreground">{t("title")}</div>
+          {isLoading ? (
+            <div className="px-2 py-4 text-sm text-muted-foreground">{t("empty")}</div>
+          ) : notifications.length === 0 ? (
+            <div className="px-2 py-4 text-sm text-muted-foreground">{t("empty")}</div>
+          ) : (
+            notifications.map((n) => (
+              <DropdownMenuItem
+                key={n.id}
+                className="flex flex-col items-stretch gap-0.5 py-2 cursor-pointer"
+                onSelect={() => markRead(n.id, n.link)}
+              >
+                <span className={cn("font-medium text-sm", !n.readAt && "text-foreground")}>{n.title}</span>
+                {n.body && <span className="text-xs text-muted-foreground line-clamp-2">{n.body}</span>}
+              </DropdownMenuItem>
+            ))
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </SidebarMenuItem>
+  );
 }
 
 const fetchUnreadCount = async (): Promise<number> => {
@@ -509,6 +599,7 @@ export function AppSidebar() {
       <SidebarFooter className="border-t px-2 py-2">
         {user && (
           <SidebarMenu>
+            <NotificationsDropdown isCollapsed={!!isCollapsed} isMobile={isMobile} />
             <SidebarMenuItem>
               <DropdownMenu>
                 <TooltipProvider delayDuration={0}>

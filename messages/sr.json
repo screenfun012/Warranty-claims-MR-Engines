@@ -799,6 +799,10 @@
     "noGeneralPlanners": "Nema generalnih planera",
     "noGeneralPlannersHint": "Kreiraj planer za bilo koji projekat – dodaj kolone, menjaj boje, dodeljuj ljude.",
     "newGeneralPlanner": "Novi general planer",
+    "izvozSubtitle": "Liste za izvoz MR motora – motori, RN, kolone, timeline.",
+    "noExportPlanners": "Nema listi za izvoz",
+    "noExportPlannersHint": "Kreiraj listu za izvoz – dodaj motore, postavi datume, dodeli ljude.",
+    "newExportPlanner": "Nova lista za izvoz",
     "planerName": "Naziv planera",
     "planerNamePlaceholder": "npr. Projekat X, Nedeljni plan...",
     "columnTemplate": "Šablon kolona",
@@ -818,6 +822,18 @@
     "notesLabel": "Opis / napomene",
     "assignedLabel": "Dodeljeno",
     "periodLabel": "Period",
-    "clickForDetails": "Klik za detalje"
+    "clickForDetails": "Klik za detalje",
+    "itemRemoved": "Stavka uklonjena",
+    "saved": "Sačuvano",
+    "error": "Greška",
+    "moveError": "Greška pri premeštanju",
+    "columnsSaved": "Kolone sačuvane"
+  },
+  "notifications": {
+    "title": "Obaveštenja",
+    "empty": "Nema obaveštenja",
+    "markRead": "Označi kao pročitano",
+    "plannerAssigned": "Dodati ste u planer",
+    "itemAssigned": "Dodeljena vam je stavka"
   }
 }

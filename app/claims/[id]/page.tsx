@@ -131,10 +131,9 @@ const StatusBadge = ({ status, label }: { status: string; label: string }) => {
   );
 };
 
-// Fetch function for React Query – light=true for fast first paint, then full when opening emails/documents/photos
-const fetchClaimData = async (claimId: string, light?: boolean): Promise<Claim> => {
-  const url = light ? `/api/claims/${claimId}?light=1` : `/api/claims/${claimId}`;
-  const res = await fetch(url);
+// Fetch function for React Query
+const fetchClaimData = async (claimId: string): Promise<Claim> => {
+  const res = await fetch(`/api/claims/${claimId}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch claim: ${res.status}`);
   }
@@ -178,30 +177,16 @@ export default function ClaimDetailPage() {
   const canEdit = hasMinRole(userRole, "OPERATOR");
   const canDelete = isSuperAdmin;
 
-  // First load: light payload (overview/metadata/findings only) for fast first paint
-  const { data: claimLight, isLoading: loadingLight, refetch } = useQuery({
-    queryKey: ["claim", claimId],
-    queryFn: () => fetchClaimData(claimId, true),
+  // React Query for data fetching with caching
+  const { data: claim, isLoading: loading, refetch } = useQuery({
+    queryKey: ['claim', claimId],
+    queryFn: () => fetchClaimData(claimId),
     enabled: !!claimId,
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000, // 1 minute - data stays fresh
+    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
     retry: 2,
     retryDelay: 1000,
   });
-
-  // Full payload only when user opens emails/documents/photos tab (lazy)
-  const needsFullClaim =
-    activeTab === "emails" || activeTab === "documents" || activeTab === "photos";
-  const { data: claimFull, isLoading: loadingFull } = useQuery({
-    queryKey: ["claim-full", claimId],
-    queryFn: () => fetchClaimData(claimId, false),
-    enabled: !!claimId && needsFullClaim,
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-  });
-
-  const claim = claimFull ?? claimLight;
-  const loading = loadingLight;
 
   // Check if claim is locked or closed (read-only logic)
   // Default: CLOSED status = locked (read-only for non-SUPER_ADMIN)
@@ -426,38 +411,16 @@ export default function ClaimDetailPage() {
               <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
             </TabsContent>
             <TabsContent value="emails" className="mt-4">
-              {needsFullClaim && loadingFull ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-32 w-full" />
-                  <Skeleton className="h-32 w-full" />
-                </div>
-              ) : (
-                <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
-              )}
+              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              {needsFullClaim && loadingFull ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-24 w-full" />
-                </div>
-              ) : (
-                <ClaimClientDocuments claim={claim} isReadOnly={!canEdit || (isReadOnly ?? false)} onRefresh={() => refetch()} />
-              )}
+              <ClaimClientDocuments claim={claim} isReadOnly={!canEdit || (isReadOnly ?? false)} onRefresh={() => refetch()} />
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
               <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
             </TabsContent>
             <TabsContent value="photos" className="mt-4">
-              {needsFullClaim && loadingFull ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-10 w-full" />
-                  <Skeleton className="h-48 w-full" />
-                </div>
-              ) : (
-                <ClaimPhotos claim={claim} isReadOnly={!canEdit || (isReadOnly ?? false)} onRefresh={() => refetch()} />
-              )}
+              <ClaimPhotos claim={claim} isReadOnly={!canEdit || (isReadOnly ?? false)} onRefresh={() => refetch()} />
             </TabsContent>
           </Tabs>
         </div>
