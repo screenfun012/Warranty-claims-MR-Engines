@@ -106,11 +106,21 @@ export default function PlannerOverviewPage() {
 
   const lateItems = items.filter((i) => isLate(i.dueDate));
 
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  const dueThisMonth = items.filter((i) => {
+    if (!i.dueDate) return false;
+    const d = new Date(i.dueDate);
+    return d >= startOfMonth && d <= endOfMonth;
+  });
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-semibold mb-1">{t("plannerOverview")}</h1>
-        <p className="text-muted-foreground text-sm">{tPlanner("overviewSubtitle")}</p>
+        <p className="text-muted-foreground text-sm mb-2">{tPlanner("overviewSubtitle")}</p>
+        <p className="text-muted-foreground text-xs max-w-xl">{tPlanner("overviewConnectionHint")}</p>
       </div>
 
       {/* Brzi linkovi */}
@@ -164,6 +174,42 @@ export default function PlannerOverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Rokovi – ovaj mesec */}
+      {items.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{tPlanner("dueThisMonth")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dueThisMonth.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{tPlanner("noItemsDueThisMonth")}</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {dueThisMonth.slice(0, 10).map((i) => (
+                  <li key={i.id} className="flex items-center justify-between gap-2 text-sm">
+                    <span>{i.rn || i.engineNo}</span>
+                    <span className="text-muted-foreground">
+                      {i.dueDate ? new Date(i.dueDate).toLocaleDateString() : ""}
+                    </span>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/export-planner/${i.batchId}`} className="gap-1 shrink-0">
+                        {i.customName || i.batchCode}
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </Button>
+                  </li>
+                ))}
+                {dueThisMonth.length > 10 && (
+                  <li className="text-muted-foreground text-xs pt-1">
+                    +{dueThisMonth.length - 10} još
+                  </li>
+                )}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Moja zaduženja */}
       <Card>

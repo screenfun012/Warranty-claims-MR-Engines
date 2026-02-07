@@ -39,7 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange } from "lucide-react";
+import { ChevronLeft, Plus, Lock, LockOpen, GripVertical, Printer, FileText, Download, Calendar, Trash2, X, Clock, CalendarRange, LayoutGrid, List } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -994,6 +994,7 @@ export default function ExportBatchPage() {
   const [newColumnLabel, setNewColumnLabel] = useState("");
   const [newColumnColor, setNewColumnColor] = useState("slate");
   const [boardFilter, setBoardFilter] = useState<"all" | "mine" | "late" | "thisMonth">("all");
+  const [generalViewMode, setGeneralViewMode] = useState<"board" | "list">("board");
 
   const { data: batch, isLoading } = useQuery({
     queryKey: ["export-batch", id],
@@ -1448,8 +1449,81 @@ export default function ExportBatchPage() {
             ({t("ofCount", { count: filteredItems.length, total: batch?.items?.length ?? 0 })})
           </span>
         )}
+        {batch.batchType === "GENERIC" && (
+          <div className="flex rounded-lg border border-border bg-muted/30 p-0.5">
+            <button
+              type="button"
+              onClick={() => setGeneralViewMode("board")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                generalViewMode === "board" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              {t("viewBoard")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setGeneralViewMode("list")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                generalViewMode === "list" ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <List className="h-4 w-4" />
+              {t("viewList")}
+            </button>
+          </div>
+        )}
       </div>
 
+      {batch.batchType === "GENERIC" && generalViewMode === "list" ? (
+        <Card className="mb-6 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left py-3 px-3 font-medium">{t("columnLabel")}</th>
+                  <th className="text-left py-3 px-3 font-medium">{t("itemTitle")}</th>
+                  <th className="text-left py-3 px-3 font-medium">{t("assignedTo")}</th>
+                  <th className="text-left py-3 px-3 font-medium">{t("dueDateLabel")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                      {t("noItemsTimeline")}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((item) => {
+                    const col = columns.find((c) => c.id === item.status);
+                    const title = item.rn?.trim() || item.details?.slice(0, 60) || t("itemTitlePlaceholder");
+                    return (
+                      <tr
+                        key={item.id}
+                        className={cn(
+                          "border-b border-border/50 hover:bg-muted/30 cursor-pointer transition-colors",
+                          PRIORITY_BORDER[item.priority ?? ""]
+                        )}
+                        onClick={() => setDetailItem(item)}
+                      >
+                        <td className="py-2.5 px-3">{col?.label ?? item.status}</td>
+                        <td className="py-2.5 px-3 font-medium">{title}</td>
+                        <td className="py-2.5 px-3 text-muted-foreground">{item.assignedTo?.fullName ?? "–"}</td>
+                        <td className="py-2.5 px-3 text-muted-foreground">
+                          {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : "–"}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ) : (
       <DndContext
         sensors={sensors}
         collisionDetection={columnAwareCollisionDetection}
@@ -1527,6 +1601,7 @@ export default function ExportBatchPage() {
           ) : null}
         </DragOverlay>
       </DndContext>
+      )}
 
       <div className="mt-6 md:mt-8 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
         <div className="min-w-[480px] w-full">

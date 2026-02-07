@@ -11,13 +11,15 @@ export async function GET(_request: NextRequest) {
   try {
     await requirePermission(PERMISSIONS.EXPORT_PLANNER_READ);
     const session = await getSession();
-    const userId = (session?.user as { id?: string })?.id;
-    if (!userId) return NextResponse.json({ items: [] });
+    const email = (session?.user as { email?: string })?.email;
+    if (!email) return NextResponse.json({ items: [] });
 
     const prisma = await getPrisma();
+    const dbUser = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    if (!dbUser) return NextResponse.json({ items: [] });
 
     const items = await prisma.exportBatchItem.findMany({
-      where: { assignedToId: userId },
+      where: { assignedToId: dbUser.id },
       orderBy: [{ dueDate: "asc" }, { sortOrder: "asc" }],
       select: {
         id: true,

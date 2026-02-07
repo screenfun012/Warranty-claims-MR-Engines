@@ -849,7 +849,12 @@
     "viewAll": "All lists",
     "noActivity": "No recent activity",
     "activityBatch": "List",
-    "activityAction": "Action"
+    "activityAction": "Action",
+    "overviewConnectionHint": "Items assigned to you in any list (Export planner or General) appear in „My assignments” below.",
+    "dueThisMonth": "Due this month",
+    "noItemsDueThisMonth": "No items due this month",
+    "viewBoard": "Board",
+    "viewList": "List"
   },
   "notifications": {
     "title": "Notifications",

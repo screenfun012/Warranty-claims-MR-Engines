@@ -843,7 +843,12 @@
     "viewAll": "Sve liste",
     "noActivity": "Nema nedavne aktivnosti",
     "activityBatch": "Lista",
-    "activityAction": "Radnja"
+    "activityAction": "Radnja",
+    "overviewConnectionHint": "Stavke koje su vam dodeljene u listi (iz Planer izvoza ili General) pojavljuju se u „Moja zaduženja” ispod.",
+    "dueThisMonth": "Rokovi – ovaj mesec",
+    "noItemsDueThisMonth": "Nema stavki sa rokom ovog meseca",
+    "viewBoard": "Tablo",
+    "viewList": "Lista"
   },
   "notifications": {
     "title": "Obaveštenja",
