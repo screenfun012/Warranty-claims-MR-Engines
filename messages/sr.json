@@ -827,7 +827,15 @@
     "saved": "Sačuvano",
     "error": "Greška",
     "moveError": "Greška pri premeštanju",
-    "columnsSaved": "Kolone sačuvane"
+    "columnsSaved": "Kolone sačuvane",
+    "overviewSubtitle": "Moja zaduženja i pregled stavki dodeljenih vam u planeru",
+    "myAssignments": "Moja zaduženja",
+    "assignedCount": "Dodeljeno stavki",
+    "lateCount": "Kasne",
+    "noAssignments": "Nemate dodeljenih stavki",
+    "noAssignmentsHint": "Zaduženja vam dodeljuju drugi korisnici u listi (Planer izvoza ili General).",
+    "openBatch": "Otvori listu",
+    "late": "Kasni"
   },
   "notifications": {
     "title": "Obaveštenja",

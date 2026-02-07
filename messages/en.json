@@ -833,7 +833,15 @@
     "izvozSubtitle": "Lists for MR Engines export – motors, RN, columns, timeline",
     "noExportPlanners": "No export planners",
     "noExportPlannersHint": "Create a list to plan and track motors for export.",
-    "newExportPlanner": "New export list"
+    "newExportPlanner": "New export list",
+    "overviewSubtitle": "My assignments and overview of items assigned to you in the planner",
+    "myAssignments": "My assignments",
+    "assignedCount": "Assigned items",
+    "lateCount": "Late",
+    "noAssignments": "You have no assigned items",
+    "noAssignmentsHint": "Assignments are given to you by other users in a list (Export planner or General).",
+    "openBatch": "Open list",
+    "late": "Late"
   },
   "notifications": {
     "title": "Notifications",
