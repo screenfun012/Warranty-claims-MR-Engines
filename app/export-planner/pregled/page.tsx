@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LayoutList, ListTodo, AlertCircle, ExternalLink } from "lucide-react";
+import { LayoutList, ListTodo, AlertCircle, ExternalLink, Truck, LayoutDashboard, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Summary = { assignedCount: number; lateCount: number };
@@ -18,6 +18,15 @@ type AssignmentItem = {
   batchId: string;
   batchCode?: string;
   customName?: string | null;
+};
+
+type BatchSummary = { id: string; batchCode: string; customName: string | null; batchType: string };
+type ActivityEntry = {
+  id: string;
+  batchId: string;
+  action: string;
+  createdAt: string;
+  batch: { id: string; batchCode: string; customName: string | null } | null;
 };
 
 const fetchSummary = async (): Promise<Summary> => {
@@ -33,13 +42,37 @@ const fetchAssignments = async (): Promise<AssignmentItem[]> => {
   return data.items ?? [];
 };
 
+const fetchBatches = async (batchType: string): Promise<BatchSummary[]> => {
+  const res = await fetch(`/api/export-planner/batches?batchType=${batchType}`);
+  if (!res.ok) return [];
+  return res.json();
+};
+
+const fetchActivity = async (): Promise<ActivityEntry[]> => {
+  const res = await fetch("/api/export-planner/activity?limit=15");
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data.activity ?? [];
+};
+
 function isLate(dueDate: string | null): boolean {
   if (!dueDate) return false;
   const due = new Date(dueDate);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
-  return due < today && due.toDateString() !== today.toDateString();
+  return due < today;
+}
+
+function actionLabel(action: string): string {
+  const map: Record<string, string> = {
+    BATCH_CREATED: "Lista kreirana",
+    BATCH_FROZEN: "Lista zaključana",
+    BATCH_DELETED: "Lista obrisana",
+    ITEM_ADDED: "Stavka dodata",
+    ITEM_REMOVED: "Stavka uklonjena",
+  };
+  return map[action] || action;
 }
 
 export default function PlannerOverviewPage() {
@@ -56,14 +89,52 @@ export default function PlannerOverviewPage() {
     queryFn: fetchAssignments,
   });
 
+  const { data: exportBatches = [] } = useQuery({
+    queryKey: ["export-planner-batches", "MR_ENGINES"],
+    queryFn: () => fetchBatches("MR_ENGINES"),
+  });
+
+  const { data: generalBatches = [] } = useQuery({
+    queryKey: ["export-planner-batches", "GENERIC"],
+    queryFn: () => fetchBatches("GENERIC"),
+  });
+
+  const { data: activity = [], isLoading: activityLoading } = useQuery({
+    queryKey: ["export-planner-activity"],
+    queryFn: fetchActivity,
+  });
+
   const lateItems = items.filter((i) => isLate(i.dueDate));
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">{t("plannerOverview")}</h1>
-      <p className="text-muted-foreground text-sm mb-6">{tPlanner("overviewSubtitle")}</p>
+    <div className="p-6 max-w-5xl mx-auto space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold mb-1">{t("plannerOverview")}</h1>
+        <p className="text-muted-foreground text-sm">{tPlanner("overviewSubtitle")}</p>
+      </div>
 
-      <div className="grid gap-4 md:grid-cols-2 mb-8">
+      {/* Brzi linkovi */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">{tPlanner("quickLinks")}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link href="/export-planner/izvoz">
+              <Truck className="h-4 w-4" />
+              {t("plannerExport")}
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="gap-2">
+            <Link href="/export-planner/general">
+              <LayoutDashboard className="h-4 w-4" />
+              {t("plannerGeneral")}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{tPlanner("assignedCount")}</CardTitle>
@@ -94,6 +165,7 @@ export default function PlannerOverviewPage() {
         </Card>
       </div>
 
+      {/* Moja zaduženja */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -109,9 +181,12 @@ export default function PlannerOverviewPage() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
+            <div className="py-6 text-center text-muted-foreground">
               <p className="font-medium">{tPlanner("noAssignments")}</p>
               <p className="text-sm mt-1">{tPlanner("noAssignmentsHint")}</p>
+              <Button asChild variant="link" size="sm" className="mt-3">
+                <Link href="/export-planner/izvoz">{tPlanner("viewAll")} →</Link>
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -154,6 +229,118 @@ export default function PlannerOverviewPage() {
                 </tbody>
               </table>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Liste za izvoz + General (prvih nekoliko sa linkom Sve) */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base">{tPlanner("exportLists")}</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/export-planner/izvoz">{tPlanner("viewAll")}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {exportBatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{tPlanner("noExportPlanners")}</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {exportBatches.slice(0, 8).map((b) => (
+                  <li key={b.id}>
+                    <Link
+                      href={`/export-planner/${b.id}`}
+                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                    >
+                      {b.customName || b.batchCode}
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                    </Link>
+                  </li>
+                ))}
+                {exportBatches.length > 8 && (
+                  <li>
+                    <Button asChild variant="link" size="sm" className="h-auto p-0 text-muted-foreground">
+                      <Link href="/export-planner/izvoz">+ {exportBatches.length - 8} …</Link>
+                    </Button>
+                  </li>
+                )}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-base">{tPlanner("generalLists")}</CardTitle>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/export-planner/general">{tPlanner("viewAll")}</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {generalBatches.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{tPlanner("noGeneralPlanners")}</p>
+            ) : (
+              <ul className="space-y-1.5">
+                {generalBatches.slice(0, 8).map((b) => (
+                  <li key={b.id}>
+                    <Link
+                      href={`/export-planner/${b.id}`}
+                      className="text-sm text-primary hover:underline flex items-center gap-1"
+                    >
+                      {b.customName || b.batchCode}
+                      <ExternalLink className="h-3 w-3 shrink-0" />
+                    </Link>
+                  </li>
+                ))}
+                {generalBatches.length > 8 && (
+                  <li>
+                    <Button asChild variant="link" size="sm" className="h-auto p-0 text-muted-foreground">
+                      <Link href="/export-planner/general">+ {generalBatches.length - 8} …</Link>
+                    </Button>
+                  </li>
+                )}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Nedavna aktivnost */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            {tPlanner("recentActivity")}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {activityLoading ? (
+            <div className="space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-10 animate-pulse rounded bg-muted" />
+              ))}
+            </div>
+          ) : activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">{tPlanner("noActivity")}</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {activity.map((e) => (
+                <li key={e.id} className="flex flex-wrap items-baseline gap-2">
+                  <span className="font-medium">{actionLabel(e.action)}</span>
+                  {e.batch && (
+                    <Link
+                      href={`/export-planner/${e.batchId}`}
+                      className="text-primary hover:underline"
+                    >
+                      {e.batch.customName || e.batch.batchCode}
+                    </Link>
+                  )}
+                  <span className="text-muted-foreground text-xs">
+                    {new Date(e.createdAt).toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </CardContent>
       </Card>

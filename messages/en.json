@@ -841,7 +841,15 @@
     "noAssignments": "You have no assigned items",
     "noAssignmentsHint": "Assignments are given to you by other users in a list (Export planner or General).",
     "openBatch": "Open list",
-    "late": "Late"
+    "late": "Late",
+    "quickLinks": "Quick links",
+    "recentActivity": "Recent activity",
+    "exportLists": "Export lists",
+    "generalLists": "General lists",
+    "viewAll": "All lists",
+    "noActivity": "No recent activity",
+    "activityBatch": "List",
+    "activityAction": "Action"
   },
   "notifications": {
     "title": "Notifications",

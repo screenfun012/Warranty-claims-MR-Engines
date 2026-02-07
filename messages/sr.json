@@ -835,7 +835,15 @@
     "noAssignments": "Nemate dodeljenih stavki",
     "noAssignmentsHint": "Zaduženja vam dodeljuju drugi korisnici u listi (Planer izvoza ili General).",
     "openBatch": "Otvori listu",
-    "late": "Kasni"
+    "late": "Kasni",
+    "quickLinks": "Brzi linkovi",
+    "recentActivity": "Nedavna aktivnost",
+    "exportLists": "Liste za izvoz",
+    "generalLists": "General liste",
+    "viewAll": "Sve liste",
+    "noActivity": "Nema nedavne aktivnosti",
+    "activityBatch": "Lista",
+    "activityAction": "Radnja"
   },
   "notifications": {
     "title": "Obaveštenja",
