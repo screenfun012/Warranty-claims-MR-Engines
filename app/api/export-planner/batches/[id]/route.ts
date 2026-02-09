@@ -4,7 +4,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
-import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { requirePermission, createPermissionError, PERMISSIONS, getUserRole } from "@/lib/auth/permissions";
+import { hasPermission } from "@/lib/auth/roles";
 import { createBatchAudit, triggerBatchChanged } from "@/lib/export-planner/utils";
 import { getSession } from "@/lib/auth/get-session";
 
@@ -130,6 +131,19 @@ export async function DELETE(
 
     const batch = await prisma.exportBatch.findUnique({ where: { id } });
     if (!batch) return NextResponse.json({ error: "Batch not found" }, { status: 404 });
+
+    const role = await getUserRole();
+    const canDeleteAny = role && hasPermission(role, PERMISSIONS.EXPORT_PLANNER_DELETE_ANY);
+    if (!canDeleteAny) {
+      const session = await getSession();
+      const userId = (session?.user as { id?: string })?.id ?? null;
+      if (batch.createdById !== userId) {
+        return NextResponse.json(
+          { error: "Forbidden: Možete obrisati samo planer koji ste vi kreirali." },
+          { status: 403 }
+        );
+      }
+    }
 
     await prisma.exportBatch.delete({ where: { id } });
 

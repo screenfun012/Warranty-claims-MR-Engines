@@ -702,6 +702,8 @@
       "SUPER_ADMIN": "Super Admin",
       "ADMIN": "Admin",
       "OPERATOR": "Operator",
+      "PLANNER_OPERATOR": "Planner operator",
+      "PLANNER_VIEWER": "Planner viewer",
       "VIEWER": "Viewer"
     }
   },

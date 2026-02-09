@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requirePermission(PERMISSIONS.EXPORT_PLANNER_EDIT);
+    await requirePermission(PERMISSIONS.EXPORT_PLANNER_CREATE);
     const prisma = await getPrisma();
     const body = await request.json();
     const batchType = body.batchType ?? "GENERIC";

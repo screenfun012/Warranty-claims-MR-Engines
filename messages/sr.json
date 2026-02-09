@@ -700,6 +700,8 @@
       "SUPER_ADMIN": "Super Admin",
       "ADMIN": "Admin",
       "OPERATOR": "Operator",
+      "PLANNER_OPERATOR": "Planer operater",
+      "PLANNER_VIEWER": "Planer pregled",
       "VIEWER": "Viewer"
     }
   },

@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const validRoles = ["SUPER_ADMIN", "ADMIN", "OPERATOR", "VIEWER"];
+    const validRoles = ["SUPER_ADMIN", "ADMIN", "OPERATOR", "PLANNER_OPERATOR", "PLANNER_VIEWER", "VIEWER"];
     if (!validRoles.includes(newRole)) {
       return NextResponse.json(
         { error: `Invalid role. Must be one of: ${validRoles.join(", ")}` },

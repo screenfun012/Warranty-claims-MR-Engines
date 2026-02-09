@@ -68,6 +68,8 @@ export default function ProfilePage() {
     SUPER_ADMIN: { icon: Crown, color: "bg-amber-500 dark:bg-amber-600", label: t("profile.roles.SUPER_ADMIN") },
     ADMIN: { icon: UserRoundCog, color: "bg-purple-500 dark:bg-purple-600", label: t("profile.roles.ADMIN") },
     OPERATOR: { icon: UserCheck, color: "bg-blue-500 dark:bg-blue-600", label: t("profile.roles.OPERATOR") },
+    PLANNER_OPERATOR: { icon: UserCheck, color: "bg-teal-500 dark:bg-teal-600", label: t("profile.roles.PLANNER_OPERATOR") },
+    PLANNER_VIEWER: { icon: Eye, color: "bg-slate-500 dark:bg-slate-600", label: t("profile.roles.PLANNER_VIEWER") },
     VIEWER: { icon: Eye, color: "bg-gray-500 dark:bg-gray-600", label: t("profile.roles.VIEWER") },
   };
 
