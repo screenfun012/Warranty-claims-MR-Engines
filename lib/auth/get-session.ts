@@ -1,5 +1,6 @@
 import { auth0 } from "@/lib/auth0";
 import { getUserRoles } from "@/lib/auth0-management";
+import { normalizeAuth0Role } from "@/lib/auth/roles";
 
 export async function getSession() {
   const session = await auth0.getSession();
@@ -41,9 +42,10 @@ export async function getSession() {
   if (roles.length === 0) {
     roles = ['VIEWER'];
   }
-  
-  // Uzmi prvi role (ili VIEWER ako nema)
-  const role = Array.isArray(roles) ? roles[0] : roles || 'VIEWER';
+
+  // Normalizuj nazive iz Auth0 (npr. "Planer operater" -> PLANNER_OPERATOR) da aplikacija prepozna ulogu
+  const normalizedRoles = roles.map((r) => normalizeAuth0Role(r));
+  const role = normalizedRoles[0] || 'VIEWER';
   
   // Debug logging u development modu
   if (process.env.NODE_ENV === 'development') {

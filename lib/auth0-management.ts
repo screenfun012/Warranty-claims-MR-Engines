@@ -186,8 +186,10 @@ export async function getUserRoles(auth0UserId: string): Promise<string[]> {
     
     let roleNames: string[] = ['VIEWER'];
     if (rolesData && Array.isArray(rolesData) && rolesData.length > 0) {
-      roleNames = rolesData.map((role: any) => role.name || role.id || role);
-      console.log('[Auth0 Management] Roles from API:', roleNames);
+      const raw = rolesData.map((role: any) => role.name || role.id || role);
+      const { normalizeAuth0Role } = await import('@/lib/auth/roles');
+      roleNames = raw.map((name: string) => normalizeAuth0Role(name));
+      console.log('[Auth0 Management] Roles from API:', raw, '-> normalized:', roleNames);
     } else {
       console.log('[Auth0 Management] No roles found, using default VIEWER');
     }
@@ -210,8 +212,15 @@ export async function getUserRoles(auth0UserId: string): Promise<string[]> {
   }
 }
 
+/** Alternativni nazivi uloga u Auth0 (ako je u Dashboard-u drugačiji naziv) */
+const AUTH0_ROLE_NAME_ALTERNATIVES: Record<string, string[]> = {
+  PLANNER_OPERATOR: ["PLANNER_OPERATOR", "Planer operater", "Planner operator", "planer_operater"],
+  PLANNER_VIEWER: ["PLANNER_VIEWER", "Planer pregled", "Planner viewer", "planer_viewer"],
+};
+
 /**
  * Assign role to user in Auth0 Roles sistem - koristi direktan HTTP poziv
+ * Za PLANNER_* prvo proba tačan naziv, pa alternativne (npr. "Planer operater") da ne forsira nazad na OPERATOR
  */
 export async function assignRoleToUser(auth0UserId: string, roleName: string): Promise<void> {
   if (!domain || !clientId || !clientSecret) {
@@ -220,30 +229,28 @@ export async function assignRoleToUser(auth0UserId: string, roleName: string): P
 
   try {
     const accessToken = await getManagementApiToken();
-    
-    // 1. Pronađi role ID po imenu (sa retry logikom)
-    const rolesUrl = `https://${domain}/api/v2/roles?name_filter=${encodeURIComponent(roleName)}`;
-    const rolesResponse = await fetchWithRetry(rolesUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+    const namesToTry = AUTH0_ROLE_NAME_ALTERNATIVES[roleName] ?? [roleName];
+
+    let roleId: string | null = null;
+    for (const name of namesToTry) {
+      const rolesUrl = `https://${domain}/api/v2/roles?name_filter=${encodeURIComponent(name)}`;
+      const rolesResponse = await fetchWithRetry(rolesUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (!rolesResponse.ok) continue;
+      const roles = await rolesResponse.json();
+      if (roles && roles.length > 0) {
+        roleId = roles[0].id;
+        break;
       }
-    });
-    
-    if (!rolesResponse.ok) {
-      const errorData = await rolesResponse.text();
-      if (rolesResponse.status === 429) {
-        throw new Error(`Rate limit reached. Molimo sačekajte nekoliko sekundi i pokušajte ponovo.`);
-      }
-      throw new Error(`Failed to get roles: ${rolesResponse.status} ${errorData}`);
     }
-    
-    const roles = await rolesResponse.json();
-    if (!roles || roles.length === 0) {
-      throw new Error(`Role '${roleName}' not found in Auth0`);
+
+    if (!roleId) {
+      throw new Error(`Role '${roleName}' nije pronađena u Auth0 (isprobani nazivi: ${namesToTry.join(", ")}). Kreirajte ulogu u Auth0 Dashboard-u sa jednim od tih naziva.`);
     }
-    
-    const roleId = roles[0].id;
     
     // 2. Ukloni sve postojeće role od korisnika (sa retry logikom)
     const currentRolesUrl = `https://${domain}/api/v2/users/${encodeURIComponent(auth0UserId)}/roles`;

@@ -60,11 +60,11 @@ export async function POST(request: NextRequest) {
     try {
       roles = await getUserRoles(userId);
     } catch (error) {
-      console.warn('[Sync Users] Could not fetch roles from Management API, using default OPERATOR');
-      roles = ['OPERATOR'];
+      console.warn('[Sync Users] Could not fetch roles from Management API, using default VIEWER');
+      roles = ['VIEWER'];
     }
 
-    const role = roles.length > 0 ? roles[0] : 'OPERATOR';
+    const role = roles.length > 0 ? roles[0] : 'VIEWER';
 
     // Create or update user in Prisma database
     const user = await prisma.user.upsert({

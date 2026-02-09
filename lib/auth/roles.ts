@@ -95,15 +95,11 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     PERMISSIONS.EXPORT_PLANNER_DELETE_ANY,
   ],
   PLANNER_OPERATOR: [
-    PERMISSIONS.CLAIMS_READ,
-    PERMISSIONS.INBOX_READ,
     PERMISSIONS.EXPORT_PLANNER_READ,
     PERMISSIONS.EXPORT_PLANNER_CREATE,
     PERMISSIONS.EXPORT_PLANNER_EDIT,
   ],
   PLANNER_VIEWER: [
-    PERMISSIONS.CLAIMS_READ,
-    PERMISSIONS.INBOX_READ,
     PERMISSIONS.EXPORT_PLANNER_READ,
   ],
   VIEWER: [
@@ -112,6 +108,24 @@ export const ROLE_PERMISSIONS: Record<Role, string[]> = {
     PERMISSIONS.EXPORT_PLANNER_READ,
   ],
 };
+
+/**
+ * Map Auth0 role names to our role constants (da ne gubimo PLANNER_* kada Auth0 vraća drugačiji naziv)
+ */
+const AUTH0_ROLE_ALIASES: Record<string, string> = {
+  "Planer operater": ROLES.PLANNER_OPERATOR,
+  "Planner operator": ROLES.PLANNER_OPERATOR,
+  "planer_operater": ROLES.PLANNER_OPERATOR,
+  "Planer pregled": ROLES.PLANNER_VIEWER,
+  "Planner viewer": ROLES.PLANNER_VIEWER,
+  "planer_viewer": ROLES.PLANNER_VIEWER,
+};
+
+export function normalizeAuth0Role(name: string): string {
+  const trimmed = (name || "").trim();
+  if (Object.values(ROLES).includes(trimmed as Role)) return trimmed;
+  return AUTH0_ROLE_ALIASES[trimmed] ?? trimmed;
+}
 
 /**
  * Check if a role has a specific permission
