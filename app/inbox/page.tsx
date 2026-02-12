@@ -1043,9 +1043,9 @@ function ThreadDetail({
               </div>
             )}
           </Card>
-          );
-          });
-        })()}
+        ));
+      }
+    })()}
       </div>
 
       {/* Preview Modal */}
