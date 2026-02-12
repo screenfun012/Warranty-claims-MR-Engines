@@ -18,6 +18,15 @@ export interface SyncResult {
   newClaims: number;
 }
 
+/** Izvlači email adresu iz From headera (npr. "Claims <claims@mrgroup.rs>" -> "claims@mrgroup.rs") */
+function extractEmailFromHeader(fromHeader: string | undefined): string | null {
+  if (!fromHeader || !fromHeader.trim()) return null;
+  const trimmed = fromHeader.trim();
+  const match = trimmed.match(/<([^>]+)>/);
+  if (match) return match[1].toLowerCase().trim();
+  return trimmed.toLowerCase().trim();
+}
+
 /**
  * Sync new emails from IMAP
  * Reads MailSyncState.lastUid, fetches new messages, creates threads/messages/attachments
@@ -96,6 +105,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
   let newThreadsCount = 0;
   let newClaimsCount = 0;
   let highestUid: string | null = null;
+  const skipReasons = { outbound: 0, duplicate: 0, deleted: 0, error: 0 };
 
   // Get email config to filter out outbound emails we sent
   const { getEmailConfig } = await import("@/lib/config/envLoader");
@@ -107,11 +117,13 @@ export async function syncNewEmails(): Promise<SyncResult> {
 
   for (const fetchedMsg of fetchedMessages) {
     try {
-      // Skip outbound emails that we sent ourselves (from our SMTP address)
-      // This prevents emails we send from appearing in the inbox
-      const fromEmail = fetchedMsg.headers.from?.toLowerCase().trim();
-      if (fromEmail && ourEmailAddresses.some(addr => fromEmail.includes(addr || ''))) {
-        console.log(`[Sync] Skipping outbound email we sent: ${fetchedMsg.headers.messageId || fetchedMsg.uid} (from: ${fetchedMsg.headers.from})`);
+      // Skip only emails we really sent: From must be exactly our address (claims@mrgroup.rs),
+      // not just "includes" – da ne preskočimo dolazne mailove gde se naša adresa negde pojavi
+      const fromExtracted = extractEmailFromHeader(fetchedMsg.headers.from);
+      const isOutbound = fromExtracted && ourEmailAddresses.some(addr => addr && fromExtracted === addr.toLowerCase().trim());
+      if (isOutbound) {
+        skipReasons.outbound++;
+        console.log(`[Sync] Skip (outbound): UID ${fetchedMsg.uid} from=${fetchedMsg.headers.from} messageId=${fetchedMsg.headers.messageId || "(none)"}`);
         // Still track UID for progress
         const uidNum = parseInt(fetchedMsg.uid, 10);
         if (!highestUid || uidNum > parseInt(highestUid, 10)) {
@@ -137,8 +149,8 @@ export async function syncNewEmails(): Promise<SyncResult> {
         });
 
         if (existingMessage) {
-          // Skip duplicate message, but still track UID
-          console.log(`Skipping duplicate message: ${fetchedMsg.headers.messageId}`);
+          skipReasons.duplicate++;
+          console.log(`[Sync] Skip (duplicate): UID ${fetchedMsg.uid} messageId=${fetchedMsg.headers.messageId}`);
           continue;
         }
         
@@ -152,8 +164,8 @@ export async function syncNewEmails(): Promise<SyncResult> {
           });
 
           if (deletedMessage) {
-            // Skip message that was previously deleted - don't recreate it!
-            console.log(`Skipping previously deleted message: ${fetchedMsg.headers.messageId} (deleted at ${deletedMessage.deletedAt})`);
+            skipReasons.deleted++;
+            console.log(`[Sync] Skip (deleted): UID ${fetchedMsg.uid} messageId=${fetchedMsg.headers.messageId} deletedAt=${deletedMessage.deletedAt}`);
             continue;
           }
         } catch (deletedCheckError: any) {
@@ -334,7 +346,8 @@ export async function syncNewEmails(): Promise<SyncResult> {
       // Detect forwarded emails and update thread
       await detectForwardedEmail(thread, fetchedMsg, prisma);
     } catch (error) {
-      console.error(`Error processing message UID ${fetchedMsg.uid}:`, error);
+      skipReasons.error++;
+      console.error(`[Sync] Error processing message UID ${fetchedMsg.uid} (from=${fetchedMsg.headers.from} subject=${fetchedMsg.headers.subject?.slice(0, 50)}):`, error);
       // Continue with next message
     }
   }
@@ -357,8 +370,12 @@ export async function syncNewEmails(): Promise<SyncResult> {
     newClaims: newClaimsCount,
     highestUid,
     totalFetched: fetchedMessages.length,
+    skipped: skipReasons,
     duration: `${syncDuration}ms`,
   });
+  if (fetchedMessages.length > 0 && newMessagesCount === 0 && (skipReasons.outbound + skipReasons.duplicate + skipReasons.deleted + skipReasons.error) > 0) {
+    console.log(`[Sync] All ${fetchedMessages.length} messages were skipped. Reasons: outbound=${skipReasons.outbound} duplicate=${skipReasons.duplicate} deleted=${skipReasons.deleted} error=${skipReasons.error}`);
+  }
 
   // If new messages were synced, we can't dispatch to window from server-side
   // But the frontend polling will pick it up quickly (1-2 seconds)
