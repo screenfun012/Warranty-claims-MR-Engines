@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2, Search } from "lucide-react";
+import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2, Search, Reply } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -490,13 +490,15 @@ function ThreadDetail({
 
   const sortedMessages = useMemo(() => {
     if (!fullThread?.messages?.length) return [];
-    return [...fullThread.messages]
-      .filter((m, i, arr) => {
-        if (!m.messageId) return true;
-        const firstIdx = arr.findIndex((x) => x.messageId === m.messageId);
-        return firstIdx === i;
-      })
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const list = [...fullThread.messages];
+    const seen = new Set<string>();
+    const deduped = list.filter((m) => {
+      const key = m.messageId ?? `${m.date}-${m.from}-${m.subject}-${(m.bodyText ?? "").slice(0, 300)}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return deduped.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [fullThread?.id, fullThread?.messages]);
 
   const fetchFullThread = useCallback(async () => {
@@ -783,40 +785,63 @@ function ThreadDetail({
 
       </Card>
 
-      <div className="space-y-4">
-        {sortedMessages.map((message, index) => (
-          <Card 
-            key={message.id} 
-            className={`p-4 hover:shadow-md transition-all ${
-              index === sortedMessages.length - 1 && !fullThread.viewedAt
-                ? "bg-primary/5 border-l-2 border-l-primary animate-in fade-in slide-in-from-left-2"
-                : ""
-            }`}
-          >
-            <div className="flex justify-between items-start gap-4 mb-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-sm font-semibold">
-                    {index + 1}
-                  </span>
-                  <strong className="truncate">{message.from}</strong>
+      <div className="space-y-3">
+        {sortedMessages.map((message, index) => {
+          const isReply = index > 0;
+          const isLatest = index === sortedMessages.length - 1 && !fullThread.viewedAt;
+          return (
+            <div
+              key={message.id}
+              className={isReply ? "relative pl-5 ml-1 border-l-2 border-border/60" : ""}
+            >
+              {isReply && (
+                <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1.5">
+                  <Reply className="h-3.5 w-3.5" />
+                  <span>{t("inbox.reply")}</span>
                 </div>
-                {message.to && (
-                  <div className="text-sm text-muted-foreground">
-                    <strong>{t("inbox.to")}:</strong> {message.to}
+              )}
+              <Card
+                className={
+                  isReply
+                    ? `p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all ${isLatest ? "ring-1 ring-primary/20" : ""}`
+                    : `p-4 hover:shadow-md transition-all ${isLatest ? "bg-primary/5 border-l-2 border-l-primary animate-in fade-in slide-in-from-left-2" : ""}`
+                }
+              >
+                <div className={`flex justify-between items-start gap-4 ${isReply ? "gap-2 mb-1.5" : "mb-2"}`}>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-sm font-semibold">
+                        {index + 1}
+                      </span>
+                      <strong className={isReply ? "text-sm truncate" : "truncate"}>{message.from}</strong>
+                      {isReply && (
+                        <span className="text-muted-foreground text-xs shrink-0">
+                          {new Date(message.date).toLocaleString("sr-RS", { dateStyle: "short", timeStyle: "short" })}
+                        </span>
+                      )}
+                    </div>
+                    {!isReply && (
+                      <>
+                        {message.to && (
+                          <div className="text-sm text-muted-foreground">
+                            <strong>{t("inbox.to")}:</strong> {message.to}
+                          </div>
+                        )}
+                        {message.cc && (
+                          <div className="text-sm text-muted-foreground">
+                            <strong>{t("inbox.cc")}:</strong> {message.cc}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
-                {message.cc && (
-                  <div className="text-sm text-muted-foreground">
-                    <strong>{t("inbox.cc")}:</strong> {message.cc}
-                  </div>
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground shrink-0">
-                {new Date(message.date).toLocaleString("sr-RS", { dateStyle: "short", timeStyle: "short" })}
-              </div>
-            </div>
-            <div className="mt-2 overflow-hidden">
+                  {!isReply && (
+                    <div className="text-sm text-muted-foreground shrink-0">
+                      {new Date(message.date).toLocaleString("sr-RS", { dateStyle: "short", timeStyle: "short" })}
+                    </div>
+                  )}
+                </div>
+                <div className={isReply ? "mt-1.5 overflow-hidden text-sm" : "mt-2 overflow-hidden"}>
               {message.bodyHtml ? (
                 <div 
                   dangerouslySetInnerHTML={{ __html: message.bodyHtml }} 
@@ -1047,7 +1072,9 @@ function ThreadDetail({
               </div>
             )}
           </Card>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       {/* Preview Modal */}

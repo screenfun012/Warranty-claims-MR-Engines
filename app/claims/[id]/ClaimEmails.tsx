@@ -13,6 +13,7 @@ import { Paperclip, FileText, Image as ImageIcon, Mail, Check } from "lucide-rea
 import { FileViewerModal } from "@/components/file-viewer-modal";
 import { cn } from "@/lib/utils";
 import { getCleanEmailBody } from "@/lib/email/emailBodyCleaner";
+import { extractCleanBody } from "@/lib/email/emailThreadingUtils";
 
 interface ClaimEmailsProps {
   claim: any;
@@ -375,10 +376,10 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
 
                     <div className="text-sm whitespace-pre-wrap break-words bg-background/50 p-3 rounded border">
                       {(() => {
-                        const cleanText = getCleanEmailBody({
-                          bodyText: message.bodyText,
-                          bodyHtml: message.bodyHtml,
-                        });
+                        const cleanText = extractCleanBody(
+                          message.bodyText || '',
+                          message.bodyHtml
+                        );
                         return cleanText || t("claims.emails.noText");
                       })()}
                     </div>

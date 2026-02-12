@@ -11,6 +11,14 @@ import {
   saveAttachmentForUnassignedThread,
   saveAttachmentForClaim,
 } from "@/lib/files/fileStorage";
+import {
+  cleanSubject,
+  extractCleanBody,
+  isClaimEmail,
+  isSentDirectlyToClaim,
+  isForwardedEmail,
+  extractOriginalSenderFromForward,
+} from "./emailThreadingUtils";
 
 export interface SyncResult {
   newMessages: number;
@@ -107,39 +115,32 @@ export async function syncNewEmails(): Promise<SyncResult> {
         highestUid = fetchedMsg.uid;
       }
 
-      // Find or create email thread
-      const threadBefore = await prisma.emailThread.findFirst({
-        where: {
-          OR: [
-            { subjectOriginal: fetchedMsg.headers.subject },
-            {
-              messages: {
-                some: {
-                  OR: [
-                    { messageId: fetchedMsg.headers.messageId },
-                    fetchedMsg.headers.inReplyTo ? { messageId: fetchedMsg.headers.inReplyTo } : {},
-                  ],
-                },
-              },
-            },
-          ],
-        },
-      });
+      // Get claims email
+      const { getEmailConfig } = await import("@/lib/config/envLoader");
+      const emailConfig = getEmailConfig();
+      const claimsEmail = (emailConfig.imapUserEmail || emailConfig.smtpUserEmail || "").toLowerCase();
 
-      let thread = await findOrCreateThread(fetchedMsg, prisma);
-      const isNewThread = !threadBefore;
-      
-      if (isNewThread) {
-        newThreadsCount++;
-        console.log(`New thread created: ${thread.id} - ${fetchedMsg.headers.subject}`);
+      // Check relevance
+      const isRelevant = isClaimEmail(fetchedMsg.headers.to, fetchedMsg.headers.cc, claimsEmail);
+      if (!isRelevant) {
+        console.log(`[MailSync] Skipping irrelevant: ${fetchedMsg.headers.subject}`);
+        continue;
       }
 
-      // Ista poruka u istom thread-u = samo jedan red u bazi (ne skrivamo mail, samo ne dupliramo red)
-      if (fetchedMsg.headers.messageId) {
-        const alreadyInThread = await prisma.emailMessage.findFirst({
-          where: { emailThreadId: thread.id, messageId: fetchedMsg.headers.messageId },
-        });
-        if (alreadyInThread) continue;
+      // Find/create thread
+      const thread = await findOrCreateThreadWithMessageId(fetchedMsg, prisma, claimsEmail);
+
+      // Check duplicate
+      const isDuplicate = await checkIfMessageExists(
+        thread.id,
+        fetchedMsg.headers.messageId,
+        fetchedMsg.headers.date,
+        fetchedMsg.headers.from,
+        prisma
+      );
+      if (isDuplicate) {
+        console.log(`[MailSync] Duplicate skipped: ${fetchedMsg.headers.messageId}`);
+        continue;
       }
 
       // Create email message – svi mailovi iz inboxa se upisuju, korisnik odlučuje šta da briše
@@ -151,7 +152,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
           to: fetchedMsg.headers.to,
           cc: fetchedMsg.headers.cc,
           subject: fetchedMsg.headers.subject,
-          bodyText: fetchedMsg.bodyText,
+          bodyText: extractCleanBody(fetchedMsg.bodyText || '', fetchedMsg.bodyHtml),
           bodyHtml: fetchedMsg.bodyHtml,
           messageId: fetchedMsg.headers.messageId,
           inReplyTo: fetchedMsg.headers.inReplyTo,
@@ -325,67 +326,84 @@ export async function syncNewEmails(): Promise<SyncResult> {
 }
 
 /**
- * Find or create an email thread based on message headers
+ * Find or create thread using Message-ID and References
  */
-async function findOrCreateThread(fetchedMsg: FetchedMessage, prisma: Awaited<ReturnType<typeof getPrisma>>) {
-  // Try to find existing thread by messageId or inReplyTo
-  let thread = null;
+async function findOrCreateThreadWithMessageId(
+  fetchedMsg: FetchedMessage,
+  prisma: Awaited<ReturnType<typeof getPrisma>>,
+  claimsEmail: string
+) {
+  // 1. Try InReplyTo
+  if (fetchedMsg.headers.inReplyTo) {
+    const thread = await prisma.emailThread.findFirst({
+      where: { messages: { some: { messageId: fetchedMsg.headers.inReplyTo } } },
+    });
+    if (thread) {
+      console.log(`[MailSync] Found thread via InReplyTo: ${thread.id}`);
+      return thread;
+    }
+  }
 
+  // 2. Try MessageId
   if (fetchedMsg.headers.messageId) {
-    thread = await prisma.emailThread.findFirst({
+    const thread = await prisma.emailThread.findFirst({
       where: {
-        OR: [
-          { subjectOriginal: fetchedMsg.headers.subject },
-          {
-            messages: {
-              some: {
-                OR: [
-                  { messageId: fetchedMsg.headers.messageId },
-                  { messageId: fetchedMsg.headers.inReplyTo },
-                ],
-              },
-            },
+        messages: {
+          some: {
+            OR: [
+              { messageId: fetchedMsg.headers.messageId },
+              ...(fetchedMsg.headers.inReplyTo ? [{ messageId: fetchedMsg.headers.inReplyTo }] : []),
+            ],
           },
-        ],
+        },
       },
     });
+    if (thread) {
+      console.log(`[MailSync] Found thread via MessageId: ${thread.id}`);
+      return thread;
+    }
   }
 
-  // If not found, try by subject (for same conversation)
-  if (!thread) {
-    thread = await prisma.emailThread.findFirst({
-      where: {
-        subjectOriginal: fetchedMsg.headers.subject,
-      },
-    });
+  // 3. Fallback: subject
+  const thread = await prisma.emailThread.findFirst({
+    where: { subjectOriginal: fetchedMsg.headers.subject },
+  });
+  if (thread) {
+    console.log(`[MailSync] Found thread via subject: ${thread.id}`);
+    return thread;
   }
 
-  const { getEmailConfig } = await import("@/lib/config/envLoader");
-  const emailConfig = getEmailConfig();
-  const claimsAddress = (emailConfig.imapUserEmail || emailConfig.smtpUserEmail || "").toLowerCase().trim();
-  const toHeader = (fetchedMsg.headers.to || "").toLowerCase();
-  const sentDirectlyToClaims = claimsAddress && toHeader.includes(claimsAddress);
+  // 4. Create new
+  const isSentDirectly = isSentDirectlyToClaim(fetchedMsg.headers.to, claimsEmail);
+  return await prisma.emailThread.create({
+    data: {
+      subjectOriginal: fetchedMsg.headers.subject,
+      originalSender: fetchedMsg.headers.from,
+      threadStatus: isSentDirectly ? "NEW_CLAIM" : "HAS_REPLIES",
+    },
+  });
+}
 
-  // Create new thread if not found
-  if (!thread) {
-    const subject = fetchedMsg.headers.subject || "(No Subject)";
-    // Reklamacija = samo kada je mail poslat direktno na claims (To:), ne kada je u CC
-    const threadStatus = sentDirectlyToClaims ? "NEW_CLAIM" : "HAS_REPLIES";
-    thread = await prisma.emailThread.create({
-      data: {
-        subjectOriginal: subject,
-        originalSender: fetchedMsg.headers.from,
-        threadStatus,
-      },
+/**
+ * Check if message already exists
+ */
+async function checkIfMessageExists(
+  threadId: string,
+  messageId: string | undefined,
+  date: Date,
+  from: string,
+  prisma: Awaited<ReturnType<typeof getPrisma>>
+): Promise<boolean> {
+  if (messageId) {
+    const exists = await prisma.emailMessage.findFirst({
+      where: { emailThreadId: threadId, messageId },
     });
-  } else {
-    await prisma.emailThread.update({
-      where: { id: thread.id },
-      data: { threadStatus: "HAS_REPLIES", updatedAt: new Date() },
-    });
+    if (exists) return true;
   }
-
-  return thread;
+  const exists = await prisma.emailMessage.findFirst({
+    where: { emailThreadId: threadId, date, from },
+  });
+  return !!exists;
 }
 
 /**

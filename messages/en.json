@@ -158,7 +158,9 @@
     "deleteThreadWarning": "WARNING: This thread is linked to claim {claimCode}. Deleting this thread will PERMANENTLY delete:\n\n• The email and all attachments\n• The linked claim and all its data\n• All files from Synology/NAS server\n\nThis action is IRREVERSIBLE. Are you sure?",
     "deletePermanently": "Delete permanently",
     "markAsRead": "Mark as read",
-    "markAsUnread": "Mark as unread"
+    "markAsUnread": "Mark as unread",
+    "reply": "Reply",
+    "originalMessage": "Original message"
   },
   "claims": {
     "title": "Claims",

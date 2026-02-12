@@ -156,7 +156,9 @@
     "deleteThreadWarning": "UPOZORENJE: Ova poruka je povezana sa reklamacijom {claimCode}. Brisanjem ove poruke će se TRAJNO obrisati:\n\n• Email poruka i svi prilozi\n• Povezana reklamacija i svi njeni podaci\n• Svi fajlovi sa Synology/NAS servera\n\nOva akcija je NEPOVRATNA. Da li ste sigurni?",
     "deletePermanently": "Obriši trajno",
     "markAsRead": "Označi kao pročitano",
-    "markAsUnread": "Označi kao nepročitano"
+    "markAsUnread": "Označi kao nepročitano",
+    "reply": "Odgovor",
+    "originalMessage": "Prva poruka"
   },
   "claims": {
     "title": "Reklamacije",
