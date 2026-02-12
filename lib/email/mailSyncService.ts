@@ -18,15 +18,6 @@ export interface SyncResult {
   newClaims: number;
 }
 
-/** Izvlači email adresu iz From headera (npr. "Claims <claims@mrgroup.rs>" -> "claims@mrgroup.rs") */
-function extractEmailFromHeader(fromHeader: string | undefined): string | null {
-  if (!fromHeader || !fromHeader.trim()) return null;
-  const trimmed = fromHeader.trim();
-  const match = trimmed.match(/<([^>]+)>/);
-  if (match) return match[1].toLowerCase().trim();
-  return trimmed.toLowerCase().trim();
-}
-
 /**
  * Sync new emails from IMAP
  * Reads MailSyncState.lastUid, fetches new messages, creates threads/messages/attachments
@@ -105,80 +96,15 @@ export async function syncNewEmails(): Promise<SyncResult> {
   let newThreadsCount = 0;
   let newClaimsCount = 0;
   let highestUid: string | null = null;
-  const skipReasons = { outbound: 0, duplicate: 0, deleted: 0, error: 0 };
+  const skipReasons = { error: 0 };
 
-  // Get email config to filter out outbound emails we sent
-  const { getEmailConfig } = await import("@/lib/config/envLoader");
-  const emailConfig = getEmailConfig();
-  const ourEmailAddresses = [
-    emailConfig.smtpUserEmail?.toLowerCase().trim(),
-    emailConfig.imapUserEmail?.toLowerCase().trim(),
-  ].filter(Boolean);
+  // Svi mailovi iz inboxa se prikazuju – korisnik odlučuje šta da briše. Ne preskačemo outbound, duplicate ni deleted.
 
   for (const fetchedMsg of fetchedMessages) {
     try {
-      // Skip only emails we really sent: From must be exactly our address (claims@mrgroup.rs),
-      // not just "includes" – da ne preskočimo dolazne mailove gde se naša adresa negde pojavi
-      const fromExtracted = extractEmailFromHeader(fetchedMsg.headers.from);
-      const isOutbound = fromExtracted && ourEmailAddresses.some(addr => addr && fromExtracted === addr.toLowerCase().trim());
-      if (isOutbound) {
-        skipReasons.outbound++;
-        console.log(`[Sync] Skip (outbound): UID ${fetchedMsg.uid} from=${fetchedMsg.headers.from} messageId=${fetchedMsg.headers.messageId || "(none)"}`);
-        // Still track UID for progress
-        const uidNum = parseInt(fetchedMsg.uid, 10);
-        if (!highestUid || uidNum > parseInt(highestUid, 10)) {
-          highestUid = fetchedMsg.uid;
-        }
-        continue;
-      }
-
-      // Update highest UID (always track highest, even if message is duplicate)
       const uidNum = parseInt(fetchedMsg.uid, 10);
       if (!highestUid || uidNum > parseInt(highestUid, 10)) {
         highestUid = fetchedMsg.uid;
-      }
-
-      // Check if message already exists (by messageId) BEFORE creating thread
-      let isNewMessage = true;
-      if (fetchedMsg.headers.messageId) {
-        // First check if message is in the database
-        const existingMessage = await prisma.emailMessage.findFirst({
-          where: {
-            messageId: fetchedMsg.headers.messageId,
-          },
-        });
-
-        if (existingMessage) {
-          skipReasons.duplicate++;
-          console.log(`[Sync] Skip (duplicate): UID ${fetchedMsg.uid} messageId=${fetchedMsg.headers.messageId}`);
-          continue;
-        }
-        
-        // CRITICAL: Check if message was previously deleted (to prevent recreating deleted emails)
-        // Wrap in try-catch in case DeletedEmailMessage table doesn't exist yet (migration not applied)
-        try {
-          const deletedMessage = await prisma.deletedEmailMessage.findUnique({
-            where: {
-              messageId: fetchedMsg.headers.messageId,
-            },
-          });
-
-          if (deletedMessage) {
-            skipReasons.deleted++;
-            console.log(`[Sync] Skip (deleted): UID ${fetchedMsg.uid} messageId=${fetchedMsg.headers.messageId} deletedAt=${deletedMessage.deletedAt}`);
-            continue;
-          }
-        } catch (deletedCheckError: any) {
-          // If DeletedEmailMessage table doesn't exist yet, just log and continue
-          // This happens if migration hasn't been applied to production yet
-          if (deletedCheckError?.code === 'P2021' || deletedCheckError?.code === 'SQLITE_UNKNOWN' || 
-              deletedCheckError?.message?.includes('no such table')) {
-            console.warn(`[Sync] DeletedEmailMessage table not found, skipping deleted message check (migration may not be applied yet)`);
-          } else {
-            // Re-throw if it's a different error
-            throw deletedCheckError;
-          }
-        }
       }
 
       // Find or create email thread
@@ -208,7 +134,15 @@ export async function syncNewEmails(): Promise<SyncResult> {
         console.log(`New thread created: ${thread.id} - ${fetchedMsg.headers.subject}`);
       }
 
-      // Create email message
+      // Ista poruka u istom thread-u = samo jedan red u bazi (ne skrivamo mail, samo ne dupliramo red)
+      if (fetchedMsg.headers.messageId) {
+        const alreadyInThread = await prisma.emailMessage.findFirst({
+          where: { emailThreadId: thread.id, messageId: fetchedMsg.headers.messageId },
+        });
+        if (alreadyInThread) continue;
+      }
+
+      // Create email message – svi mailovi iz inboxa se upisuju, korisnik odlučuje šta da briše
       const emailMessage = await prisma.emailMessage.create({
         data: {
           emailThreadId: thread.id,
@@ -370,11 +304,11 @@ export async function syncNewEmails(): Promise<SyncResult> {
     newClaims: newClaimsCount,
     highestUid,
     totalFetched: fetchedMessages.length,
-    skipped: skipReasons,
+    errors: skipReasons.error,
     duration: `${syncDuration}ms`,
   });
-  if (fetchedMessages.length > 0 && newMessagesCount === 0 && (skipReasons.outbound + skipReasons.duplicate + skipReasons.deleted + skipReasons.error) > 0) {
-    console.log(`[Sync] All ${fetchedMessages.length} messages were skipped. Reasons: outbound=${skipReasons.outbound} duplicate=${skipReasons.duplicate} deleted=${skipReasons.deleted} error=${skipReasons.error}`);
+  if (skipReasons.error > 0) {
+    console.log(`[Sync] ${skipReasons.error} message(s) failed to process (see errors above).`);
   }
 
   // If new messages were synced, we can't dispatch to window from server-side
