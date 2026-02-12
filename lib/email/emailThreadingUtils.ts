@@ -164,8 +164,8 @@ export function extractCleanBody(bodyText: string, bodyHtml?: string): string {
  */
 function stripHtmlTags(html: string): string {
   return html
-    .replace(/<style[^>]*>.*?<\/style>/gis, '')
-    .replace(/<script[^>]*>.*?<\/script>/gis, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n\n')
     .replace(/<\/div>/gi, '\n')
@@ -209,7 +209,7 @@ export function isSentDirectlyToClaim(
   claimEmailAddress: string
 ): boolean {
   const normalized = claimEmailAddress.toLowerCase().trim();
-  return to && to.toLowerCase().includes(normalized);
+  return !!(to && to.toLowerCase().includes(normalized));
 }
 
 /**
