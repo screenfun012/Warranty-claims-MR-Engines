@@ -785,32 +785,45 @@ function ThreadDetail({
 
       </Card>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {sortedMessages.map((message, index) => {
           const isReply = index > 0;
           const isLatest = index === sortedMessages.length - 1 && !fullThread.viewedAt;
           return (
             <div
               key={message.id}
-              className={isReply ? "relative pl-5 ml-1 border-l-2 border-border/60" : ""}
+              className={
+                isReply
+                  ? "relative pl-5 ml-0 border-l-4 border-l-blue-500/70 dark:border-l-blue-400/60"
+                  : "relative pl-5 ml-0 border-l-4 border-l-primary"
+              }
             >
-              {isReply && (
-                <div className="flex items-center gap-2 text-muted-foreground text-xs font-medium mb-1.5">
-                  <Reply className="h-3.5 w-3.5" />
+              {isReply ? (
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 text-xs font-semibold mb-1.5">
+                  <Reply className="h-3.5 w-3.5 shrink-0" />
                   <span>{t("inbox.reply")}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-primary text-xs font-semibold mb-1.5">
+                  <Mail className="h-3.5 w-3.5 shrink-0" />
+                  <span>{t("inbox.originalMessage")}</span>
                 </div>
               )}
               <Card
                 className={
                   isReply
-                    ? `p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all ${isLatest ? "ring-1 ring-primary/20" : ""}`
-                    : `p-4 hover:shadow-md transition-all ${isLatest ? "bg-primary/5 border-l-2 border-l-primary animate-in fade-in slide-in-from-left-2" : ""}`
+                    ? `p-3 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50 dark:hover:bg-blue-950/30 transition-all border border-blue-200/50 dark:border-blue-800/30 ${isLatest ? "ring-1 ring-blue-400/30 dark:ring-blue-500/20" : ""}`
+                    : `p-4 hover:shadow-md transition-all bg-background border border-primary/20 ${isLatest ? "bg-primary/5 ring-1 ring-primary/20 animate-in fade-in slide-in-from-left-2" : ""}`
                 }
               >
                 <div className={`flex justify-between items-start gap-4 ${isReply ? "gap-2 mb-1.5" : "mb-2"}`}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-sm font-semibold">
+                      <span
+                        className={`shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-semibold ${
+                          isReply ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300" : "bg-primary/15 text-primary"
+                        }`}
+                      >
                         {index + 1}
                       </span>
                       <strong className={isReply ? "text-sm truncate" : "truncate"}>{message.from}</strong>
