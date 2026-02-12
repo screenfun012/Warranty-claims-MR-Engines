@@ -55,6 +55,7 @@ interface EmailThread {
   } | null;
   messages: Array<{
     id: string;
+    messageId?: string | null;
     date: string;
     from: string;
     to: string;
@@ -487,6 +488,17 @@ function ThreadDetail({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const sortedMessages = useMemo(() => {
+    if (!fullThread?.messages?.length) return [];
+    return [...fullThread.messages]
+      .filter((m, i, arr) => {
+        if (!m.messageId) return true;
+        const firstIdx = arr.findIndex((x) => x.messageId === m.messageId);
+        return firstIdx === i;
+      })
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  }, [fullThread?.id, fullThread?.messages]);
+
   const fetchFullThread = useCallback(async () => {
     setLoading(true);
     try {
@@ -772,19 +784,11 @@ function ThreadDetail({
       </Card>
 
       <div className="space-y-4">
-        {(() => {
-          const sorted = [...fullThread.messages]
-            .filter((m, i, arr) => {
-              if (!m.messageId) return true;
-              const firstIdx = arr.findIndex((x) => x.messageId === m.messageId);
-              return firstIdx === i;
-            })
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-          return sorted.map((message, index) => (
+        {sortedMessages.map((message, index) => (
           <Card 
             key={message.id} 
             className={`p-4 hover:shadow-md transition-all ${
-              index === sorted.length - 1 && !fullThread.viewedAt
+              index === sortedMessages.length - 1 && !fullThread.viewedAt
                 ? "bg-primary/5 border-l-2 border-l-primary animate-in fade-in slide-in-from-left-2"
                 : ""
             }`}
@@ -1043,9 +1047,7 @@ function ThreadDetail({
               </div>
             )}
           </Card>
-        ));
-      }
-    })()}
+        ))}
       </div>
 
       {/* Preview Modal */}
