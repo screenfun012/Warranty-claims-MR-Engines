@@ -360,15 +360,21 @@ async function findOrCreateThread(fetchedMsg: FetchedMessage, prisma: Awaited<Re
     });
   }
 
-  // Create new thread if not found
+  // Create new thread if not found (prvi mail = reklamacija)
   if (!thread) {
-    // subjectOriginal is required - use fallback if subject is missing
     const subject = fetchedMsg.headers.subject || "(No Subject)";
     thread = await prisma.emailThread.create({
       data: {
         subjectOriginal: subject,
         originalSender: fetchedMsg.headers.from,
+        threadStatus: "NEW_CLAIM",
       },
+    });
+  } else {
+    // Nova poruka u postojećem thread-u = dopisivanje
+    await prisma.emailThread.update({
+      where: { id: thread.id },
+      data: { threadStatus: "HAS_REPLIES", updatedAt: new Date() },
     });
   }
 

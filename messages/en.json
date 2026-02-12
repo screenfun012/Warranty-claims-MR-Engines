@@ -111,6 +111,8 @@
     "subject": "Subject",
     "received": "Received",
     "claim": "Linked Claim",
+    "reklamacija": "Claim",
+    "dopisivanje": "Replies",
     "unassigned": "Unassigned",
     "noThreads": "No email threads found",
     "noThreadsMatchingSearch": "No email threads found matching your search",

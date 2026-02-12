@@ -111,6 +111,8 @@
     "subject": "Naslov",
     "received": "Primljeno",
     "claim": "Reklamacija",
+    "reklamacija": "Reklamacija",
+    "dopisivanje": "Dopisivanje",
     "unassigned": "Nedodeljeno",
     "noThreads": "Nema poruka",
     "noThreadsMatchingSearch": "Nema poruka koje odgovaraju pretrazi",

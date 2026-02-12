@@ -32,13 +32,19 @@ export async function GET() {
           },
           take: 1,
         },
+        _count: { select: { messages: true } },
       },
       orderBy: {
         updatedAt: "desc",
       },
     });
 
-    return NextResponse.json({ threads });
+    const threadsForResponse = threads.map(({ _count, ...t }) => ({
+      ...t,
+      threadStatus: t.threadStatus ?? "NEW_CLAIM",
+      messageCount: _count?.messages ?? 0,
+    }));
+    return NextResponse.json({ threads: threadsForResponse });
   } catch (error) {
     console.error("Error fetching inbox:", error);
     const permError = createPermissionError(error);

@@ -47,6 +47,8 @@ interface EmailThread {
   forwardedBy: string | null;
   claimId: string | null;
   viewedAt: string | null;
+  threadStatus?: string;   // NEW_CLAIM | HAS_REPLIES
+  messageCount?: number;
   claim: {
     id: string;
     claimCodeRaw: string | null;
@@ -344,10 +346,20 @@ export default function InboxPage() {
                     </span>
                   ),
                   subject: (
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
                       <span className={isUnread ? "font-bold truncate" : "truncate"}>
                         {thread.subjectOriginal}
                       </span>
+                      {thread.threadStatus === "HAS_REPLIES" && (
+                        <Badge variant="secondary" className="shrink-0 text-xs">
+                          {t("inbox.dopisivanje")}{thread.messageCount != null ? ` (${thread.messageCount})` : ""}
+                        </Badge>
+                      )}
+                      {thread.threadStatus === "NEW_CLAIM" && (
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          {t("inbox.reklamacija")}
+                        </Badge>
+                      )}
                       {showNewBadge && (
                         <Badge variant="destructive" className="shrink-0 animate-pulse">
                           {t("claims.status.NEW")}
