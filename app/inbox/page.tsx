@@ -772,33 +772,44 @@ function ThreadDetail({
       </Card>
 
       <div className="space-y-4">
-        {fullThread.messages.map((message, index) => (
+        {(() => {
+          const sorted = [...fullThread.messages]
+            .filter((m, i, arr) => {
+              if (!m.messageId) return true;
+              const firstIdx = arr.findIndex((x) => x.messageId === m.messageId);
+              return firstIdx === i;
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+          return sorted.map((message, index) => (
           <Card 
             key={message.id} 
             className={`p-4 hover:shadow-md transition-all ${
-              index === fullThread.messages.length - 1 && !fullThread.viewedAt
+              index === sorted.length - 1 && !fullThread.viewedAt
                 ? "bg-primary/5 border-l-2 border-l-primary animate-in fade-in slide-in-from-left-2"
                 : ""
             }`}
           >
-            <div className="flex justify-between mb-2">
-              <div>
-                <strong>{t("inbox.from")}:</strong> {message.from}
+            <div className="flex justify-between items-start gap-4 mb-2">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-full bg-muted text-sm font-semibold">
+                    {index + 1}
+                  </span>
+                  <strong className="truncate">{message.from}</strong>
+                </div>
                 {message.to && (
-                  <>
-                    <br />
+                  <div className="text-sm text-muted-foreground">
                     <strong>{t("inbox.to")}:</strong> {message.to}
-                  </>
+                  </div>
                 )}
                 {message.cc && (
-                  <>
-                    <br />
+                  <div className="text-sm text-muted-foreground">
                     <strong>{t("inbox.cc")}:</strong> {message.cc}
-                  </>
+                  </div>
                 )}
               </div>
-              <div className="text-sm text-muted-foreground">
-                {new Date(message.date).toLocaleString()}
+              <div className="text-sm text-muted-foreground shrink-0">
+                {new Date(message.date).toLocaleString("sr-RS", { dateStyle: "short", timeStyle: "short" })}
               </div>
             </div>
             <div className="mt-2 overflow-hidden">
@@ -1032,7 +1043,9 @@ function ThreadDetail({
               </div>
             )}
           </Card>
-        ))}
+          );
+          });
+        })()}
       </div>
 
       {/* Preview Modal */}

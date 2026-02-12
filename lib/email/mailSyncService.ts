@@ -360,18 +360,25 @@ async function findOrCreateThread(fetchedMsg: FetchedMessage, prisma: Awaited<Re
     });
   }
 
-  // Create new thread if not found (prvi mail = reklamacija)
+  const { getEmailConfig } = await import("@/lib/config/envLoader");
+  const emailConfig = getEmailConfig();
+  const claimsAddress = (emailConfig.imapUserEmail || emailConfig.smtpUserEmail || "").toLowerCase().trim();
+  const toHeader = (fetchedMsg.headers.to || "").toLowerCase();
+  const sentDirectlyToClaims = claimsAddress && toHeader.includes(claimsAddress);
+
+  // Create new thread if not found
   if (!thread) {
     const subject = fetchedMsg.headers.subject || "(No Subject)";
+    // Reklamacija = samo kada je mail poslat direktno na claims (To:), ne kada je u CC
+    const threadStatus = sentDirectlyToClaims ? "NEW_CLAIM" : "HAS_REPLIES";
     thread = await prisma.emailThread.create({
       data: {
         subjectOriginal: subject,
         originalSender: fetchedMsg.headers.from,
-        threadStatus: "NEW_CLAIM",
+        threadStatus,
       },
     });
   } else {
-    // Nova poruka u postojećem thread-u = dopisivanje
     await prisma.emailThread.update({
       where: { id: thread.id },
       data: { threadStatus: "HAS_REPLIES", updatedAt: new Date() },
