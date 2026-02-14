@@ -1,6 +1,6 @@
 "use client";
 
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -210,6 +210,9 @@ export function FileViewerModal({
         <DialogTitle className="sr-only">
           {currentFile.fileName || `File ${currentIndex + 1}`}
         </DialogTitle>
+        <DialogDescription className="sr-only">
+          File viewer for {currentFile.fileName || "attachment"}.
+        </DialogDescription>
         <div className="relative w-full h-full flex flex-col bg-background rounded-lg overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b bg-background">
@@ -303,15 +306,15 @@ export function FileViewerModal({
             </div>
           </div>
 
-          {/* Content */}
+          {/* Content - flex-1 min-h-0 flex flex-col so PDF/video use full height */}
           <div 
             ref={containerRef}
-            className="flex-1 overflow-hidden flex items-center justify-center bg-gray-900/95 dark:bg-black/95 relative"
+            className="flex-1 min-h-0 overflow-hidden flex flex-col items-stretch bg-gray-900/95 dark:bg-black/95 relative"
             onWheel={handleWheel}
           >
             {isImage(currentFile.mimeType) ? (
               <div
-                className={`w-full h-full flex items-center justify-center overflow-hidden ${zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"}`}
+                className={`flex-1 min-h-0 w-full flex items-center justify-center overflow-hidden ${zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"}`}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
@@ -326,25 +329,29 @@ export function FileViewerModal({
                 />
               </div>
             ) : isPdf(currentFile.mimeType) ? (
-              <iframe
-                src={currentFile.url}
-                className="w-full h-full min-h-[600px] border-0"
-                title={currentFile.fileName || "PDF"}
-              />
-            ) : isVideo(currentFile.mimeType) ? (
-              <div className="w-full h-full flex items-center justify-center p-4">
-                <video
-                  ref={videoRef}
-                  className="max-w-full max-h-full"
-                  playsInline
-                  preload="metadata"
+              <div className="w-full h-full min-h-0 flex-1 flex flex-col">
+                <iframe
                   src={currentFile.url}
-                >
-                  Your browser does not support the video tag.
-                </video>
+                  className="min-h-0 flex-1 w-full border-0"
+                  title={currentFile.fileName || "PDF"}
+                />
+              </div>
+            ) : isVideo(currentFile.mimeType) ? (
+              <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-end overflow-hidden p-4 pb-20">
+                <div className="file-viewer-video-container w-full max-w-full max-h-[calc(100%-3.5rem)] min-h-0 flex flex-col items-center justify-center overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    className="file-viewer-video max-w-full max-h-full w-auto object-contain"
+                    playsInline
+                    preload="metadata"
+                    src={currentFile.url}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center gap-4 p-8">
+              <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 p-8">
                 <p className="text-muted-foreground">
                   Preview not available for this file type
                 </p>

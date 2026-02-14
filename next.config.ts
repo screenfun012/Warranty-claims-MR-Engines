@@ -143,6 +143,10 @@ const nextConfig: NextConfig = {
   },
   // Experimental features for better performance
   experimental: {
+    // Allow larger file uploads (e.g. video) in API routes and Server Actions (default 1MB)
+    serverActions: {
+      bodySizeLimit: "50mb",
+    },
     optimizePackageImports: [
       'lucide-react', 
       'recharts',

@@ -606,6 +606,12 @@ export default function ClaimsPage() {
                   if (e.key === "Escape") {
                     setShowClaimCodeSuggestions(false);
                   }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    setFilters((prev) => ({ ...prev, claimCode: textFilters.claimCode, customerId: textFilters.customerId }));
+                    setCurrentPage(1);
+                    setShowClaimCodeSuggestions(false);
+                  }
                 }}
                 className="h-9 min-h-[36px] pl-9 transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
@@ -616,7 +622,9 @@ export default function ClaimsPage() {
                       key={idx}
                       type="button"
                       onClick={() => {
-                        setTextFilters(prev => ({ ...prev, claimCode: suggestion }));
+                        setTextFilters((prev) => ({ ...prev, claimCode: suggestion }));
+                        setFilters((prev) => ({ ...prev, claimCode: suggestion }));
+                        setCurrentPage(1);
                         setShowClaimCodeSuggestions(false);
                       }}
                       className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors"
@@ -649,6 +657,12 @@ export default function ClaimsPage() {
                   if (e.key === "Escape") {
                     setShowCustomerSuggestions(false);
                   }
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    setFilters((prev) => ({ ...prev, claimCode: textFilters.claimCode, customerId: textFilters.customerId }));
+                    setCurrentPage(1);
+                    setShowCustomerSuggestions(false);
+                  }
                 }}
                 className="h-9 min-h-[36px] pl-9 transition-all hover:border-primary/50 focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
@@ -659,7 +673,9 @@ export default function ClaimsPage() {
                       key={idx}
                       type="button"
                       onClick={() => {
-                        setTextFilters(prev => ({ ...prev, customerId: suggestion }));
+                        setTextFilters((prev) => ({ ...prev, customerId: suggestion }));
+                        setFilters((prev) => ({ ...prev, customerId: suggestion }));
+                        setCurrentPage(1);
                         setShowCustomerSuggestions(false);
                       }}
                       className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground text-sm transition-colors"

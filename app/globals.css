@@ -352,3 +352,8 @@
 .file-viewer-img.file-viewer-img-no-transition {
   transition: none;
 }
+
+/* File viewer modal – video: leave room for Plyr controls so they stay visible in portrait */
+.file-viewer-video {
+  max-height: calc(100% - 3.5rem);
+}
