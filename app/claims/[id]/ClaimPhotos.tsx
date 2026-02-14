@@ -321,7 +321,7 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                   disabled={uploading}
                   className="hidden"
                   id="photo-upload"
-                  accept="image/*,.pdf,.doc,.docx"
+                  accept="image/*,.pdf,.doc,.docx,video/*,.mp4,.webm,.mov,.m4v,.ogg"
                 />
                 <Button
                   type="button"

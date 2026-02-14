@@ -16,7 +16,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { FileViewerModal } from "@/components/file-viewer-modal";
 
 // Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {
@@ -487,6 +487,18 @@ function ThreadDetail({
   const [previewAttachment, setPreviewAttachment] = useState<{ id: string; fileName: string; mimeType: string } | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const allAttachmentFiles = useMemo(() => {
+    if (!fullThread?.messages?.length) return [];
+    return fullThread.messages.flatMap((m) =>
+      (m.attachments || []).map((a) => ({
+        id: a.id,
+        url: `/api/files/${a.id}`,
+        fileName: a.fileName,
+        mimeType: a.mimeType,
+      }))
+    );
+  }, [fullThread?.messages]);
 
   const sortedMessages = useMemo(() => {
     if (!fullThread?.messages?.length) return [];
@@ -1089,45 +1101,20 @@ function ThreadDetail({
         })}
       </div>
 
-      {/* Preview Modal */}
-      <Dialog open={!!previewAttachment} onOpenChange={(open) => !open && setPreviewAttachment(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto" showCloseButton={true}>
-          <DialogHeader>
-            <DialogTitle>{previewAttachment?.fileName}</DialogTitle>
-          </DialogHeader>
-          {previewAttachment && (
-            <div className="mt-4">
-              {previewAttachment.mimeType?.startsWith("image/") ? (
-                <img 
-                  src={`/api/files/${previewAttachment.id}`}
-                  alt={previewAttachment.fileName}
-                  className="max-w-full h-auto rounded"
-                />
-              ) : previewAttachment.mimeType === "application/pdf" ? (
-                <iframe
-                  src={`/api/files/${previewAttachment.id}`}
-                  className="w-full h-[80vh] rounded border"
-                  title={previewAttachment.fileName}
-                />
-              ) : (
-                <div className="flex items-center justify-center h-64 bg-muted rounded">
-                  <p className="text-muted-foreground">
-                    {t("inbox.previewNotAvailable")}{" "}
-                    <a 
-                      href={`/api/files/${previewAttachment.id}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="ml-2 text-primary underline"
-                    >
-                      {t("inbox.downloadInstead")}
-                    </a>
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Preview / file viewer (images, PDF, video, etc.) */}
+      <FileViewerModal
+        open={!!previewAttachment}
+        onOpenChange={(open) => !open && setPreviewAttachment(null)}
+        files={allAttachmentFiles}
+        initialIndex={
+          previewAttachment
+            ? Math.max(
+                0,
+                allAttachmentFiles.findIndex((f) => f.id === previewAttachment.id)
+              )
+            : 0
+        }
+      />
 
       <ConfirmDialog
         open={showDeleteDialog}
