@@ -329,7 +329,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
                   <div className="flex flex-col items-center">
                     <div className={`w-3 h-3 rounded-full ${isInbound ? 'bg-blue-500' : 'bg-green-500'}`} />
                     {index < sortedMessages.length - 1 && (
-                      <div className={`w-0.5 flex-1 mt-2 ${isInbound ? 'bg-blue-300' : 'bg-green-300'}`} style={{ minHeight: '20px' }} />
+                      <div className={`w-0.5 flex-1 mt-2 min-h-5 ${isInbound ? 'bg-blue-300' : 'bg-green-300'}`} />
                     )}
                   </div>
 

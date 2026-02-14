@@ -159,7 +159,7 @@ model EmailThread {
   originalSender  String?
   forwardedBy     String?
   viewedAt        DateTime? // When the thread was last viewed/opened
-  threadStatus    String?   // NEW_CLAIM = prvi mail (reklamacija), HAS_REPLIES = dopisivanje
+  threadStatus    String?        // NEW_CLAIM | HAS_REPLIES
   messages        EmailMessage[]
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt

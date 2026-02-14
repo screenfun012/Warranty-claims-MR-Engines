@@ -532,7 +532,7 @@ export default function ClaimsPage() {
         )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "0ms" }}>
+          <div className="animate-in fade-in slide-in-from-left-4 relative [animation-delay:0ms]">
             <label className="text-sm font-medium mb-2 block">{t("common.status")}</label>
             <div className="relative" ref={statusDropdownRef}>
               <button
@@ -585,7 +585,7 @@ export default function ClaimsPage() {
               )}
             </div>
           </div>
-          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "100ms" }}>
+          <div className="animate-in fade-in slide-in-from-left-4 relative [animation-delay:100ms]">
             <label className="text-sm font-medium mb-2 block">{t("claims.mrNumber")}</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
@@ -628,7 +628,7 @@ export default function ClaimsPage() {
               )}
             </div>
           </div>
-          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "200ms" }}>
+          <div className="animate-in fade-in slide-in-from-left-4 relative [animation-delay:200ms]">
             <label className="text-sm font-medium mb-2 block">{t("claims.customer")}</label>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
@@ -671,7 +671,7 @@ export default function ClaimsPage() {
               )}
             </div>
           </div>
-          <div className="animate-in fade-in slide-in-from-left-4 relative" style={{ animationDelay: "50ms" }}>
+          <div className="animate-in fade-in slide-in-from-left-4 relative [animation-delay:50ms]">
             <label className="text-sm font-medium mb-2 block flex items-center gap-2">
               <AlertCircle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
               {t("dashboard.urgentClaims")}

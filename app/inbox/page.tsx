@@ -858,8 +858,7 @@ function ThreadDetail({
               {message.bodyHtml ? (
                 <div 
                   dangerouslySetInnerHTML={{ __html: message.bodyHtml }} 
-                  className="email-body overflow-x-auto max-w-full"
-                  style={{ wordBreak: 'break-word' }}
+                  className="email-body overflow-x-auto max-w-full break-words"
                 />
               ) : (
                 <p className="whitespace-pre-wrap break-words">{message.bodyText || ""}</p>
