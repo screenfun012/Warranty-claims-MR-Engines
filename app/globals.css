@@ -341,3 +341,14 @@
     pointer-events: auto;
   }
 }
+
+/* File viewer modal – image zoom/rotate (variables set from JS) */
+.file-viewer-img {
+  transform: rotate(var(--img-rotation, 0deg)) scale(var(--img-zoom, 1)) translate(var(--img-x, 0), var(--img-y, 0));
+  transition: transform 0.2s ease-out;
+  max-width: var(--img-max-w, 100%);
+  max-height: var(--img-max-h, 100%);
+}
+.file-viewer-img.file-viewer-img-no-transition {
+  transition: none;
+}

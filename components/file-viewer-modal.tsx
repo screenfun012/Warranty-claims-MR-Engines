@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
+import Plyr from "plyr";
+import "plyr/dist/plyr.css";
 
 interface FileViewerModalProps {
   open: boolean;
@@ -30,6 +32,8 @@ export function FileViewerModal({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const plyrInstanceRef = useRef<Plyr | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const currentFile = files[currentIndex];
 
@@ -50,6 +54,18 @@ export function FileViewerModal({
     }
   }, [currentIndex]);
 
+  // Sync image transform/zoom to CSS variables (avoids inline styles for linter)
+  useEffect(() => {
+    const el = imageRef.current;
+    if (!el) return;
+    el.style.setProperty("--img-rotation", `${rotation}deg`);
+    el.style.setProperty("--img-zoom", String(zoom));
+    el.style.setProperty("--img-x", `${position.x / zoom}px`);
+    el.style.setProperty("--img-y", `${position.y / zoom}px`);
+    el.style.setProperty("--img-max-w", zoom > 1 ? "none" : "100%");
+    el.style.setProperty("--img-max-h", zoom > 1 ? "none" : "100%");
+  }, [zoom, rotation, position]);
+
   const isImage = (mimeType?: string) => {
     return mimeType?.startsWith("image/") || 
            /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(currentFile?.fileName || "");
@@ -59,6 +75,36 @@ export function FileViewerModal({
     return mimeType?.includes("pdf") || 
            /\.pdf$/i.test(currentFile?.fileName || "");
   };
+
+  const isVideo = (mimeType?: string) => {
+    return mimeType?.startsWith("video/") ||
+           /\.(mp4|webm|ogg|mov|m4v)$/i.test(currentFile?.fileName || "");
+  };
+
+  // Init/destroy Plyr when viewing a video
+  useEffect(() => {
+    if (!open || !currentFile || !isVideo(currentFile.mimeType)) {
+      if (plyrInstanceRef.current) {
+        plyrInstanceRef.current.destroy();
+        plyrInstanceRef.current = null;
+      }
+      return;
+    }
+    const id = setTimeout(() => {
+      if (videoRef.current && !plyrInstanceRef.current) {
+        plyrInstanceRef.current = new Plyr(videoRef.current, {
+          controls: ["play-large", "play", "progress", "current-time", "duration", "mute", "volume", "fullscreen"],
+        });
+      }
+    }, 100);
+    return () => {
+      clearTimeout(id);
+      if (plyrInstanceRef.current) {
+        plyrInstanceRef.current.destroy();
+        plyrInstanceRef.current = null;
+      }
+    };
+  }, [open, currentIndex, currentFile?.id, currentFile?.mimeType]);
 
   const handlePrevious = useCallback(() => {
     setCurrentIndex((prev) => (prev > 0 ? prev - 1 : files.length - 1));
@@ -207,7 +253,7 @@ export function FileViewerModal({
                   >
                     <ZoomOut className="h-5 w-5" />
                   </Button>
-                  <span className="text-sm text-muted-foreground min-w-[3rem] text-center">
+                  <span className="text-sm text-muted-foreground min-w-12 text-center">
                     {Math.round(zoom * 100)}%
                   </span>
                   <Button
@@ -265,24 +311,17 @@ export function FileViewerModal({
           >
             {isImage(currentFile.mimeType) ? (
               <div
-                className="w-full h-full flex items-center justify-center overflow-hidden"
+                className={`w-full h-full flex items-center justify-center overflow-hidden ${zoom > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"}`}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
-                style={{ cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default" }}
               >
                 <img
                   ref={imageRef}
                   src={currentFile.url}
                   alt={currentFile.fileName || "Image"}
-                  className="object-contain select-none"
-                  style={{
-                    transform: `rotate(${rotation}deg) scale(${zoom}) translate(${position.x / zoom}px, ${position.y / zoom}px)`,
-                    transition: isDragging ? "none" : "transform 0.2s ease-out",
-                    maxWidth: zoom > 1 ? "none" : "100%",
-                    maxHeight: zoom > 1 ? "none" : "100%",
-                  }}
+                  className={`object-contain select-none file-viewer-img ${isDragging ? "file-viewer-img-no-transition" : ""}`}
                   draggable={false}
                 />
               </div>
@@ -292,6 +331,18 @@ export function FileViewerModal({
                 className="w-full h-full min-h-[600px] border-0"
                 title={currentFile.fileName || "PDF"}
               />
+            ) : isVideo(currentFile.mimeType) ? (
+              <div className="w-full h-full flex items-center justify-center p-4">
+                <video
+                  ref={videoRef}
+                  className="max-w-full max-h-full"
+                  playsInline
+                  preload="metadata"
+                  src={currentFile.url}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center gap-4 p-8">
                 <p className="text-muted-foreground">
