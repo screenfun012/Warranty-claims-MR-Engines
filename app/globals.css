@@ -357,3 +357,8 @@
 .file-viewer-video {
   max-height: calc(100% - 3.5rem);
 }
+
+/* Plyr theme: use app primary color for progress bar and control hover/focus */
+.file-viewer-video-container .plyr {
+  --plyr-color-main: var(--primary);
+}

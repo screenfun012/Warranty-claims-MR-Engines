@@ -65,25 +65,31 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // If customer name is provided, first find customers matching the name
+    // If customer name/company is provided, find customers matching name OR company
     let customerIds: string[] = [];
     if (customerName) {
       try {
-        // Normalize search query for Serbian Latin support
-        const normalizedCustomerName = normalizeSerbianLatin(customerName);
-        
-        // Fetch all customers and filter in memory for Serbian character support
+        const normalizedQuery = normalizeSerbianLatin(customerName);
         const allCustomers = await prisma.customer.findMany({
           select: {
             id: true,
             name: true,
+            company: true,
           },
         });
-        
-        // Filter customers that match the normalized search
-        customerIds = allCustomers
-          .filter(c => normalizeSerbianLatin(c.name || "").includes(normalizedCustomerName))
-          .map(c => c.id);
+        // Support "Name (Company)" format from suggestions: match both parts
+        const nameCompanyMatch = customerName.match(/^(.+?)\s*\((.+)\)\s*$/);
+        const matchCustomer = (c: { name: string | null; company: string | null }) => {
+          const n = normalizeSerbianLatin(c.name || "");
+          const co = normalizeSerbianLatin(c.company || "");
+          if (nameCompanyMatch) {
+            const qName = normalizeSerbianLatin(nameCompanyMatch[1].trim());
+            const qCompany = normalizeSerbianLatin(nameCompanyMatch[2].trim());
+            return (qName ? n.includes(qName) : true) && (qCompany ? co.includes(qCompany) : true);
+          }
+          return n.includes(normalizedQuery) || co.includes(normalizedQuery);
+        };
+        customerIds = allCustomers.filter(matchCustomer).map((c) => c.id);
       } catch (error) {
         console.warn("Error searching customers:", error);
       }

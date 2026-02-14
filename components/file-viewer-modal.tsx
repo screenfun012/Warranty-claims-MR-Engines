@@ -2,7 +2,7 @@
 
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, RefreshCw } from "lucide-react";
+import { X, Download, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Plyr from "plyr";
 import "plyr/dist/plyr.css";
@@ -31,6 +31,7 @@ export function FileViewerModal({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const plyrInstanceRef = useRef<Plyr | null>(null);
@@ -43,6 +44,7 @@ export function FileViewerModal({
       setZoom(1);
       setRotation(0);
       setPosition({ x: 0, y: 0 });
+      setIsFullscreen(false);
     }
   }, [open, initialIndex]);
 
@@ -80,6 +82,66 @@ export function FileViewerModal({
     return mimeType?.startsWith("video/") ||
            /\.(mp4|webm|ogg|mov|m4v)$/i.test(currentFile?.fileName || "");
   };
+
+  const isDocx = (mimeType?: string) => {
+    return mimeType?.includes("wordprocessingml") ||
+           mimeType === "application/msword" ||
+           /\.(docx|doc)$/i.test(currentFile?.fileName || "");
+  };
+
+  const isExcel = (mimeType?: string) => {
+    return mimeType?.includes("spreadsheetml") ||
+           mimeType === "application/vnd.ms-excel" ||
+           /\.(xlsx|xls)$/i.test(currentFile?.fileName || "");
+  };
+
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [excelHtml, setExcelHtml] = useState<string | null>(null);
+  const [docLoadError, setDocLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!currentFile || (!isDocx(currentFile.mimeType) && !isExcel(currentFile.mimeType))) {
+      setDocxHtml(null);
+      setExcelHtml(null);
+      setDocLoadError(null);
+      return;
+    }
+    setDocxHtml(null);
+    setExcelHtml(null);
+    setDocLoadError(null);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(currentFile.url);
+        if (!res.ok) throw new Error("Failed to fetch");
+        const buf = await res.arrayBuffer();
+        if (cancelled) return;
+        if (isDocx(currentFile.mimeType)) {
+          const mammoth = await import("mammoth");
+          const result = await mammoth.convertToHtml({ arrayBuffer: buf });
+          if (!cancelled) setDocxHtml(result.value);
+        } else if (isExcel(currentFile.mimeType)) {
+          const XLSX = await import("xlsx");
+          const wb = XLSX.read(buf, { type: "array" });
+          const first = wb.SheetNames[0];
+          if (!first) {
+            if (!cancelled) setDocLoadError("No sheet");
+            return;
+          }
+          const sheet = wb.Sheets[first];
+          const html = XLSX.utils.sheet_to_html(sheet);
+          if (!cancelled) setExcelHtml(html);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setDocLoadError(e instanceof Error ? e.message : "Failed to load");
+          setDocxHtml(null);
+          setExcelHtml(null);
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [currentFile?.id, currentFile?.url, currentFile?.mimeType]);
 
   // Init/destroy Plyr when viewing a video
   useEffect(() => {
@@ -206,7 +268,10 @@ export function FileViewerModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 gap-0 bg-transparent border-0 shadow-none" showCloseButton={false}>
+      <DialogContent
+        className={`p-0 gap-0 bg-transparent border-0 shadow-none transition-all ${isFullscreen ? "fixed inset-0 w-screen h-screen max-w-none max-h-none rounded-none" : "max-w-[95vw] max-h-[95vh] w-full h-full"}`}
+        showCloseButton={false}
+      >
         <DialogTitle className="sr-only">
           {currentFile.fileName || `File ${currentIndex + 1}`}
         </DialogTitle>
@@ -290,6 +355,14 @@ export function FileViewerModal({
               <Button
                 variant="ghost"
                 size="icon"
+                onClick={() => setIsFullscreen((v) => !v)}
+                title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+              >
+                {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={handleDownload}
                 title="Download"
               >
@@ -349,6 +422,36 @@ export function FileViewerModal({
                     Your browser does not support the video tag.
                   </video>
                 </div>
+              </div>
+            ) : isDocx(currentFile.mimeType) ? (
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                {docLoadError && (
+                  <p className="text-destructive text-sm p-2">{docLoadError}</p>
+                )}
+                {docxHtml && (
+                  <div
+                    className="flex-1 min-h-0 overflow-auto p-6 prose prose-sm dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: docxHtml }}
+                  />
+                )}
+                {!docxHtml && !docLoadError && (
+                  <p className="text-muted-foreground p-4">Loading document…</p>
+                )}
+              </div>
+            ) : isExcel(currentFile.mimeType) ? (
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                {docLoadError && (
+                  <p className="text-destructive text-sm p-2">{docLoadError}</p>
+                )}
+                {excelHtml && (
+                  <div
+                    className="flex-1 min-h-0 overflow-auto p-4 [&_table]:min-w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:bg-muted [&_th]:px-2 [&_td]:px-2"
+                    dangerouslySetInnerHTML={{ __html: excelHtml }}
+                  />
+                )}
+                {!excelHtml && !docLoadError && (
+                  <p className="text-muted-foreground p-4">Loading spreadsheet…</p>
+                )}
               </div>
             ) : (
               <div className="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 p-8">

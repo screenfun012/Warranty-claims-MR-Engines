@@ -318,29 +318,46 @@ export default function ClaimsPage() {
     // Show suggestions if there's text
     if (value.trim()) {
       setShowCustomerSuggestions(true);
-      // Generate suggestions from allClaims with Serbian Latin support - use company instead of name
+      // Suggestions: match by customer name OR company (Serbian Latin)
       const normalizedValue = normalizeSerbianLatin(value);
-      const suggestions: string[] = Array.from(
-        new Set(
-          allClaims
-            .map((c: Claim) => c.customer?.company)
-            .filter((company: string | null | undefined): company is string => !!company && normalizeSerbianLatin(company).includes(normalizedValue))
-            .slice(0, 5)
-        )
-      ) as string[];
-      setCustomerSuggestions(suggestions);
+      const seen = new Set<string>();
+      const suggestions: string[] = [];
+      for (const c of allClaims) {
+        const cust = c.customer;
+        if (!cust) continue;
+        const name = cust.name || "";
+        const company = cust.company || "";
+        const matchName = name && normalizeSerbianLatin(name).includes(normalizedValue);
+        const matchCompany = company && normalizeSerbianLatin(company).includes(normalizedValue);
+        if (matchName && !seen.has(name)) {
+          seen.add(name);
+          suggestions.push(company ? `${name} (${company})` : name);
+        }
+        if (matchCompany && !seen.has(company)) {
+          seen.add(company);
+          suggestions.push(company);
+        }
+        if (suggestions.length >= 8) break;
+      }
+      setCustomerSuggestions(suggestions.slice(0, 8));
     } else {
       setShowCustomerSuggestions(false);
       setCustomerSuggestions([]);
     }
   }, [allClaims]);
 
-  // NO debounce - filters are only applied when user clicks suggestion or presses Enter
-  // This keeps the list visible while typing
-
-  // Initial load is handled by React Query automatically - no need for manual fetch
-
-  // Initial fetch only - no refresh on status change
+  // Debounced apply: sync textFilters to filters so typing triggers search after a short delay
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFilters((prev) => ({
+        ...prev,
+        claimCode: textFilters.claimCode.trim(),
+        customerId: textFilters.customerId.trim(),
+      }));
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(t);
+  }, [textFilters.claimCode, textFilters.customerId]);
 
   // Listen for claim updates to refresh the list
   useEffect(() => {
