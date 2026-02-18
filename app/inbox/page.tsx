@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,7 +25,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { FileViewerModal } from "@/components/file-viewer-modal";
+
+const FileViewerModal = dynamic(
+  () => import("@/components/file-viewer-modal").then((m) => ({ default: m.FileViewerModal })),
+  { ssr: false, loading: () => <Skeleton className="h-0 w-0 overflow-hidden" /> }
+);
 
 // Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {

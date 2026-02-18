@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
@@ -8,8 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Languages, FileText, Image as ImageIcon, Paperclip, Trash2, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FileViewerModal } from "@/components/file-viewer-modal";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const FileViewerModal = dynamic(
+  () => import("@/components/file-viewer-modal").then((m) => ({ default: m.FileViewerModal })),
+  { ssr: false, loading: () => <Skeleton className="h-0 w-0 overflow-hidden" /> }
+);
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 interface ClaimClientDocumentsProps {

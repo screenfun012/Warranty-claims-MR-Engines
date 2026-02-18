@@ -115,8 +115,12 @@ export default function ClaimsPage() {
   const queryClient = useQueryClient();
   const t = useTranslations();
   
-  // Helper to get status label
-  const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
+  // Helper to get status label (empty status would cause t("claims.status.") → INSUFFICIENT_PATH)
+  const getStatusLabel = (status: string) => {
+    if (status == null || String(status).trim() === "") return status ?? "";
+    const msg = t(`claims.status.${status}` as any);
+    return typeof msg === "string" ? msg : status;
+  };
   
   // Get user role
   interface Auth0User {

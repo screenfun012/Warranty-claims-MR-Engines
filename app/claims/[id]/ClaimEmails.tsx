@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -10,7 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Paperclip, FileText, Image as ImageIcon, Mail, Check } from "lucide-react";
-import { FileViewerModal } from "@/components/file-viewer-modal";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const FileViewerModal = dynamic(
+  () => import("@/components/file-viewer-modal").then((m) => ({ default: m.FileViewerModal })),
+  { ssr: false, loading: () => <Skeleton className="h-0 w-0 overflow-hidden" /> }
+);
 import { cn } from "@/lib/utils";
 import { getCleanEmailBody } from "@/lib/email/emailBodyCleaner";
 import { extractCleanBody } from "@/lib/email/emailThreadingUtils";

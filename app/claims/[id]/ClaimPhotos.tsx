@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { FileViewerModal } from "@/components/file-viewer-modal";
+import { Skeleton } from "@/components/ui/skeleton";
+
+const FileViewerModal = dynamic(
+  () => import("@/components/file-viewer-modal").then((m) => ({ default: m.FileViewerModal })),
+  { ssr: false, loading: () => <Skeleton className="h-0 w-0 overflow-hidden" /> }
+);
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
