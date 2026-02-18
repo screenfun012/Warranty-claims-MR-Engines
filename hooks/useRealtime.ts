@@ -35,6 +35,8 @@ export function useRealtime(options?: {
   const invalidateInbox = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ["inbox"] });
     queryClient.invalidateQueries({ queryKey: ["unread-count"] });
+    queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    queryClient.invalidateQueries({ queryKey: ["inboxThreads"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   }, [queryClient]);
 

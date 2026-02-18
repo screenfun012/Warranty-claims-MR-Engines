@@ -865,6 +865,8 @@
   "notifications": {
     "title": "Notifications",
     "empty": "No notifications",
+    "unreadMessages": "Unread messages ({count})",
+    "inboxClickHint": "Click to open Inbox",
     "markRead": "Mark as read",
     "plannerAssigned": "You were added to a planner",
     "itemAssigned": "You were assigned to an item"

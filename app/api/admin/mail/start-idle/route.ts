@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { startIdleSync, isIdleSyncActive, isUsingIdleMode } from "@/lib/email/mailSyncScheduler";
 import { getImapIdleClient } from "@/lib/email/imapIdleClient";
 
+/**
+ * POST: Start IMAP IDLE (real-time mail). Call once after deploy so new emails appear immediately.
+ * GET: Check if sync is active and whether IDLE or polling is used.
+ */
 export async function POST() {
   try {
     // Always restart sync to ensure it's running

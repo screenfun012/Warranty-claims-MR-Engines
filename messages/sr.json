@@ -859,6 +859,8 @@
   "notifications": {
     "title": "Obaveštenja",
     "empty": "Nema obaveštenja",
+    "unreadMessages": "Nepročitane poruke ({count})",
+    "inboxClickHint": "Klik za pregled u Inbox-u",
     "markRead": "Označi kao pročitano",
     "plannerAssigned": "Dodati ste u planer",
     "itemAssigned": "Dodeljena vam je stavka"

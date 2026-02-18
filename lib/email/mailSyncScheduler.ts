@@ -63,8 +63,8 @@ export async function startIdleSync(): Promise<void> {
         // Callback when new message is detected
         console.log("[AutoSync] IDLE detected mailbox change, syncing emails...");
         try {
-          // Add a small delay to ensure IMAP server has processed the new message
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Minimal delay so IMAP server has the message ready (was 2000ms; 300ms is enough for speed)
+          await new Promise(resolve => setTimeout(resolve, 300));
           
           const result = await syncNewEmails();
           if (result.newMessages > 0) {

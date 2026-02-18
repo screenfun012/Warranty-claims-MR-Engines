@@ -80,7 +80,7 @@ type NavigationItemWithRole = NavigationItem & {
 
 const warrantyNavigation: NavigationItemWithRole[] = [
   { name: "Dashboard", translationKey: "nav.dashboard", href: "/", icon: Home, minRole: "VIEWER" },
-  { name: "Inbox", translationKey: "nav.inbox", href: "/inbox", icon: Inbox, showBadge: true, minRole: "VIEWER" },
+  { name: "Inbox", translationKey: "nav.inbox", href: "/inbox", icon: Inbox, showBadge: false, minRole: "VIEWER" },
   { name: "Claims", translationKey: "nav.claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
   { name: "Statistics", translationKey: "nav.statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
   { name: "Settings", translationKey: "nav.settings", href: "/settings", icon: Settings, minRole: "ADMIN" },
@@ -131,7 +131,15 @@ const fetchNotifications = async (): Promise<{ notifications: NotificationItem[]
   return res.json();
 };
 
-function NotificationsDropdown({ isCollapsed, isMobile }: { isCollapsed: boolean; isMobile: boolean }) {
+function NotificationsDropdown({
+  isCollapsed,
+  isMobile,
+  inboxUnreadCount = 0,
+}: {
+  isCollapsed: boolean;
+  isMobile: boolean;
+  inboxUnreadCount?: number;
+}) {
   const t = useTranslations("notifications");
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -141,7 +149,8 @@ function NotificationsDropdown({ isCollapsed, isMobile }: { isCollapsed: boolean
     staleTime: 60 * 1000,
   });
   const notifications = data?.notifications ?? [];
-  const unreadCount = data?.unreadCount ?? 0;
+  const notificationsUnread = data?.unreadCount ?? 0;
+  const totalUnread = notificationsUnread + inboxUnreadCount;
 
   const markRead = React.useCallback(
     async (id: string, link: string | null) => {
@@ -169,9 +178,12 @@ function NotificationsDropdown({ isCollapsed, isMobile }: { isCollapsed: boolean
                 >
                   <Bell className={cn("h-5 w-5 shrink-0", !isCollapsed && "mr-2")} />
                   {!isCollapsed && <span className="truncate">{t("title")}</span>}
-                  {unreadCount > 0 && (
-                    <Badge variant="destructive" className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px]">
-                      {unreadCount > 99 ? "99+" : unreadCount}
+                  {totalUnread > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-1 text-[10px] animate-pulse"
+                    >
+                      {totalUnread > 99 ? "99+" : totalUnread}
                     </Badge>
                   )}
                 </SidebarMenuButton>
@@ -182,21 +194,37 @@ function NotificationsDropdown({ isCollapsed, isMobile }: { isCollapsed: boolean
         </TooltipProvider>
         <DropdownMenuContent align="end" className="w-80 max-h-[70vh] overflow-y-auto">
           <div className="px-2 py-1.5 text-sm font-semibold text-foreground">{t("title")}</div>
-          {isLoading ? (
-            <div className="px-2 py-4 text-sm text-muted-foreground">{t("empty")}</div>
-          ) : notifications.length === 0 ? (
+          {isLoading && notifications.length === 0 && inboxUnreadCount === 0 ? (
             <div className="px-2 py-4 text-sm text-muted-foreground">{t("empty")}</div>
           ) : (
-            notifications.map((n) => (
-              <DropdownMenuItem
-                key={n.id}
-                className="flex flex-col items-stretch gap-0.5 py-2 cursor-pointer"
-                onSelect={() => markRead(n.id, n.link)}
-              >
-                <span className={cn("font-medium text-sm", !n.readAt && "text-foreground")}>{n.title}</span>
-                {n.body && <span className="text-xs text-muted-foreground line-clamp-2">{n.body}</span>}
-              </DropdownMenuItem>
-            ))
+            <>
+              {inboxUnreadCount > 0 && (
+                <DropdownMenuItem
+                  className="flex flex-col items-stretch gap-0.5 py-2 cursor-pointer font-medium text-foreground"
+                  onSelect={() => router.push("/inbox")}
+                >
+                  <span className="text-sm">{t("unreadMessages", { count: inboxUnreadCount })}</span>
+                  <span className="text-xs text-muted-foreground">{t("inboxClickHint")}</span>
+                </DropdownMenuItem>
+              )}
+              {inboxUnreadCount > 0 && notifications.length > 0 && (
+                <div className="my-1 border-t border-border" role="separator" />
+              )}
+              {notifications.length === 0 && inboxUnreadCount === 0 ? (
+                <div className="px-2 py-4 text-sm text-muted-foreground">{t("empty")}</div>
+              ) : (
+                notifications.map((n) => (
+                  <DropdownMenuItem
+                    key={n.id}
+                    className="flex flex-col items-stretch gap-0.5 py-2 cursor-pointer"
+                    onSelect={() => markRead(n.id, n.link)}
+                  >
+                    <span className={cn("font-medium text-sm", !n.readAt && "text-foreground")}>{n.title}</span>
+                    {n.body && <span className="text-xs text-muted-foreground line-clamp-2">{n.body}</span>}
+                  </DropdownMenuItem>
+                ))
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -599,7 +627,7 @@ export function AppSidebar() {
       <SidebarFooter className="border-t px-2 py-2">
         {user && (
           <SidebarMenu>
-            <NotificationsDropdown isCollapsed={!!isCollapsed} isMobile={isMobile} />
+            <NotificationsDropdown isCollapsed={!!isCollapsed} isMobile={isMobile} inboxUnreadCount={plannerOnly ? 0 : unreadCount} />
             <SidebarMenuItem>
               <DropdownMenu>
                 <TooltipProvider delayDuration={0}>

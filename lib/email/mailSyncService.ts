@@ -19,6 +19,7 @@ import {
   isForwardedEmail,
   extractOriginalSenderFromForward,
 } from "./emailThreadingUtils";
+import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 
 export interface SyncResult {
   newMessages: number;
@@ -312,10 +313,13 @@ export async function syncNewEmails(): Promise<SyncResult> {
     console.log(`[Sync] ${skipReasons.error} message(s) failed to process (see errors above).`);
   }
 
-  // If new messages were synced, we can't dispatch to window from server-side
-  // But the frontend polling will pick it up quickly (1-2 seconds)
+  // Notify all connected clients immediately via Pusher so inbox refreshes without waiting for polling
   if (newMessagesCount > 0) {
-    console.log(`[Sync] ${newMessagesCount} new messages synced - frontend should refresh soon`);
+    console.log(`[Sync] ${newMessagesCount} new messages synced - triggering real-time update`);
+    triggerEvent(CHANNELS.INBOX, EVENTS.INBOX_NEW, {
+      newMessages: newMessagesCount,
+      newThreads: newThreadsCount,
+    }).catch((err) => console.warn("[Sync] Pusher trigger failed (non-fatal):", err?.message ?? err));
   }
 
   return {
