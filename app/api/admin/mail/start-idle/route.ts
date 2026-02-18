@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { startIdleSync, isIdleSyncActive, isUsingIdleMode } from "@/lib/email/mailSyncScheduler";
-import { getImapIdleClient } from "@/lib/email/imapIdleClient";
 
 /**
  * POST: Start IMAP IDLE (real-time mail). Call once after deploy so new emails appear immediately.
@@ -12,7 +11,7 @@ export async function POST() {
     // This will reset reconnect attempts if IDLE failed
     await startIdleSync();
     
-    const usingIdle = isUsingIdleMode();
+    const usingIdle = await isUsingIdleMode();
     const mode = usingIdle ? "IDLE (real-time push)" : "Polling (every 30 seconds)";
     
     return NextResponse.json({
@@ -35,7 +34,8 @@ export async function POST() {
 export async function GET() {
   try {
     const active = isIdleSyncActive();
-    const usingIdle = isUsingIdleMode();
+    const usingIdle = await isUsingIdleMode();
+    const { getImapIdleClient } = await import("@/lib/email/imapIdleClient");
     const idleClient = getImapIdleClient();
     const reconnectAttempts = idleClient.getReconnectAttempts();
     

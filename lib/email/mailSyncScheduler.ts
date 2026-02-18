@@ -2,16 +2,29 @@
  * Mail Sync Scheduler - Automatic email synchronization
  * Supports both IMAP IDLE (real-time push) and periodic polling
  * Falls back to polling if IDLE is not available or fails
+ *
  */
 
-import { syncNewEmails } from "./mailSyncService";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 import { env } from "@/lib/config/env";
-import { getImapIdleClient } from "./imapIdleClient";
 
 let syncInterval: NodeJS.Timeout | null = null;
 let isSyncActive = false;
 let useIdleMode = false;
+let idleStartPromise: Promise<void> | null = null;
+
+/**
+ * Ensure IDLE/sync is started (called on first inbox API request so no manual "start IDLE" is needed).
+ * Safe to call from any API route; starts sync once in the background.
+ */
+export function ensureIdleStarted(): void {
+  if (idleStartPromise !== null) return;
+  if (!env.MAIL_SYNC_ENABLED || !isEmailConfigured()) return;
+  idleStartPromise = startIdleSync().catch((err) => {
+    console.warn("[AutoSync] ensureIdleStarted failed (non-fatal):", err?.message ?? err);
+    idleStartPromise = null;
+  });
+}
 
 /**
  * Start automatic email sync
@@ -20,7 +33,7 @@ let useIdleMode = false;
 export async function startIdleSync(): Promise<void> {
   // If already active but IDLE failed, restart it
   if (isSyncActive) {
-    const usingIdle = isUsingIdleMode();
+    const usingIdle = await isUsingIdleMode();
     if (!usingIdle && env.MAIL_SYNC_USE_IDLE) {
       console.log("[AutoSync] IDLE failed, restarting sync to retry IDLE...");
       await stopIdleSync();
@@ -42,6 +55,9 @@ export async function startIdleSync(): Promise<void> {
 
   isSyncActive = true;
   useIdleMode = env.MAIL_SYNC_USE_IDLE;
+
+  const { syncNewEmails } = await import("./mailSyncService");
+  const { getImapIdleClient } = await import("./imapIdleClient");
 
   // Initial sync regardless of mode
   try {
@@ -134,6 +150,7 @@ export async function stopIdleSync(): Promise<void> {
   // Stop IDLE if active
   if (useIdleMode) {
     try {
+      const { getImapIdleClient } = await import("./imapIdleClient");
       const idleClient = getImapIdleClient();
       await idleClient.stop();
       useIdleMode = false;
@@ -161,9 +178,9 @@ export function isIdleSyncActive(): boolean {
 /**
  * Check if currently using IDLE mode
  */
-export function isUsingIdleMode(): boolean {
+export async function isUsingIdleMode(): Promise<boolean> {
   if (!isSyncActive) return false;
-  const idleClient = getImapIdleClient();
-  return idleClient.isIdleActive();
+  const { getImapIdleClient } = await import("./imapIdleClient");
+  return getImapIdleClient().isIdleActive();
 }
 
