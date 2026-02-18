@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,10 @@ import {
   X,
   CalendarIcon,
   Info,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import {
   Tooltip,
@@ -93,6 +97,8 @@ export default function StatisticsPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [sortField, setSortField] = useState<string>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Fetch departments for filter
   const { data: departmentsData } = useQuery({
@@ -199,6 +205,22 @@ export default function StatisticsPage() {
     });
     return sorted;
   }, [claims, sortField, sortDirection]);
+
+  // Pagination: reset to page 1 when filters or sort change
+  const totalPages = Math.max(1, Math.ceil(sortedClaims.length / pageSize));
+  const paginatedClaims = useMemo(
+    () => sortedClaims.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [sortedClaims, currentPage, pageSize]
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortField, sortDirection]);
+
+  // Clamp current page when result set shrinks
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(Math.max(1, totalPages));
+  }, [totalPages, currentPage]);
 
   // Handle sort
   const handleSort = (field: string) => {
@@ -534,7 +556,7 @@ export default function StatisticsPage() {
               { key: "created", label: t("claims.createdAt") },
               { key: "reason", label: "" },
             ]}
-            data={sortedClaims.map((claim) => ({
+            data={paginatedClaims.map((claim) => ({
               mrNumber: (
                 <span className="font-medium">{claim.claimCodeRaw || "-"}</span>
               ),
@@ -579,7 +601,7 @@ export default function StatisticsPage() {
               </div>
             }
             onRowClick={(row, index) => {
-              const claim = sortedClaims[index];
+              const claim = paginatedClaims[index];
               if (claim) {
                 router.push(`/claims/${claim.id}`);
               }
@@ -587,6 +609,97 @@ export default function StatisticsPage() {
           />
         )}
       </Card>
+
+      {/* Pagination - same UX as claims */}
+      {!isLoading && sortedClaims.length > 0 && totalPages >= 1 && (
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-sm text-muted-foreground">
+              {t("claims.pagination.showing")}{" "}
+              <span className="font-medium">
+                {sortedClaims.length > 0 ? (currentPage - 1) * pageSize + 1 : 0}
+              </span>
+              {" - "}
+              <span className="font-medium">
+                {Math.min(currentPage * pageSize, sortedClaims.length)}
+              </span>{" "}
+              {t("claims.pagination.of")}{" "}
+              <span className="font-medium">{sortedClaims.length}</span>{" "}
+              {t("claims.pagination.claims")}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{t("claims.pagination.perPage")}:</span>
+                <Select
+                  value={pageSize.toString()}
+                  onValueChange={(value) => {
+                    setPageSize(Number(value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="w-[70px] h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-1 px-2">
+                  <span className="text-sm">
+                    {t("claims.pagination.page")}{" "}
+                    <span className="font-medium">{currentPage}</span>{" "}
+                    {t("claims.pagination.of")}{" "}
+                    <span className="font-medium">{totalPages}</span>
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
     </div>
   );
 }
