@@ -88,15 +88,16 @@ interface Claim {
 
 /** Build PATCH body from current claim (cache) so we always send what's on screen and avoid race conditions */
 function buildPatchBodyFromClaim(c: Claim): Record<string, unknown> {
+  const r = c as unknown as Record<string, unknown>;
   const body: Record<string, unknown> = {
     claimCodeRaw: c.claimCodeRaw ?? null,
-    customerId: c.customer?.id ?? (c as Record<string, unknown>).customerId ?? null,
+    customerId: c.customer?.id ?? r.customerId ?? null,
     customerNumber: c.customerNumber ?? null,
     engineType: c.engineType ?? null,
     mrEngineCode: c.mrEngineCode ?? null,
     assignedWorkerName: c.assignedWorkerName ?? null,
-    faultDepartmentId: c.faultDepartment?.id ?? (c as Record<string, unknown>).faultDepartmentId ?? null,
-    faultDepartmentIds: c.faultDepartments?.map((d) => d.id) ?? (c as Record<string, unknown>).faultDepartmentIds ?? [],
+    faultDepartmentId: c.faultDepartment?.id ?? r.faultDepartmentId ?? null,
+    faultDepartmentIds: c.faultDepartments?.map((d) => d.id) ?? r.faultDepartmentIds ?? [],
     workerFault: c.workerFault ?? null,
     yearEngineDone: c.yearEngineDone ?? null,
     dateEngineDone: c.dateEngineDone ?? null,
@@ -106,14 +107,14 @@ function buildPatchBodyFromClaim(c: Claim): Record<string, unknown> {
     status: c.status ?? "NEW",
     summarySr: c.summarySr ?? null,
     summaryEn: c.summaryEn ?? null,
-    summaryDe: (c as Record<string, unknown>).summaryDe ?? null,
-    summaryFr: (c as Record<string, unknown>).summaryFr ?? null,
-    summaryNl: (c as Record<string, unknown>).summaryNl ?? null,
+    summaryDe: r.summaryDe ?? null,
+    summaryFr: r.summaryFr ?? null,
+    summaryNl: r.summaryNl ?? null,
     claimPrefix: c.claimPrefix ?? null,
     claimNumber: c.claimNumber ?? null,
     claimYear: c.claimYear ?? null,
-    claimAcceptanceStatus: (c as Record<string, unknown>).claimAcceptanceStatus ?? null,
-    assignedToId: c.assignedTo?.id ?? (c as Record<string, unknown>).assignedToId ?? null,
+    claimAcceptanceStatus: r.claimAcceptanceStatus ?? null,
+    assignedToId: c.assignedTo?.id ?? r.assignedToId ?? null,
     isLocked: c.isLocked ?? null,
   };
   Object.keys(body).forEach((k) => {
