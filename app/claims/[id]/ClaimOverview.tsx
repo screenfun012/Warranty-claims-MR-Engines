@@ -230,9 +230,6 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
     }
   };
 
-  const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
-  const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
-
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-6">
