@@ -127,7 +127,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [claimCode, setClaimCode] = useState(claim.claimCodeRaw || "");
   const [customerNumber, setCustomerNumber] = useState(claim.customerNumber || "");
   const [customerName, setCustomerName] = useState(claim.customer?.name || "");
-  const [customerCompany, setCustomerCompany] = useState(claim.customer?.company || "");
   const [engineType, setEngineType] = useState(claim.engineType || "");
   const [engineCode, setEngineCode] = useState(claim.mrEngineCode || "");
   const [assignedWorkerName, setAssignedWorkerName] = useState(claim.assignedWorkerName || "");
@@ -300,7 +299,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setClaimCode(claim.claimCodeRaw || "");
       setCustomerNumber(claim.customerNumber || "");
       setCustomerName(claim.customer?.name || "");
-      setCustomerCompany(claim.customer?.company || "");
       setEngineType(claim.engineType || "");
       setEngineCode(claim.mrEngineCode || "");
       setAssignedWorkerName(claim.assignedWorkerName || "");
@@ -327,7 +325,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (claim.claimCodeRaw !== claimCode) setClaimCode(claim.claimCodeRaw || "");
       if (claim.customerNumber !== customerNumber) setCustomerNumber(claim.customerNumber || "");
       if (claim.customer?.name !== customerName) setCustomerName(claim.customer?.name || "");
-      if (claim.customer?.company !== customerCompany) setCustomerCompany(claim.customer?.company || "");
       if (claim.engineType !== engineType) setEngineType(claim.engineType || "");
       if (claim.mrEngineCode !== engineCode) setEngineCode(claim.mrEngineCode || "");
       if (claim.assignedWorkerName !== assignedWorkerName) setAssignedWorkerName(claim.assignedWorkerName || "");
@@ -352,11 +349,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       if (!!claim.processingEmailSentAt !== notificationSent) setNotificationSent(!!claim.processingEmailSentAt);
     }
   }, [
-    claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.customer?.company,
+    claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name,
     claim.engineType, claim.mrEngineCode, claim.assignedWorkerName,
     claim.faultDepartment?.id, claim.faultDepartments, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate,
     claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt,
-    editingField, claimCode, customerNumber, customerName, customerCompany, engineType, engineCode,
+    editingField, claimCode, customerNumber, customerName, engineType, engineCode,
     assignedWorkerName, faultDepartmentId, faultDepartmentIds, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
   ]);
 
@@ -433,14 +430,9 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       company: normalizedNewCompany || null,
     };
     
-    // Update local state immediately for instant feedback
-    if (field === 'name') {
-      setCustomerName(normalizedNewName);
-    } else {
-      setCustomerCompany(normalizedNewCompany);
-    }
-    
-    // Optimistically update the claim cache
+    if (field === 'name') setCustomerName(normalizedNewName);
+
+    // Optimistically update the claim cache (company comes from claim after cache update)
     onUpdate({ 
       customer: optimisticCustomer,
       ...(claim.status === "NEW" && { status: "IN_ANALYSIS" })
@@ -469,16 +461,13 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           const errorData = await res.json().catch(() => ({}));
           console.error("Failed to update customer:", errorData);
           if (field === 'name') setCustomerName(currentName);
-          if (field === 'company') setCustomerCompany(currentCompany);
           onUpdate({ customer: claim.customer });
           alert(t("claims.metadata.customer.updateError") + ": " + (errorData.error || t("common.error")));
         }
       })
       .catch((error) => {
         console.error("Error updating customer:", error);
-        // Revert on error
         if (field === 'name') setCustomerName(currentName);
-        if (field === 'company') setCustomerCompany(currentCompany);
         onUpdate({ customer: claim.customer });
         alert(t("claims.metadata.customer.updateError"));
       });
@@ -502,11 +491,9 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             customer: data.customer,
           });
         } else {
-          // Revert on error
           const errorData = await res.json().catch(() => ({}));
           console.error("Failed to create customer:", errorData);
           setCustomerName("");
-          setCustomerCompany("");
           onUpdate({ customer: null });
           alert(t("claims.metadata.customer.createError") + ": " + (errorData.error || t("common.error")));
         }
@@ -514,13 +501,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       .catch((error) => {
         console.error("Error creating customer:", error);
         setCustomerName("");
-        setCustomerCompany("");
         onUpdate({ customer: null });
         alert(t("claims.metadata.customer.createError"));
       });
     } else {
       setCustomerName("");
-      setCustomerCompany("");
     }
   };
 
@@ -646,12 +631,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             {t("claims.metadata.customerCompany")} <span className="text-red-500">*</span>
           </Label>
           <Select
-            value={customerCompany}
+            value={claim.customer?.company ?? ""}
             onValueChange={(value) => {
               if (value === "__add_new__") {
                 setShowAddCompany(true);
               } else {
-                setCustomerCompany(value);
                 handleCustomerUpdate('company', value);
               }
             }}
@@ -693,7 +677,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                           const trimmed = newCompany.trim();
                           if (!companies.includes(trimmed)) {
                             setCompanies([...companies, trimmed]);
-                            setCustomerCompany(trimmed);
                             handleCustomerUpdate('company', trimmed);
                             setNewCompany("");
                             setShowAddCompany(false);
@@ -714,7 +697,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                         const trimmed = newCompany.trim();
                         if (trimmed && !companies.includes(trimmed)) {
                           setCompanies([...companies, trimmed]);
-                          setCustomerCompany(trimmed);
                           handleCustomerUpdate('company', trimmed);
                           setNewCompany("");
                           setShowAddCompany(false);

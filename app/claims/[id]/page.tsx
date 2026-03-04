@@ -21,6 +21,7 @@ import { ClaimFindings } from "./ClaimFindings";
 import { ClaimPhotos } from "./ClaimPhotos";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useClaimBreadcrumb } from "@/components/claim-breadcrumb-context";
 
 // Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {
@@ -155,7 +156,7 @@ export default function ClaimDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+  const { setLabel: setClaimBreadcrumbLabel } = useClaimBreadcrumb();
   const { user } = useUser();
   
   // Helper to get status label
@@ -208,6 +209,21 @@ export default function ClaimDetailPage() {
     }
   }, [claimId]);
 
+  // Breadcrumb: human-readable label for this claim (cleared on unmount)
+  useEffect(() => {
+    if (claim) {
+      const label =
+        claim.claimCodeRaw?.trim() ||
+        claim.customer?.company?.trim() ||
+        claim.customer?.name?.trim() ||
+        claim.id.slice(0, 12);
+      setClaimBreadcrumbLabel(label);
+    } else {
+      setClaimBreadcrumbLabel(null);
+    }
+    return () => setClaimBreadcrumbLabel(null);
+  }, [claim, setClaimBreadcrumbLabel]);
+
   // Handle refresh parameter
   useEffect(() => {
     if (!searchParams) return;
@@ -231,16 +247,22 @@ export default function ClaimDetailPage() {
 
       // Otherwise, treat it as a partial update
       const updateData = { ...updates } as Partial<Claim>;
-      
-      // Remove customer object from updateData if present (we only update customerId)
+      const customerFromUpdates = (updates as Record<string, unknown>).customer;
+
+      // API expects only customerId; don't send customer object in PATCH body
       if ('customer' in updateData) {
-        delete (updateData as any).customer;
+        delete (updateData as Record<string, unknown>).customer;
       }
-      
-      // Optimistic update - update cache immediately
+
+      // Optimistic update - merge into cache including customer so UI updates immediately
       const previousClaim = claim;
       if (claim) {
-        queryClient.setQueryData(['claim', claimId], { ...claim, ...updateData });
+        const nextClaim = {
+          ...claim,
+          ...updateData,
+          ...(customerFromUpdates !== undefined && { customer: customerFromUpdates }),
+        };
+        queryClient.setQueryData(['claim', claimId], nextClaim);
       }
       
       // Make API call for all updates

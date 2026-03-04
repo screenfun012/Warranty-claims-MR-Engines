@@ -21,24 +21,24 @@ import { Home, ChevronRight } from "lucide-react";
 import { ApprovalGuard } from "@/components/approval-guard";
 import { useRealtime } from "@/hooks/useRealtime";
 import { useTranslations } from "next-intl";
+import { ClaimBreadcrumbProvider, useClaimBreadcrumb } from "@/components/claim-breadcrumb-context";
 
 function PageTitle({ pathname }: { pathname: string | null }) {
   const t = useTranslations();
-  
+  const { label: claimBreadcrumbLabel } = useClaimBreadcrumb();
+
   if (!pathname) return null;
 
-  // Get breadcrumbs from pathname
   const getBreadcrumbs = (path: string): Array<{ label: string; href: string }> => {
     const parts = path.split("/").filter(Boolean);
     const breadcrumbs: Array<{ label: string; href: string }> = [{ label: t("nav.dashboard"), href: "/" }];
-    
+
     if (parts.length === 0) return breadcrumbs;
-    
+
     let currentPath = "";
     parts.forEach((part, index) => {
       currentPath += `/${part}`;
-      
-      // Handle specific routes
+
       if (part === "claims") {
         if (parts[index + 1] === "new") {
           breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
@@ -46,7 +46,10 @@ function PageTitle({ pathname }: { pathname: string | null }) {
           return;
         } else if (parts[index + 1]) {
           breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
-          breadcrumbs.push({ label: `${t("nav.claims")} ${parts[index + 1].slice(0, 8)}...`, href: currentPath + "/" + parts[index + 1] });
+          const segmentLabel =
+            claimBreadcrumbLabel?.trim() ||
+            `${t("nav.claims")} ${parts[index + 1].slice(0, 8)}...`;
+          breadcrumbs.push({ label: segmentLabel, href: `${currentPath}/${parts[index + 1]}` });
           return;
         } else {
           breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
@@ -166,17 +169,19 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <ApprovalGuard>
-      <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
-            <SidebarTriggerWithTooltip />
-            <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />
-            <PageTitle pathname={pathname} />
-          </header>
-          <main className="flex-1 overflow-auto bg-background/50">{children}</main>
-        </SidebarInset>
-      </SidebarProvider>
+      <ClaimBreadcrumbProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <SidebarInset>
+            <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
+              <SidebarTriggerWithTooltip />
+              <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />
+              <PageTitle pathname={pathname} />
+            </header>
+            <main className="flex-1 overflow-auto bg-background/50">{children}</main>
+          </SidebarInset>
+        </SidebarProvider>
+      </ClaimBreadcrumbProvider>
     </ApprovalGuard>
   );
 }

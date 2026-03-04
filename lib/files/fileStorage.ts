@@ -47,7 +47,9 @@ if (USE_WEBDAV) {
   console.warn("[FileStorage] ⚠ WebDAV not configured. Using local filesystem (dev only).");
 }
 
-async function getClaimBaseKey(claim: Claim & { customer?: { name: string | null; company?: string | null } | null }): Promise<string> {
+type ClaimForFolder = Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean };
+
+async function getClaimBaseKey(claim: ClaimForFolder): Promise<string> {
   let companyName: string | null = null;
   if (claim.customer) {
     companyName = claim.customer.company || claim.customer.name;
@@ -63,7 +65,11 @@ async function getClaimBaseKey(claim: Claim & { customer?: { name: string | null
       console.warn(`[getClaimBaseKey] Failed to load customer for claim ${claim.id}:`, error);
     }
   }
-  const sanitizedCompanyName = sanitizeCustomerNameForPath(companyName);
+  const isDomestic = !!claim.isDomesticMarket;
+  const sanitizedCompanyName =
+    isDomestic && !companyName?.trim()
+      ? "Domestic"
+      : sanitizeCustomerNameForPath(companyName);
   const sanitizedClaimCode = claim.claimCodeRaw
     ? sanitizeClaimCodeForPath(claim.claimCodeRaw)
     : claim.id;
@@ -138,10 +144,11 @@ export async function createClaimFolder(claim: Claim & { customer?: { name: stri
   }
 }
 
-/** Returns true if claim has Firma (customer) and MR Code (claimCodeRaw) - required for folder creation */
+/** Returns true if folder can be created: (Kompanija kupca + MR broj) OR domaće tržište */
 export async function claimHasProperFolderMetadata(
-  claim: Claim & { customer?: { name: string | null; company?: string | null } | null }
+  claim: Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean }
 ): Promise<boolean> {
+  if (claim.isDomesticMarket) return true;
   let companyName: string | null = null;
   if (claim.customer) {
     companyName = claim.customer.company || claim.customer.name;
