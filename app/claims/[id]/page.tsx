@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -158,6 +158,10 @@ export default function ClaimDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { setLabel: setClaimBreadcrumbLabel } = useClaimBreadcrumb();
   const { user } = useUser();
+
+  const pendingUpdatesRef = useRef<Record<string, unknown>>({});
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const PATCH_DEBOUNCE_MS = 500;
   
   // Helper to get status label
   const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
@@ -238,80 +242,100 @@ export default function ClaimDetailPage() {
   const updateClaim = useCallback(async (updates: Partial<Claim> | Claim) => {
     try {
       const updateKeys = Object.keys(updates);
-      
-      // If a full claim object is passed (from API response), update cache directly
-      if (updateKeys.length > 15 && 'id' in updates && (updates as Claim).id === claim?.id) {
-        queryClient.setQueryData(['claim', claimId], updates as Claim);
+
+      if (updateKeys.length > 15 && "id" in updates && (updates as Claim).id === claim?.id) {
+        queryClient.setQueryData(["claim", claimId], updates as Claim);
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        pendingUpdatesRef.current = {};
         return;
       }
 
-      // Otherwise, treat it as a partial update
       const updateData = { ...updates } as Partial<Claim>;
       const customerFromUpdates = (updates as Record<string, unknown>).customer;
 
-      // API expects only customerId; don't send customer object in PATCH body
-      if ('customer' in updateData) {
+      if ("customer" in updateData) {
         delete (updateData as Record<string, unknown>).customer;
       }
 
-      // Optimistic update - merge into cache including customer so UI updates immediately
-      const previousClaim = claim;
       if (claim) {
         const nextClaim = {
           ...claim,
           ...updateData,
           ...(customerFromUpdates !== undefined && { customer: customerFromUpdates }),
         };
-        queryClient.setQueryData(['claim', claimId], nextClaim);
+        queryClient.setQueryData(["claim", claimId], nextClaim);
       }
-      
-      // Make API call for all updates
-      try {
-          console.log('[updateClaim] Sending update to API:', updateData);
-          const res = await fetch(`/api/claims/${claimId}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updateData),
-          });
 
-          if (!res.ok) {
-            const errorText = await res.text();
-            console.error('[updateClaim] API error:', res.status, errorText);
-            // Revert optimistic update on error
-            if (previousClaim) {
-              queryClient.setQueryData(['claim', claimId], previousClaim);
-            }
-            // Show user-friendly error
-            alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
-            throw new Error(`API error: ${res.status}`);
-          }
+      pendingUpdatesRef.current = { ...pendingUpdatesRef.current, ...updateData };
 
-          const data = await res.json();
-          console.log('[updateClaim] API response:', data);
-          if (data.claim) {
-            queryClient.setQueryData(['claim', claimId], data.claim);
-            // Invalidate statistics cache so it reflects the updated claim
-            // This ensures faultDepartments changes appear in the statistics tab
-            queryClient.invalidateQueries({ queryKey: ['statistics'] });
-            console.log('[updateClaim] Cache updated and statistics invalidated');
-          } else {
-            console.warn('[updateClaim] No claim in response:', data);
-          }
-        } catch (error) {
-          console.error("Error saving claim update:", error);
-          // Revert optimistic update on error
-          if (previousClaim) {
-            queryClient.setQueryData(['claim', claimId], previousClaim);
-          }
-          // Show user-friendly error if not already shown
-          if (error instanceof Error && !error.message.includes('API error')) {
-            alert(`Greška pri čuvanju: ${error.message}`);
-          }
+      const flushPending = () => {
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
         }
+        const toSend = { ...pendingUpdatesRef.current };
+        if (Object.keys(toSend).length === 0) return;
+        pendingUpdatesRef.current = {};
+
+        const previousClaim = queryClient.getQueryData<Claim>(["claim", claimId]);
+        const body = { ...toSend };
+        if ("customer" in body) delete (body as Record<string, unknown>).customer;
+
+        fetch(`/api/claims/${claimId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              const errorText = await res.text();
+              if (previousClaim) queryClient.setQueryData(["claim", claimId], previousClaim);
+              alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
+              return;
+            }
+            const data = await res.json();
+            if (data.claim) {
+              queryClient.setQueryData(["claim", claimId], data.claim);
+              queryClient.invalidateQueries({ queryKey: ["statistics"] });
+              queryClient.invalidateQueries({ queryKey: ["claims"] });
+            }
+          })
+          .catch((error) => {
+            console.error("Error saving claim update:", error);
+            if (previousClaim) queryClient.setQueryData(["claim", claimId], previousClaim);
+            alert(`Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown error"}`);
+          });
+      };
+
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = setTimeout(flushPending, PATCH_DEBOUNCE_MS);
     } catch (error) {
       console.error("Error updating claim:", error);
     }
   }, [claim, claimId, queryClient]);
+
+  useEffect(() => {
+    const id = claimId;
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      const toSend = { ...pendingUpdatesRef.current };
+      if (Object.keys(toSend).length === 0) return;
+      pendingUpdatesRef.current = {};
+      const body = { ...toSend } as Record<string, unknown>;
+      if ("customer" in body) delete body.customer;
+      fetch(`/api/claims/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).catch((err) => console.error("[updateClaim] Flush on unmount failed:", err));
+    };
+  }, [claimId]);
 
   if (loading) {
     return (

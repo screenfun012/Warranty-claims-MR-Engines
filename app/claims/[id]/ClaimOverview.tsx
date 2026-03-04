@@ -307,14 +307,12 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
             value={getSourceValue()}
             onChange={(e) => {
               if (!isReadOnly) {
-                const newValue = e.target.value;
                 setIsEditingSource(true);
-                setSourceText(newValue);
-                // Save to summary field
-                handleSourceTextChange(newValue);
+                setSourceText(e.target.value);
               }
             }}
             onBlur={() => {
+              if (!isReadOnly) handleSourceTextChange(getSourceValue());
               setIsEditingSource(false);
             }}
             rows={10}
@@ -354,13 +352,12 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
             value={getTargetValue()}
             onChange={(e) => {
               if (!isReadOnly) {
-                const newValue = e.target.value;
                 setIsEditingTarget(prev => ({ ...prev, [targetLang]: true }));
-                setTargetTexts(prev => ({ ...prev, [targetLang]: newValue }));
-                handleTargetTextChange(newValue);
+                setTargetTexts(prev => ({ ...prev, [targetLang]: e.target.value }));
               }
             }}
             onBlur={() => {
+              if (!isReadOnly) handleTargetTextChange(getTargetValue());
               setIsEditingTarget(prev => ({ ...prev, [targetLang]: false }));
             }}
             rows={10}
