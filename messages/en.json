@@ -185,6 +185,7 @@
     "notFound": "Claim not found",
     "unassigned": "Unassigned Claim",
     "backToList": "Back to list",
+    "saveAndBackToList": "Save claim and back",
     "lockedInfo": {
       "closed": "Closed claim.",
       "locked": "Locked claim.",

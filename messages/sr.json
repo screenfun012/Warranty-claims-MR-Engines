@@ -183,6 +183,7 @@
     "notFound": "Reklamacija nije pronađena",
     "unassigned": "Nedodeljena reklamacija",
     "backToList": "Nazad na listu",
+    "saveAndBackToList": "Sačuvaj reklamaciju i nazad",
     "lockedInfo": {
       "closed": "Završena reklamacija.",
       "locked": "Zaključana reklamacija.",

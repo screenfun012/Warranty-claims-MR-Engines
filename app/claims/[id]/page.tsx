@@ -86,6 +86,42 @@ interface Claim {
   reportSections: any[];
 }
 
+/** Build PATCH body from current claim (cache) so we always send what's on screen and avoid race conditions */
+function buildPatchBodyFromClaim(c: Claim): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    claimCodeRaw: c.claimCodeRaw ?? null,
+    customerId: c.customer?.id ?? (c as Record<string, unknown>).customerId ?? null,
+    customerNumber: c.customerNumber ?? null,
+    engineType: c.engineType ?? null,
+    mrEngineCode: c.mrEngineCode ?? null,
+    assignedWorkerName: c.assignedWorkerName ?? null,
+    faultDepartmentId: c.faultDepartment?.id ?? (c as Record<string, unknown>).faultDepartmentId ?? null,
+    faultDepartmentIds: c.faultDepartments?.map((d) => d.id) ?? (c as Record<string, unknown>).faultDepartmentIds ?? [],
+    workerFault: c.workerFault ?? null,
+    yearEngineDone: c.yearEngineDone ?? null,
+    dateEngineDone: c.dateEngineDone ?? null,
+    claimArrivalDate: c.claimArrivalDate ?? null,
+    reason: c.reason ?? null,
+    isDomesticMarket: c.isDomesticMarket ?? false,
+    status: c.status ?? "NEW",
+    summarySr: c.summarySr ?? null,
+    summaryEn: c.summaryEn ?? null,
+    summaryDe: (c as Record<string, unknown>).summaryDe ?? null,
+    summaryFr: (c as Record<string, unknown>).summaryFr ?? null,
+    summaryNl: (c as Record<string, unknown>).summaryNl ?? null,
+    claimPrefix: c.claimPrefix ?? null,
+    claimNumber: c.claimNumber ?? null,
+    claimYear: c.claimYear ?? null,
+    claimAcceptanceStatus: (c as Record<string, unknown>).claimAcceptanceStatus ?? null,
+    assignedToId: c.assignedTo?.id ?? (c as Record<string, unknown>).assignedToId ?? null,
+    isLocked: c.isLocked ?? null,
+  };
+  Object.keys(body).forEach((k) => {
+    if (body[k] === undefined) delete body[k];
+  });
+  return body;
+}
+
 // Status badge component with icons - styled like the table
 // Text is neutral gray, icons are colored and animated - unified status system
 const StatusBadge = ({ status, label }: { status: string; label: string }) => {
@@ -159,9 +195,9 @@ export default function ClaimDetailPage() {
   const { setLabel: setClaimBreadcrumbLabel } = useClaimBreadcrumb();
   const { user } = useUser();
 
-  const pendingUpdatesRef = useRef<Record<string, unknown>>({});
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const PATCH_DEBOUNCE_MS = 500;
+  const [isSaving, setIsSaving] = useState(false);
   
   // Helper to get status label
   const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
@@ -238,6 +274,44 @@ export default function ClaimDetailPage() {
     }
   }, [searchParams, claimId, refetch, router]);
 
+  const sendCurrentClaimToServer = useCallback((): Promise<boolean> => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    const current = queryClient.getQueryData<Claim>(["claim", claimId]);
+    if (!current) return Promise.resolve(false);
+    const body = buildPatchBodyFromClaim(current);
+    const previousClaim = current;
+    setIsSaving(true);
+    return fetch(`/api/claims/${claimId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const errorText = await res.text();
+          queryClient.setQueryData(["claim", claimId], previousClaim);
+          alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
+          return false;
+        }
+        const data = await res.json();
+        if (data.claim) {
+          queryClient.setQueryData(["claim", claimId], data.claim);
+          queryClient.invalidateQueries({ queryKey: ["statistics"] });
+          queryClient.invalidateQueries({ queryKey: ["claims"] });
+        }
+        return true;
+      })
+      .catch((error) => {
+        console.error("Error saving claim update:", error);
+        queryClient.setQueryData(["claim", claimId], previousClaim);
+        alert(`Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown error"}`);
+        return false;
+      })
+      .finally(() => setIsSaving(false));
+  }, [claimId, queryClient]);
 
   const updateClaim = useCallback(async (updates: Partial<Claim> | Claim) => {
     try {
@@ -249,13 +323,11 @@ export default function ClaimDetailPage() {
           clearTimeout(debounceTimerRef.current);
           debounceTimerRef.current = null;
         }
-        pendingUpdatesRef.current = {};
         return;
       }
 
       const updateData = { ...updates } as Partial<Claim>;
       const customerFromUpdates = (updates as Record<string, unknown>).customer;
-
       if ("customer" in updateData) {
         delete (updateData as Record<string, unknown>).customer;
       }
@@ -269,49 +341,8 @@ export default function ClaimDetailPage() {
         queryClient.setQueryData(["claim", claimId], nextClaim);
       }
 
-      pendingUpdatesRef.current = { ...pendingUpdatesRef.current, ...updateData };
-
-      const flushPending = () => {
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-          debounceTimerRef.current = null;
-        }
-        const toSend = { ...pendingUpdatesRef.current };
-        if (Object.keys(toSend).length === 0) return;
-        pendingUpdatesRef.current = {};
-
-        const previousClaim = queryClient.getQueryData<Claim>(["claim", claimId]);
-        const body = { ...toSend };
-        if ("customer" in body) delete (body as Record<string, unknown>).customer;
-
-        fetch(`/api/claims/${claimId}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        })
-          .then(async (res) => {
-            if (!res.ok) {
-              const errorText = await res.text();
-              if (previousClaim) queryClient.setQueryData(["claim", claimId], previousClaim);
-              alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
-              return;
-            }
-            const data = await res.json();
-            if (data.claim) {
-              queryClient.setQueryData(["claim", claimId], data.claim);
-              queryClient.invalidateQueries({ queryKey: ["statistics"] });
-              queryClient.invalidateQueries({ queryKey: ["claims"] });
-            }
-          })
-          .catch((error) => {
-            console.error("Error saving claim update:", error);
-            if (previousClaim) queryClient.setQueryData(["claim", claimId], previousClaim);
-            alert(`Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown error"}`);
-          });
-      };
-
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = setTimeout(flushPending, PATCH_DEBOUNCE_MS);
+      debounceTimerRef.current = setTimeout(sendCurrentClaimToServer, PATCH_DEBOUNCE_MS);
     } catch (error) {
       console.error("Error updating claim:", error);
     }
@@ -324,18 +355,16 @@ export default function ClaimDetailPage() {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }
-      const toSend = { ...pendingUpdatesRef.current };
-      if (Object.keys(toSend).length === 0) return;
-      pendingUpdatesRef.current = {};
-      const body = { ...toSend } as Record<string, unknown>;
-      if ("customer" in body) delete body.customer;
+      const current = queryClient.getQueryData<Claim>(["claim", id]);
+      if (!current) return;
+      const body = buildPatchBodyFromClaim(current);
       fetch(`/api/claims/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       }).catch((err) => console.error("[updateClaim] Flush on unmount failed:", err));
     };
-  }, [claimId]);
+  }, [claimId, queryClient]);
 
   if (loading) {
     return (
@@ -389,6 +418,21 @@ export default function ClaimDetailPage() {
           )}
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
+          {canEdit && (
+            <Button
+              variant="default"
+              size="sm"
+              disabled={isSaving}
+              onClick={() => {
+                sendCurrentClaimToServer().then((ok) => {
+                  if (ok) router.push("/claims");
+                });
+              }}
+              className="h-8 text-xs sm:text-sm"
+            >
+              {isSaving ? t("common.loading") : t("claims.saveAndBackToList")}
+            </Button>
+          )}
           <Button 
             variant="ghost" 
             size="sm"

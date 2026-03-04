@@ -91,38 +91,18 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
   const [isEditingSource, setIsEditingSource] = useState(false);
   const [isEditingTarget, setIsEditingTarget] = useState<Record<string, boolean>>({});
 
-  // Initialize source text when claim or useEmailBody changes (only if not currently editing)
-  useEffect(() => {
-    if (!isEditingSource) {
-      if (useEmailBody) {
-        setSourceText(emailBodyText);
-      } else {
-        const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
-        setSourceText(sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "");
-      }
-    }
-  }, [useEmailBody, emailBodyText, sourceLang, claim, isEditingSource]);
+  const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
+  const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
 
-  // Initialize target texts when claim changes (only if not currently editing that target)
-  useEffect(() => {
-    LANGUAGES.forEach(lang => {
-      if (!isEditingTarget[lang.code]) {
-        const value = getSummaryValue(lang.field);
-        setTargetTexts(prev => ({ ...prev, [lang.code]: value }));
-      }
-    });
-  }, [claim, isEditingTarget]);
-
+  /** When not editing, derive from claim so no useEffect sync and no flash when clearing text */
   const getSourceValue = () => {
-    return sourceText;
+    if (isEditingSource) return sourceText;
+    if (useEmailBody) return emailBodyText;
+    return sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "";
   };
 
   const getTargetValue = () => {
-    // Use local state if editing, otherwise use claim value
-    if (isEditingTarget[targetLang] !== undefined && isEditingTarget[targetLang]) {
-      return targetTexts[targetLang] ?? "";
-    }
-    const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
+    if (isEditingTarget[targetLang]) return targetTexts[targetLang] ?? "";
     return targetLangConfig ? getSummaryValue(targetLangConfig.field) : "";
   };
 
@@ -305,6 +285,12 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           </div>
           <Textarea
             value={getSourceValue()}
+            onFocus={() => {
+              if (!isReadOnly) {
+                setSourceText(getSourceValue());
+                setIsEditingSource(true);
+              }
+            }}
             onChange={(e) => {
               if (!isReadOnly) {
                 setIsEditingSource(true);
@@ -350,6 +336,12 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           </div>
           <Textarea
             value={getTargetValue()}
+            onFocus={() => {
+              if (!isReadOnly) {
+                setTargetTexts(prev => ({ ...prev, [targetLang]: getTargetValue() }));
+                setIsEditingTarget(prev => ({ ...prev, [targetLang]: true }));
+              }
+            }}
             onChange={(e) => {
               if (!isReadOnly) {
                 setIsEditingTarget(prev => ({ ...prev, [targetLang]: true }));
