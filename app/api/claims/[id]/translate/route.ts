@@ -54,28 +54,23 @@ export async function POST(
         return NextResponse.json({ error: "Claim not found" }, { status: 404 });
       }
 
-      // Determine source text based on sourceLang
-      let textToTranslate = "";
       const sourceLangUpper = (sourceLang || "SR").toUpperCase();
-      const claimWithSummaries = claim as typeof claim & {
-        summaryDe?: string | null;
-        summaryFr?: string | null;
-        summaryNl?: string | null;
-      };
-      
-      if (sourceLangUpper === "SR") {
-        textToTranslate = claim.summarySr || "";
-      } else if (sourceLangUpper === "EN") {
-        textToTranslate = claim.summaryEn || "";
-      } else if (sourceLangUpper === "DE") {
-        textToTranslate = claimWithSummaries.summaryDe || "";
-      } else if (sourceLangUpper === "FR") {
-        textToTranslate = claimWithSummaries.summaryFr || "";
-      } else if (sourceLangUpper === "NL") {
-        textToTranslate = claimWithSummaries.summaryNl || "";
+      // Prefer text sent from frontend (what's on screen); fallback to DB so unsaved edits can be translated
+      let textToTranslate = typeof text === "string" && text.trim() ? text.trim() : "";
+      if (!textToTranslate) {
+        const claimWithSummaries = claim as typeof claim & {
+          summaryDe?: string | null;
+          summaryFr?: string | null;
+          summaryNl?: string | null;
+        };
+        if (sourceLangUpper === "SR") textToTranslate = claim.summarySr || "";
+        else if (sourceLangUpper === "EN") textToTranslate = claim.summaryEn || "";
+        else if (sourceLangUpper === "DE") textToTranslate = claimWithSummaries.summaryDe || "";
+        else if (sourceLangUpper === "FR") textToTranslate = claimWithSummaries.summaryFr || "";
+        else if (sourceLangUpper === "NL") textToTranslate = claimWithSummaries.summaryNl || "";
       }
 
-      if (!textToTranslate) {
+      if (!textToTranslate.trim()) {
         const langNames: Record<string, string> = {
           SR: "Serbian",
           EN: "English",

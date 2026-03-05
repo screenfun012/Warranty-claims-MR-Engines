@@ -183,8 +183,9 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
       return;
     }
 
-    const textToTranslate = sourceText; // Use current sourceText state (which can be edited)
-    if (!textToTranslate || !textToTranslate.trim()) {
+    // Use whatever is shown in the source box: email body OR summary (so "Koristi body emaila" works too)
+    const textToTranslate = getSourceValue();
+    if (!textToTranslate || !String(textToTranslate).trim()) {
       if (useEmailBody) {
         alert(t("claims.overview.translate.noEmailBody"));
       } else {
@@ -195,7 +196,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
 
     setTranslating(true);
     try {
-      // If using email body, send the text directly, otherwise use summary type
+      // Always send the current text from the UI so API doesn't rely on DB (which may not be saved yet)
       const requestBody = useEmailBody 
         ? {
             type: "text",
@@ -205,6 +206,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           }
         : {
             type: "summary",
+            text: textToTranslate,
             targetLang: targetLang.toUpperCase(),
             sourceLang: sourceLang.toUpperCase(),
           };
