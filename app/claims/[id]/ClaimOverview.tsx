@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -90,21 +90,42 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
   const [targetTexts, setTargetTexts] = useState<Record<string, string>>({});
   const [isEditingSource, setIsEditingSource] = useState(false);
   const [isEditingTarget, setIsEditingTarget] = useState<Record<string, boolean>>({});
+  const overviewClaimIdRef = useRef(claim.id);
 
   const sourceLangConfig = LANGUAGES.find(l => l.code === sourceLang);
   const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
 
-  /** When not editing, derive from claim so no useEffect sync and no flash when clearing text */
+  /** Sync from claim only when claim.id or source/target lang changes – never on every claim change, so deleted text stays deleted */
+  useEffect(() => {
+    if (overviewClaimIdRef.current !== claim.id) {
+      overviewClaimIdRef.current = claim.id;
+      setSourceText(useEmailBody ? emailBodyText : (sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : ""));
+      setTargetTexts(
+        LANGUAGES.reduce((acc, lang) => {
+          acc[lang.code] = getSummaryValue(lang.field);
+          return acc;
+        }, {} as Record<string, string>)
+      );
+      return;
+    }
+    setSourceText(useEmailBody ? emailBodyText : (sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : ""));
+  }, [claim.id, sourceLang, useEmailBody]);
+
+  useEffect(() => {
+    if (overviewClaimIdRef.current !== claim.id) return;
+    setTargetTexts((prev) => ({
+      ...prev,
+      [targetLang]: getSummaryValue(targetLangConfig?.field ?? ""),
+    }));
+  }, [claim.id, targetLang]);
+
+  /** Display always from local state so nothing overwrites what user just cleared */
   const getSourceValue = () => {
-    if (isEditingSource) return sourceText;
-    if (useEmailBody) return emailBodyText;
-    return sourceLangConfig ? getSummaryValue(sourceLangConfig.field) : "";
+    if (useEmailBody && !isEditingSource) return emailBodyText;
+    return sourceText;
   };
 
-  const getTargetValue = () => {
-    if (isEditingTarget[targetLang]) return targetTexts[targetLang] ?? "";
-    return targetLangConfig ? getSummaryValue(targetLangConfig.field) : "";
-  };
+  const getTargetValue = () => targetTexts[targetLang] ?? "";
 
   const handleSourceChange = (value: string) => {
     setSourceLang(value);
@@ -295,7 +316,9 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
               }
             }}
             onBlur={() => {
-              if (!isReadOnly) handleSourceTextChange(getSourceValue());
+              const val = getSourceValue();
+              if (!isReadOnly) handleSourceTextChange(val);
+              setSourceText(val);
               setIsEditingSource(false);
             }}
             rows={10}
@@ -346,7 +369,9 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
               }
             }}
             onBlur={() => {
-              if (!isReadOnly) handleTargetTextChange(getTargetValue());
+              const val = getTargetValue();
+              if (!isReadOnly) handleTargetTextChange(val);
+              setTargetTexts(prev => ({ ...prev, [targetLang]: val }));
               setIsEditingTarget(prev => ({ ...prev, [targetLang]: false }));
             }}
             rows={10}

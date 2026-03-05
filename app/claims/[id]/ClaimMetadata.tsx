@@ -292,10 +292,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     }
   };
 
-  // Sync local state when claim changes
+  // Sync local state only when claim.id changes (new claim loaded). Never overwrite form on every claim change – that caused reverts.
   useEffect(() => {
     if (prevClaimIdRef.current !== claim.id) {
-      // New claim loaded, reset all local state
+      prevClaimIdRef.current = claim.id;
       setClaimCode(claim.claimCodeRaw || "");
       setCustomerNumber(claim.customerNumber || "");
       setCustomerName(claim.customer?.name || "");
@@ -303,7 +303,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setEngineCode(claim.mrEngineCode || "");
       setAssignedWorkerName(claim.assignedWorkerName || "");
       setFaultDepartmentId(claim.faultDepartment?.id || "");
-      // Set faultDepartmentIds - prefer faultDepartments array, fallback to single faultDepartment
       if (claim.faultDepartments && claim.faultDepartments.length > 0) {
         setFaultDepartmentIds(claim.faultDepartments.map((d) => d.id));
       } else if (claim.faultDepartment?.id) {
@@ -319,43 +318,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setIsDomesticMarket(claim.isDomesticMarket || false);
       setEditingField(null);
       setNotificationSent(!!claim.processingEmailSentAt);
-      prevClaimIdRef.current = claim.id;
-    } else if (!editingField) {
-      // External update, sync if not editing
-      if (claim.claimCodeRaw !== claimCode) setClaimCode(claim.claimCodeRaw || "");
-      if (claim.customerNumber !== customerNumber) setCustomerNumber(claim.customerNumber || "");
-      if (claim.customer?.name !== customerName) setCustomerName(claim.customer?.name || "");
-      if (claim.engineType !== engineType) setEngineType(claim.engineType || "");
-      if (claim.mrEngineCode !== engineCode) setEngineCode(claim.mrEngineCode || "");
-      if (claim.assignedWorkerName !== assignedWorkerName) setAssignedWorkerName(claim.assignedWorkerName || "");
-      if (claim.faultDepartment?.id !== faultDepartmentId) setFaultDepartmentId(claim.faultDepartment?.id || "");
-      // Sync multiple fault departments - only if API actually returned faultDepartments array
-      // Don't reset to empty if faultDepartments is undefined (API might not have returned it)
-      if (claim.faultDepartments !== undefined) {
-        const newFaultDepartmentIds = claim.faultDepartments.map((d) => d.id);
-        if (JSON.stringify(newFaultDepartmentIds.sort()) !== JSON.stringify(faultDepartmentIds.sort())) {
-          setFaultDepartmentIds(newFaultDepartmentIds);
-        }
-      }
-      if (claim.workerFault !== workerFault) setWorkerFault(claim.workerFault || "");
-      if (claim.yearEngineDone?.toString() !== yearEngineDone) setYearEngineDone(claim.yearEngineDone?.toString() || "");
-      // Sync date fields
-      const newDateEngineDone = claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined;
-      if (newDateEngineDone?.toISOString() !== dateEngineDone?.toISOString()) setDateEngineDone(newDateEngineDone);
-      const newClaimArrivalDate = claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined;
-      if (newClaimArrivalDate?.toISOString() !== claimArrivalDate?.toISOString()) setClaimArrivalDate(newClaimArrivalDate);
-      if (claim.reason !== reason) setReason(claim.reason || "");
-      if (claim.isDomesticMarket !== isDomesticMarket) setIsDomesticMarket(claim.isDomesticMarket || false);
-      if (!!claim.processingEmailSentAt !== notificationSent) setNotificationSent(!!claim.processingEmailSentAt);
     }
-  }, [
-    claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name,
-    claim.engineType, claim.mrEngineCode, claim.assignedWorkerName,
-    claim.faultDepartment?.id, claim.faultDepartments, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate,
-    claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt,
-    editingField, claimCode, customerNumber, customerName, engineType, engineCode,
-    assignedWorkerName, faultDepartmentId, faultDepartmentIds, workerFault, yearEngineDone, dateEngineDone, claimArrivalDate, reason, isDomesticMarket, notificationSent
-  ]);
+  }, [claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.engineType, claim.mrEngineCode, claim.assignedWorkerName, claim.faultDepartment?.id, claim.faultDepartments, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate, claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt]);
 
   // Save field on blur
   const handleFieldBlur = (field: string, value: string | number | boolean | null) => {

@@ -10,7 +10,7 @@ import { parseClaimCode } from "@/lib/domain/claimCode";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 import { logActivityFromRequest } from "@/lib/activity-log";
-import { createClaimFolder, claimHasProperFolderMetadata } from "@/lib/files/fileStorage";
+import { createClaimFolder, claimHasProperFolderMetadata, renameClaimFolderIfNeeded } from "@/lib/files/fileStorage";
 
 export async function GET(
   request: NextRequest,
@@ -547,6 +547,19 @@ export async function PATCH(
           (claim as { serverFolderPath?: string | null }).serverFolderPath = folderPath;
           console.log(`[PATCH /api/claims/${id}] Created Synology folder (Firma - MR Code): ${folderPath}`);
         }
+      }
+    }
+
+    // When company or MR code changes and folder already exists, rename folder on server so old name is not left behind
+    if (claim?.serverFolderPath) {
+      const newFolderPath = await renameClaimFolderIfNeeded(claim);
+      if (newFolderPath) {
+        await prisma.claim.update({
+          where: { id },
+          data: { serverFolderPath: newFolderPath },
+        });
+        (claim as { serverFolderPath?: string | null }).serverFolderPath = newFolderPath;
+        console.log(`[PATCH /api/claims/${id}] Renamed Synology folder to: ${newFolderPath}`);
       }
     }
 

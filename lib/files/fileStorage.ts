@@ -144,6 +144,46 @@ export async function createClaimFolder(claim: Claim & { customer?: { name: stri
   }
 }
 
+/**
+ * When company or MR code changes and claim already has a folder, rename it on the server
+ * so the old folder with wrong name is not left behind. Returns new base key or null.
+ */
+export async function renameClaimFolderIfNeeded(
+  claim: Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean; serverFolderPath?: string | null }
+): Promise<string | null> {
+  const oldStored = claim.serverFolderPath?.trim();
+  if (!oldStored) return null;
+  const newBaseKey = await getClaimBaseKey(claim);
+  const oldBaseKey = path.isAbsolute(oldStored) || oldStored.includes(path.sep)
+    ? path.basename(oldStored)
+    : oldStored;
+  if (oldBaseKey === newBaseKey) return null;
+
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      const fromPath = getWebDAVPath(oldBaseKey);
+      const toPath = getWebDAVPath(newBaseKey);
+      await webdavClient.moveFile(fromPath, toPath, { overwrite: false });
+      console.log(`[renameClaimFolder] Renamed on Synology: ${oldBaseKey} -> ${newBaseKey}`);
+      return newBaseKey;
+    } catch (error) {
+      console.error(`[renameClaimFolder] WebDAV rename failed:`, error);
+      return null;
+    }
+  }
+  try {
+    const rootPath = path.resolve(env.FILE_ROOT_PATH);
+    const oldPath = path.join(rootPath, oldBaseKey);
+    const newPath = path.join(rootPath, newBaseKey);
+    await fs.rename(oldPath, newPath);
+    console.log(`[renameClaimFolder] Renamed on filesystem: ${oldBaseKey} -> ${newBaseKey}`);
+    return newBaseKey;
+  } catch (error) {
+    console.error(`[renameClaimFolder] Filesystem rename failed:`, error);
+    return null;
+  }
+}
+
 /** Returns true if folder can be created: (Kompanija kupca + MR broj) OR domaće tržište */
 export async function claimHasProperFolderMetadata(
   claim: Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean }
