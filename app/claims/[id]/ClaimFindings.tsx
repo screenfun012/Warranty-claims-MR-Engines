@@ -20,11 +20,15 @@ export function ClaimFindings({ claim, onUpdate, isReadOnly = false }: ClaimFind
   const [sections, setSections] = useState<any[]>(claim.reportSections || []);
   const [pendingSaves, setPendingSaves] = useState<Map<string, string>>(new Map());
   const saveTimeouts = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const findingsClaimIdRef = useRef(claim.id);
 
-  // Update sections when claim changes
+  // Sync sections from claim only when claim.id changes (new claim). Don't overwrite on every claim.reportSections – that reverted deleted text.
   useEffect(() => {
-    setSections(claim.reportSections || []);
-  }, [claim.reportSections]);
+    if (findingsClaimIdRef.current !== claim.id) {
+      findingsClaimIdRef.current = claim.id;
+      setSections(claim.reportSections || []);
+    }
+  }, [claim.id, claim.reportSections]);
 
   // Save pending changes when component unmounts or tab changes
   useEffect(() => {

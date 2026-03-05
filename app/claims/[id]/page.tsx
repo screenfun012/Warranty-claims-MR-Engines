@@ -199,6 +199,7 @@ export default function ClaimDetailPage() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const PATCH_DEBOUNCE_MS = 500;
   const [isSaving, setIsSaving] = useState(false);
+  const [savingAndBack, setSavingAndBack] = useState(false);
   
   // Helper to get status label
   const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
@@ -416,13 +417,19 @@ export default function ClaimDetailPage() {
             <Button
               variant="default"
               size="sm"
-              onClick={() => {
-                router.push("/claims");
-                sendCurrentClaimToServer(true);
+              onClick={async () => {
+                setSavingAndBack(true);
+                try {
+                  const ok = await sendCurrentClaimToServer(true);
+                  if (ok) router.push("/claims");
+                } finally {
+                  setSavingAndBack(false);
+                }
               }}
+              disabled={savingAndBack}
               className="h-8 text-xs sm:text-sm"
             >
-              {t("claims.saveAndBackToList")}
+              {savingAndBack ? t("common.loading") : t("claims.saveAndBackToList")}
             </Button>
           )}
           <Button 
