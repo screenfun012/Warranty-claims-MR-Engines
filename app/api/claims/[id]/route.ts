@@ -173,8 +173,7 @@ export async function PATCH(
     
     if (!userIsSuperAdmin) {
       // For non-SUPER_ADMIN users, check if claim is locked
-      const isClaimLocked = existingClaim.isLocked === true || 
-                           (existingClaim.status === "CLOSED" && existingClaim.isLocked !== false);
+      const isClaimLocked = existingClaim.isLocked === true;
       
       if (isClaimLocked) {
         return NextResponse.json(
@@ -241,11 +240,7 @@ export async function PATCH(
       }
     });
 
-    // Auto-lock claim when status becomes APPROVED or REJECTED
-    if (updateData.status === "APPROVED" || updateData.status === "REJECTED") {
-      updateData.isLocked = true;
-      console.log(`[PATCH /api/claims/${id}] Auto-locking claim due to status change to ${updateData.status}`);
-    }
+    // Do NOT auto-lock on APPROVED/REJECTED – user locks manually if needed
 
     // Ensure claimAcceptanceStatus is properly handled (can be null to clear it)
     if (body.claimAcceptanceStatus === null || body.claimAcceptanceStatus === "") {

@@ -230,16 +230,8 @@ export default function ClaimDetailPage() {
     retryDelay: 1000,
   });
 
-  // Check if claim is locked or closed (read-only logic)
-  // Default: CLOSED status = locked (read-only for non-SUPER_ADMIN)
-  // SUPER_ADMIN can unlock closed claims by setting isLocked = false
-  // SUPER_ADMIN can manually lock non-closed claims by setting isLocked = true
-  // isLocked === null or undefined means "use default" (CLOSED = locked)
-  // isLocked === true means "explicitly locked" (even if not CLOSED)
-  // isLocked === false means "explicitly unlocked" (even if CLOSED)
-  const isClaimLocked = claim ? 
-    (claim.isLocked === true) || (claim.status === "CLOSED" && claim.isLocked !== false) : 
-    false;
+  // Read-only only when explicitly locked (isLocked === true). APPROVED/REJECTED/CLOSED do not auto-lock – user locks manually.
+  const isClaimLocked = claim?.isLocked === true;
   
   const isReadOnly = !isSuperAdmin && isClaimLocked;
 
@@ -275,7 +267,8 @@ export default function ClaimDetailPage() {
     }
   }, [searchParams, claimId, refetch, router]);
 
-  const sendCurrentClaimToServer = useCallback((): Promise<boolean> => {
+  /** @param silent - when true (e.g. "save and back"), don't set isSaving so UI doesn't show loading and navigation feels instant */
+  const sendCurrentClaimToServer = useCallback((silent?: boolean): Promise<boolean> => {
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
       debounceTimerRef.current = null;
@@ -284,7 +277,7 @@ export default function ClaimDetailPage() {
     if (!current) return Promise.resolve(false);
     const body = buildPatchBodyFromClaim(current);
     const previousClaim = current;
-    setIsSaving(true);
+    if (!silent) setIsSaving(true);
     return fetch(`/api/claims/${claimId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -311,7 +304,7 @@ export default function ClaimDetailPage() {
         alert(`Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown error"}`);
         return false;
       })
-      .finally(() => setIsSaving(false));
+      .finally(() => { if (!silent) setIsSaving(false); });
   }, [claimId, queryClient]);
 
   const updateClaim = useCallback(async (updates: Partial<Claim> | Claim) => {
@@ -423,15 +416,13 @@ export default function ClaimDetailPage() {
             <Button
               variant="default"
               size="sm"
-              disabled={isSaving}
               onClick={() => {
-                sendCurrentClaimToServer().then((ok) => {
-                  if (ok) router.push("/claims");
-                });
+                router.push("/claims");
+                sendCurrentClaimToServer(true);
               }}
               className="h-8 text-xs sm:text-sm"
             >
-              {isSaving ? t("common.loading") : t("claims.saveAndBackToList")}
+              {t("claims.saveAndBackToList")}
             </Button>
           )}
           <Button 

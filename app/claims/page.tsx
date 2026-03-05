@@ -147,7 +147,6 @@ export default function ClaimsPage() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   // Separate state for text inputs to allow debouncing
@@ -200,8 +199,8 @@ export default function ClaimsPage() {
     };
   }, []);
 
-  // React Query for filtered claims (displayed in table) - server returns exact page, no client-side re-filter
-  const { data: claimsData, isLoading: loading, refetch: refetchClaims } = useQuery({
+  // React Query for filtered claims (displayed in table) - return claims + pagination so pagination is in sync (no stale "next" disabled)
+  const { data: filteredData, isLoading: loading, refetch: refetchClaims } = useQuery({
     queryKey: ['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize],
     queryFn: async () => {
       const result = await fetchClaimsData(
@@ -210,18 +209,22 @@ export default function ClaimsPage() {
         pageSize,
         false
       );
-      // Update pagination state
-      if (result.pagination) {
-        setPagination(result.pagination);
-      }
-      return result.claims;
+      return { claims: result.claims, pagination: result.pagination };
     },
     staleTime: 60 * 1000, // 1 minute - data stays fresh, less refetch when switching tabs
     gcTime: 10 * 60 * 1000, // 10 minutes - keep in cache
     placeholderData: keepPreviousData, // Keep showing current page while next page loads (no blank flash)
   });
-  
-  const claims = claimsData || [];
+
+  const claims = filteredData?.claims ?? [];
+  const pagination = filteredData?.pagination ?? null;
+
+  // When filters reduce total pages, clamp current page so "next" and page info stay valid
+  useEffect(() => {
+    if (pagination && currentPage > pagination.totalPages && pagination.totalPages >= 1) {
+      setCurrentPage(pagination.totalPages);
+    }
+  }, [pagination, currentPage]);
 
   // React Query for all claims (used for suggestions)
   const { data: allClaimsData, refetch: refetchAllClaims } = useQuery({
@@ -235,12 +238,10 @@ export default function ClaimsPage() {
 
   // Helper function to update claims in React Query cache
   const updateClaimInCache = useCallback((claimId: string, updates: Partial<Claim>) => {
-    // Update filtered claims cache - use functional update to ensure React detects change
-    queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize], (old) => {
-      if (!old) return old;
-      const updated = old.map(c => c.id === claimId ? { ...c, ...updates } : c);
-      // Force re-render by creating new array reference
-      return [...updated];
+    queryClient.setQueryData<{ claims: Claim[]; pagination: PaginationInfo | null }>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize], (old) => {
+      if (!old?.claims) return old;
+      const updated = old.claims.map(c => c.id === claimId ? { ...c, ...updates } : c);
+      return { ...old, claims: [...updated] };
     });
     
     // Update all claims cache (for suggestions)
@@ -384,9 +385,21 @@ export default function ClaimsPage() {
       });
       if (res.ok) {
         // Optimistically remove from cache
-        queryClient.setQueryData<Claim[]>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize], (old) => {
-          if (!old) return old;
-          return old.filter(c => c.id !== claimId);
+        queryClient.setQueryData<{ claims: Claim[]; pagination: PaginationInfo | null }>(['claims', 'filtered', filters.status, filters.claimCode, filters.customerId, filters.urgentOnly, currentPage, pageSize], (old) => {
+          if (!old?.claims) return old;
+          const filtered = old.claims.filter(c => c.id !== claimId);
+          const newTotal = Math.max(0, (old.pagination?.total ?? old.claims.length) - 1);
+          const totalPages = Math.ceil(newTotal / pageSize) || 1;
+          return {
+            claims: filtered,
+            pagination: old.pagination ? {
+              ...old.pagination,
+              total: newTotal,
+              totalPages,
+              hasNext: currentPage < totalPages,
+              hasPrev: currentPage > 1,
+            } : null,
+          };
         });
         queryClient.setQueryData<{ claims: Claim[]; pagination: PaginationInfo | null }>(['claims', 'all', filters.status], (old) => {
           if (!old) return old;
@@ -813,8 +826,8 @@ export default function ClaimsPage() {
               actions: (
                 <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()} key={`actions-${claim.id}-${claim.isLocked}`}>
                   {(() => {
-                    // Check if claim is locked (CLOSED = locked by default, OR isLocked === true)
-                    const isLocked = claim.isLocked === true || (claim.status === "CLOSED" && claim.isLocked !== false);
+                    // Locked only when explicitly set (no auto-lock for CLOSED/APPROVED/REJECTED)
+                    const isLocked = claim.isLocked === true;
                     return isLocked ? (
                       <Button
                         key={`unlock-${claim.id}-${claim.isLocked}`}
@@ -887,7 +900,7 @@ export default function ClaimsPage() {
       </Card>
 
       {/* Pagination */}
-      {pagination && pagination.totalPages > 1 && (
+      {pagination && pagination.total > 0 && (
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div className="text-sm text-muted-foreground">
