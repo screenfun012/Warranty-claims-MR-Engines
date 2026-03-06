@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -60,9 +61,13 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
   // Get email body text
   const emailBodyText = getEmailBodyText(claim);
 
-  // Initialize languages from existing summaries or email body
+  // Initialize language + email-body mode ONLY when a different claim is loaded —
+  // never re-run on every claim prop change, so the user's choice is respected.
+  const initClaimIdRef = useRef<string | null>(null);
   useEffect(() => {
-    // If email body exists and no summary, use email body
+    if (initClaimIdRef.current === claim.id) return;
+    initClaimIdRef.current = claim.id;
+
     if (emailBodyText && !claim.summarySr && !claim.summaryEn) {
       setUseEmailBody(true);
       setSourceLang("SR");
@@ -73,14 +78,13 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
       setSourceLang("EN");
       setUseEmailBody(false);
     } else {
-      // Check other languages
       const langWithContent = LANGUAGES.find(lang => claim[lang.field]);
       if (langWithContent) {
         setSourceLang(langWithContent.code);
         setUseEmailBody(false);
       }
     }
-  }, [claim, emailBodyText]);
+  }, [claim.id, emailBodyText]);
 
   const getSummaryValue = (field: string) => {
     return claim[field] || "";

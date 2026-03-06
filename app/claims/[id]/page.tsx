@@ -12,7 +12,6 @@ import { FileText, Mail, CheckCircle2, XCircle, Circle, Search, Languages, Folde
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 
-// This is a large component - importing sub-components
 import { ClaimMetadata } from "./ClaimMetadata";
 import { ClaimOverview } from "./ClaimOverview";
 import { ClaimEmails } from "./ClaimEmails";
@@ -23,7 +22,6 @@ import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useClaimBreadcrumb } from "@/components/claim-breadcrumb-context";
 
-// Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {
   VIEWER: 0,
   OPERATOR: 1,
@@ -86,45 +84,24 @@ interface Claim {
   reportSections: any[];
 }
 
-/** Build PATCH body from current claim (cache) so we always send what's on screen and avoid race conditions */
-function buildPatchBodyFromClaim(c: Claim): Record<string, unknown> {
-  const r = c as unknown as Record<string, unknown>;
-  const body: Record<string, unknown> = {
-    claimCodeRaw: c.claimCodeRaw ?? null,
-    customerId: c.customer?.id ?? r.customerId ?? null,
-    customerNumber: c.customerNumber ?? null,
-    engineType: c.engineType ?? null,
-    mrEngineCode: c.mrEngineCode ?? null,
-    assignedWorkerName: c.assignedWorkerName ?? null,
-    faultDepartmentId: c.faultDepartment?.id ?? r.faultDepartmentId ?? null,
-    faultDepartmentIds: c.faultDepartments?.map((d) => d.id) ?? r.faultDepartmentIds ?? [],
-    workerFault: c.workerFault ?? null,
-    yearEngineDone: c.yearEngineDone ?? null,
-    dateEngineDone: c.dateEngineDone ?? null,
-    claimArrivalDate: c.claimArrivalDate ?? null,
-    reason: c.reason ?? null,
-    isDomesticMarket: c.isDomesticMarket ?? false,
-    status: c.status ?? "NEW",
-    summarySr: c.summarySr ?? null,
-    summaryEn: c.summaryEn ?? null,
-    summaryDe: r.summaryDe ?? null,
-    summaryFr: r.summaryFr ?? null,
-    summaryNl: r.summaryNl ?? null,
-    claimPrefix: c.claimPrefix ?? null,
-    claimNumber: c.claimNumber ?? null,
-    claimYear: c.claimYear ?? null,
-    claimAcceptanceStatus: r.claimAcceptanceStatus ?? null,
-    assignedToId: c.assignedTo?.id ?? r.assignedToId ?? null,
-    isLocked: c.isLocked ?? null,
-  };
-  Object.keys(body).forEach((k) => {
-    if (body[k] === undefined) delete body[k];
-  });
-  return body;
-}
+// Fields that live only in the UI / are handled by separate API calls — never sent to PATCH /api/claims/[id]
+const SKIP_PATCH_FIELDS = new Set([
+  "customer",
+  "faultDepartment",
+  "faultDepartments",
+  "workOrder",
+  "assignedTo",
+  "emailThreads",
+  "attachments",
+  "clientDocuments",
+  "photos",
+  "reportSections",
+  "id",
+  "createdAt",
+  "updatedAt",
+  "serverFolderPath",
+]);
 
-// Status badge component with icons - styled like the table
-// Text is neutral gray, icons are colored and animated - unified status system
 const StatusBadge = ({ status, label }: { status: string; label: string }) => {
   const getIcon = () => {
     switch (status) {
@@ -157,28 +134,21 @@ const StatusBadge = ({ status, label }: { status: string; label: string }) => {
   };
 
   return (
-    <Badge 
-      variant="outline" 
+    <Badge
+      variant="outline"
       className={`${getStatusColor()} text-gray-700 dark:text-gray-300 flex items-center gap-1.5 px-2.5 py-1 rounded-md transition-all hover:shadow-sm border`}
     >
       {getIcon()}
-      <span className="text-sm font-medium">
-        {label}
-      </span>
+      <span className="text-sm font-medium">{label}</span>
     </Badge>
   );
 };
 
-// Fetch function for React Query
 const fetchClaimData = async (claimId: string): Promise<Claim> => {
   const res = await fetch(`/api/claims/${claimId}`);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch claim: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`Failed to fetch claim: ${res.status}`);
   const data = await res.json();
-  if (!data.claim) {
-    throw new Error("Claim not found");
-  }
+  if (!data.claim) throw new Error("Claim not found");
   return data.claim;
 };
 
@@ -189,60 +159,60 @@ export default function ClaimDetailPage() {
   const claimId = params?.id as string;
   const queryClient = useQueryClient();
   const t = useTranslations();
-  
+
   const [activeTab, setActiveTab] = useState("overview");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { setLabel: setClaimBreadcrumbLabel } = useClaimBreadcrumb();
   const { user } = useUser();
+  const [isSaving, setIsSaving] = useState(false);
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const PATCH_DEBOUNCE_MS = 500;
-  const [isSaving, setIsSaving] = useState(false);
-  
-  // Helper to get status label
+  const pendingRef = useRef<Record<string, unknown>>({});
+  const PATCH_DEBOUNCE_MS = 400;
+
   const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
+
   interface Auth0User {
     role?: string;
     roles?: string[];
-    'https://mr-engines-warranty/roles'?: string[] | string;
+    "https://mr-engines-warranty/roles"?: string[] | string;
     app_metadata?: { roles?: string[] | string };
   }
   const auth0User = user as Auth0User | undefined;
-  
-  // Get role from various possible locations
-  const userRolesRaw = auth0User?.role || auth0User?.roles?.[0] || auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
+  const userRolesRaw =
+    auth0User?.role ||
+    auth0User?.roles?.[0] ||
+    auth0User?.["https://mr-engines-warranty/roles"] ||
+    auth0User?.app_metadata?.roles ||
+    [];
   const userRole = Array.isArray(userRolesRaw) ? userRolesRaw[0] : userRolesRaw;
-  
-  // Permission checks
   const isSuperAdmin = hasMinRole(userRole, "SUPER_ADMIN");
   const canEdit = hasMinRole(userRole, "OPERATOR");
   const canDelete = isSuperAdmin;
 
-  // React Query for data fetching with caching
-  const { data: claim, isLoading: loading, refetch } = useQuery({
-    queryKey: ['claim', claimId],
+  const {
+    data: claim,
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: ["claim", claimId],
     queryFn: () => fetchClaimData(claimId),
     enabled: !!claimId,
-    staleTime: 60 * 1000, // 1 minute - data stays fresh
-    gcTime: 5 * 60 * 1000, // 5 minutes - keep in cache
+    staleTime: Infinity,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: 2,
     retryDelay: 1000,
   });
 
-  // Read-only only when explicitly locked (isLocked === true). APPROVED/REJECTED/CLOSED do not auto-lock – user locks manually.
   const isClaimLocked = claim?.isLocked === true;
-  
   const isReadOnly = !isSuperAdmin && isClaimLocked;
 
-  // Reset tab when claim ID changes
   useEffect(() => {
-    if (claimId) {
-      setActiveTab("overview");
-    }
+    if (claimId) setActiveTab("overview");
   }, [claimId]);
 
-  // Breadcrumb: human-readable label for this claim (cleared on unmount)
   useEffect(() => {
     if (claim) {
       const label =
@@ -257,46 +227,65 @@ export default function ClaimDetailPage() {
     return () => setClaimBreadcrumbLabel(null);
   }, [claim, setClaimBreadcrumbLabel]);
 
-  // Handle refresh parameter
   useEffect(() => {
     if (!searchParams) return;
-    const refresh = typeof searchParams === 'object' && 'get' in searchParams ? searchParams.get('refresh') : null;
+    const refresh =
+      typeof searchParams === "object" && "get" in searchParams
+        ? searchParams.get("refresh")
+        : null;
     if (refresh && claimId) {
       refetch();
       router.replace(`/claims/${claimId}`, { scroll: false });
     }
   }, [searchParams, claimId, refetch, router]);
 
-  /** @param silent - when true (e.g. "save and back"), don't set isSaving so UI doesn't show loading and navigation feels instant */
-  const sendCurrentClaimToServer = useCallback((silent?: boolean): Promise<boolean> => {
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = null;
-    }
-    const current = queryClient.getQueryData<Claim>(["claim", claimId]);
-    if (!current) return Promise.resolve(false);
-    const body = buildPatchBodyFromClaim(current);
-    const previousClaim = current;
-    if (!silent) setIsSaving(true);
-    return fetch(`/api/claims/${claimId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-      .then(async (res) => {
+  // ── Flush pending changes to server ──────────────────────────────
+  const flushToServer = useCallback(
+    async (silent?: boolean): Promise<boolean> => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+
+      // Build PATCH body from pending changes only
+      const snapshot = { ...pendingRef.current };
+      const patchBody: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(snapshot)) {
+        if (!SKIP_PATCH_FIELDS.has(k)) {
+          patchBody[k] = v;
+        }
+      }
+      if (Object.keys(patchBody).length === 0) return true;
+
+      // Clear pending for the fields we're about to send
+      pendingRef.current = {};
+      if (!silent) setIsSaving(true);
+
+      try {
+        const res = await fetch(`/api/claims/${claimId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchBody),
+        });
+
         if (!res.ok) {
+          // Re-add to pending so next attempt includes them
+          Object.assign(pendingRef.current, snapshot);
           const errorText = await res.text();
-          queryClient.setQueryData(["claim", claimId], previousClaim);
-          alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
+          if (!silent) alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
           return false;
         }
+
         const data = await res.json();
         if (data.claim) {
-          // Merge server response with current cache so user edits made while PATCH was in-flight aren't lost
-          const liveCache = queryClient.getQueryData<Claim>(["claim", claimId]);
-          const merged = liveCache ? { ...data.claim, ...liveCache, id: data.claim.id } : data.claim;
+          // Apply server response, then layer any NEW pending changes on top
+          const freshPending = pendingRef.current;
+          const merged = Object.keys(freshPending).length > 0
+            ? { ...data.claim, ...freshPending }
+            : data.claim;
           queryClient.setQueryData(["claim", claimId], merged);
-          queryClient.invalidateQueries({ queryKey: ["statistics"] });
+
+          // Update claims list caches
           queryClient.setQueriesData<{ claims: Claim[]; pagination: unknown }>(
             { queryKey: ["claims", "filtered"], exact: false },
             (old) => {
@@ -306,57 +295,70 @@ export default function ClaimDetailPage() {
               const next = { ...old, claims: [...old.claims] };
               next.claims[idx] = { ...next.claims[idx], ...data.claim };
               return next;
-            }
+            },
           );
-          queryClient.invalidateQueries({ queryKey: ["claims"] });
         }
         return true;
-      })
-      .catch((error) => {
-        console.error("Error saving claim update:", error);
-        queryClient.setQueryData(["claim", claimId], previousClaim);
-        alert(`Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown error"}`);
+      } catch (error) {
+        Object.assign(pendingRef.current, snapshot);
+        console.error("Error saving claim:", error);
+        if (!silent)
+          alert(
+            `Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown"}`,
+          );
         return false;
-      })
-      .finally(() => { if (!silent) setIsSaving(false); });
-  }, [claimId, queryClient]);
+      } finally {
+        if (!silent) setIsSaving(false);
+      }
+    },
+    [claimId, queryClient],
+  );
 
-  const updateClaim = useCallback((updates: Partial<Claim> | Claim) => {
-    try {
+  // ── Update claim (called by Metadata, Overview, etc.) ────────────
+  const updateClaim = useCallback(
+    (updates: Partial<Claim> | Claim) => {
       const updateKeys = Object.keys(updates);
 
+      // Full claim replacement (from server / child components that push entire claim)
       if (updateKeys.length > 15 && "id" in updates && (updates as Claim).id === claim?.id) {
-        queryClient.setQueryData(["claim", claimId], updates as Claim);
-        if (debounceTimerRef.current) {
-          clearTimeout(debounceTimerRef.current);
-          debounceTimerRef.current = null;
-        }
+        // Apply pending on top so unsaved edits are preserved
+        const pending = pendingRef.current;
+        const merged = Object.keys(pending).length > 0
+          ? { ...(updates as Claim), ...pending }
+          : (updates as Claim);
+        queryClient.setQueryData(["claim", claimId], merged as Claim);
         return;
       }
 
-      const updateData = { ...updates } as Partial<Claim>;
-      const customerFromUpdates = (updates as Record<string, unknown>).customer;
-      if ("customer" in updateData) {
-        delete (updateData as Record<string, unknown>).customer;
+      // Only track patchable fields; UI-only fields just update cache
+      let hasPatchable = false;
+      for (const [k, v] of Object.entries(updates)) {
+        if (!SKIP_PATCH_FIELDS.has(k)) {
+          pendingRef.current[k] = v;
+          hasPatchable = true;
+        }
       }
 
+      // Optimistic cache update (all fields, including UI-only)
       const current = queryClient.getQueryData<Claim>(["claim", claimId]) ?? claim;
       if (current) {
-        const nextClaim = {
-          ...current,
-          ...updateData,
-          ...(customerFromUpdates !== undefined && { customer: customerFromUpdates as Claim["customer"] }),
-        };
-        queryClient.setQueryData(["claim", claimId], nextClaim);
+        const nextClaim = { ...current } as Record<string, unknown>;
+        for (const [k, v] of Object.entries(updates)) {
+          nextClaim[k] = v;
+        }
+        queryClient.setQueryData(["claim", claimId], nextClaim as unknown as Claim);
       }
 
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-      debounceTimerRef.current = setTimeout(sendCurrentClaimToServer, PATCH_DEBOUNCE_MS);
-    } catch (error) {
-      console.error("Error updating claim:", error);
-    }
-  }, [claim, claimId, queryClient]);
+      // Only start debounce if there are actual server-bound fields
+      if (hasPatchable) {
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => flushToServer(), PATCH_DEBOUNCE_MS);
+      }
+    },
+    [claim, claimId, queryClient, flushToServer],
+  );
 
+  // ── Flush on unmount (fire-and-forget) ────────────────────────────
   useEffect(() => {
     const id = claimId;
     return () => {
@@ -364,21 +366,24 @@ export default function ClaimDetailPage() {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;
       }
-      const current = queryClient.getQueryData<Claim>(["claim", id]);
-      if (!current) return;
-      const body = buildPatchBodyFromClaim(current);
+      const snapshot = { ...pendingRef.current };
+      const patchBody: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(snapshot)) {
+        if (!SKIP_PATCH_FIELDS.has(k)) patchBody[k] = v;
+      }
+      if (Object.keys(patchBody).length === 0) return;
+      pendingRef.current = {};
       fetch(`/api/claims/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      }).catch((err) => console.error("[updateClaim] Flush on unmount failed:", err));
+        body: JSON.stringify(patchBody),
+      }).catch((err) => console.error("[flush on unmount]", err));
     };
-  }, [claimId, queryClient]);
+  }, [claimId]);
 
   if (loading) {
     return (
       <div className="p-4 space-y-4">
-        {/* Skeleton Header */}
         <div className="flex items-center justify-between">
           <div className="space-y-2">
             <Skeleton className="h-7 w-48" />
@@ -386,7 +391,6 @@ export default function ClaimDetailPage() {
           </div>
           <Skeleton className="h-8 w-20" />
         </div>
-        {/* Skeleton Content */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-1">
             <Skeleton className="h-[400px] w-full rounded-lg" />
@@ -413,7 +417,7 @@ export default function ClaimDetailPage() {
 
   return (
     <div className="p-2 sm:p-4 space-y-4">
-      {/* Compact Header */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
@@ -423,7 +427,9 @@ export default function ClaimDetailPage() {
             <StatusBadge status={claim.status} label={getStatusLabel(claim.status)} />
           </div>
           {claim.customer?.name && (
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">{claim.customer.name}</p>
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
+              {claim.customer.name}
+            </p>
           )}
         </div>
         <div className="flex gap-2 shrink-0 flex-wrap">
@@ -432,12 +438,12 @@ export default function ClaimDetailPage() {
               variant="default"
               size="sm"
               onClick={() => {
-                // Navigate immediately so operator isn't stuck waiting for slow PATCH on live
                 router.push("/claims");
-                // Save in background; if it fails, list page will show toast
-                sendCurrentClaimToServer(true).then((ok) => {
+                flushToServer(true).then((ok) => {
                   if (!ok) {
-                    window.dispatchEvent(new CustomEvent("claim-save-failed", { detail: { claimId } }));
+                    window.dispatchEvent(
+                      new CustomEvent("claim-save-failed", { detail: { claimId } }),
+                    );
                   }
                 });
               }}
@@ -446,8 +452,8 @@ export default function ClaimDetailPage() {
               {t("claims.saveAndBackToList")}
             </Button>
           )}
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => router.push("/claims")}
             className="h-8 text-xs sm:text-sm"
@@ -456,8 +462,8 @@ export default function ClaimDetailPage() {
             {t("common.back")}
           </Button>
           {claim.status === "CLOSED" && canDelete && (
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               size="sm"
               onClick={() => setShowDeleteDialog(true)}
               disabled={isDeleting}
@@ -469,89 +475,121 @@ export default function ClaimDetailPage() {
         </div>
       </div>
 
-      {/* Compact Info Banner */}
       {isClaimLocked && !isSuperAdmin && (
         <Card className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
           <p className="text-xs text-blue-700 dark:text-blue-300">
             <strong>
-              {claim.status === "CLOSED" ? t("claims.lockedInfo.closed") : t("claims.lockedInfo.locked")}
+              {claim.status === "CLOSED"
+                ? t("claims.lockedInfo.closed")
+                : t("claims.lockedInfo.locked")}
             </strong>{" "}
             {t("claims.lockedInfo.readOnly")}
           </p>
         </Card>
       )}
-      
-      {/* Main Content Grid */}
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-1">
-          <ClaimMetadata claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
+          <ClaimMetadata
+            claim={claim}
+            onUpdate={updateClaim}
+            isReadOnly={!canEdit || (isReadOnly ?? false)}
+          />
         </div>
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid grid-cols-5 w-full h-10 relative z-10">
-              <TabsTrigger value="overview" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
+              <TabsTrigger
+                value="overview"
+                className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer"
+              >
                 <Languages className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t("claims.tabs.summary")}</span>
               </TabsTrigger>
-              <TabsTrigger value="emails" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
+              <TabsTrigger
+                value="emails"
+                className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer"
+              >
                 <Mail className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t("claims.tabs.emails")}</span>
               </TabsTrigger>
-              <TabsTrigger value="documents" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
+              <TabsTrigger
+                value="documents"
+                className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer"
+              >
                 <FileText className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t("claims.tabs.documents")}</span>
               </TabsTrigger>
-              <TabsTrigger value="findings" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
+              <TabsTrigger
+                value="findings"
+                className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer"
+              >
                 <Search className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t("claims.tabs.findings")}</span>
               </TabsTrigger>
-              <TabsTrigger value="photos" className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer">
+              <TabsTrigger
+                value="photos"
+                className="text-xs px-2 relative z-10 pointer-events-auto cursor-pointer"
+              >
                 <Folder className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t("claims.tabs.photos")}</span>
               </TabsTrigger>
             </TabsList>
             <TabsContent value="overview" className="mt-4">
-              <ClaimOverview claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
+              <ClaimOverview
+                claim={claim}
+                onUpdate={updateClaim}
+                isReadOnly={!canEdit || (isReadOnly ?? false)}
+              />
             </TabsContent>
             <TabsContent value="emails" className="mt-4">
-              <ClaimEmails claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
+              <ClaimEmails
+                claim={claim}
+                onUpdate={updateClaim}
+                isReadOnly={!canEdit || (isReadOnly ?? false)}
+              />
             </TabsContent>
             <TabsContent value="documents" className="mt-4">
-              <ClaimClientDocuments claim={claim} isReadOnly={!canEdit || (isReadOnly ?? false)} onRefresh={() => refetch()} />
+              <ClaimClientDocuments
+                claim={claim}
+                isReadOnly={!canEdit || (isReadOnly ?? false)}
+                onRefresh={() => refetch()}
+              />
             </TabsContent>
             <TabsContent value="findings" className="mt-4">
-              <ClaimFindings claim={claim} onUpdate={updateClaim} isReadOnly={!canEdit || (isReadOnly ?? false)} />
+              <ClaimFindings
+                claim={claim}
+                onUpdate={updateClaim}
+                isReadOnly={!canEdit || (isReadOnly ?? false)}
+              />
             </TabsContent>
             <TabsContent value="photos" className="mt-4">
-              <ClaimPhotos claim={claim} isReadOnly={!canEdit || (isReadOnly ?? false)} onRefresh={() => refetch()} />
+              <ClaimPhotos
+                claim={claim}
+                isReadOnly={!canEdit || (isReadOnly ?? false)}
+                onRefresh={() => refetch()}
+              />
             </TabsContent>
           </Tabs>
         </div>
       </div>
 
-      {/* Delete confirmation dialog */}
       <ConfirmDialog
         open={showDeleteDialog}
         onOpenChange={setShowDeleteDialog}
         onConfirm={async () => {
           if (!claim) return;
-          
           setIsDeleting(true);
           try {
-            const res = await fetch(`/api/claims/${claim.id}/delete`, {
-              method: "DELETE",
-            });
-
+            const res = await fetch(`/api/claims/${claim.id}/delete`, { method: "DELETE" });
             if (res.ok) {
-              // Navigate back to claims list
               router.push("/claims");
             } else {
               const errorData = await res.json();
               alert(`${t("common.error")}: ${errorData.error || t("common.error")}`);
               setIsDeleting(false);
             }
-          } catch (error) {
-            console.error("Error deleting claim:", error);
+          } catch {
             alert(t("claims.delete.error"));
             setIsDeleting(false);
           }
@@ -565,4 +603,3 @@ export default function ClaimDetailPage() {
     </div>
   );
 }
-

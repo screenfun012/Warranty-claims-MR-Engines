@@ -322,48 +322,32 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     }
   }, [claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.engineType, claim.mrEngineCode, claim.assignedWorkerName, claim.faultDepartment?.id, claim.faultDepartments, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate, claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt]);
 
-  // Save field on blur
   const handleFieldBlur = (field: string, value: string | number | boolean | null) => {
     setEditingField(null);
     if (isReadOnly) return;
-    
-    // Get original value
-    let originalValue: any = null;
-    switch (field) {
-      case 'claimCodeRaw': originalValue = claim.claimCodeRaw; break;
-      case 'customerNumber': originalValue = claim.customerNumber; break;
-      case 'engineType': originalValue = claim.engineType; break;
-      case 'mrEngineCode': originalValue = claim.mrEngineCode; break;
-      case 'assignedWorkerName': originalValue = claim.assignedWorkerName; break;
-      case 'workerFault': originalValue = claim.workerFault; break;
-      case 'yearEngineDone': originalValue = claim.yearEngineDone; break;
-      case 'reason': originalValue = claim.reason; break;
-      case 'isDomesticMarket': originalValue = claim.isDomesticMarket; break;
-      case 'dateEngineDone': originalValue = claim.dateEngineDone; break;
-      case 'claimArrivalDate': originalValue = claim.claimArrivalDate; break;
-      default: return; // Unknown field, don't save
+
+    const originalValue: any = (claim as any)[field] ?? null;
+
+    // Normalize: empty string → null, numeric strings → number for int fields
+    let normalizedValue: unknown = typeof value === "string" && value.trim() === "" ? null : value;
+    if (field === "yearEngineDone" && typeof normalizedValue === "string") {
+      const parsed = parseInt(normalizedValue, 10);
+      normalizedValue = Number.isNaN(parsed) ? null : parsed;
     }
-    
-    // Normalize values for comparison (empty string = null for strings)
-    const normalizedValue = typeof value === 'string' && value.trim() === '' ? null : value;
-    const normalizedOriginal = originalValue === null || originalValue === undefined 
-      ? null 
-      : (typeof originalValue === 'string' && originalValue.trim() === '' ? null : originalValue);
-    
-    // Only save if value changed
-    if (normalizedValue !== normalizedOriginal) {
-      const updates: Record<string, unknown> = { [field]: normalizedValue };
-      // Auto-change status to IN_ANALYSIS if currently NEW
-      if (claim.status === "NEW") {
-        updates.status = "IN_ANALYSIS";
-      }
-      onUpdate(updates);
-      
-      // Reset notification when claim code changes
-      if (field === 'claimCodeRaw') {
-        setNotificationSent(false);
-      }
-    }
+    const normalizedOriginal =
+      originalValue == null
+        ? null
+        : typeof originalValue === "string" && originalValue.trim() === ""
+          ? null
+          : originalValue;
+
+    if (normalizedValue === normalizedOriginal) return;
+
+    const updates: Record<string, unknown> = { [field]: normalizedValue };
+    if (claim.status === "NEW") updates.status = "IN_ANALYSIS";
+    onUpdate(updates);
+
+    if (field === "claimCodeRaw") setNotificationSent(false);
   };
 
   // Handle customer name/company update with optimistic update

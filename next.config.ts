@@ -4,8 +4,8 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  /* config options here */
   reactStrictMode: true,
+  serverExternalPackages: ["imapflow", "pino", "thread-stream"],
   // Eksplicitno eksportuj Auth0 environment varijable
   env: {
     AUTH0_SECRET: process.env.AUTH0_SECRET,
