@@ -164,7 +164,7 @@
     "title": "Reklamacije",
     "subtitle": "Upravljanje svim reklamacijama",
     "newClaim": "Nova reklamacija",
-    "new": "Nova",
+    "newShort": "Nova",
     "claimCode": "MR Number",
     "mrNumber": "MR Number",
     "customerNumber": "Customer Number",
@@ -184,6 +184,7 @@
     "unassigned": "Nedodeljena reklamacija",
     "backToList": "Nazad na listu",
     "saveAndBackToList": "Sačuvaj reklamaciju i nazad",
+    "saveFailedToast": "Reklamacija nije sačuvana. Otvori je ponovo i sačuvaj.",
     "lockedInfo": {
       "closed": "Završena reklamacija.",
       "locked": "Zaključana reklamacija.",

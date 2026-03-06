@@ -878,7 +878,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             onSelect={(date) => {
               setDateEngineDone(date);
               // Auto-update when date is selected
-              const updates: Record<string, unknown> = { dateEngineDone: date?.toISOString() || null };
+              const isoDate = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T12:00:00.000Z` : null;
+              const updates: Record<string, unknown> = { dateEngineDone: isoDate };
               if (claim.status === "NEW") {
                 updates.status = "IN_ANALYSIS";
               }
@@ -899,8 +900,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             date={claimArrivalDate}
             onSelect={(date) => {
               setClaimArrivalDate(date);
-              // Auto-update when date is selected
-              const updates: Record<string, unknown> = { claimArrivalDate: date?.toISOString() || null };
+              const isoDate = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T12:00:00.000Z` : null;
+              const updates: Record<string, unknown> = { claimArrivalDate: isoDate };
               if (claim.status === "NEW") {
                 updates.status = "IN_ANALYSIS";
               }

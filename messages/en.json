@@ -166,7 +166,7 @@
     "title": "Claims",
     "subtitle": "Manage all claims",
     "newClaim": "New Claim",
-    "new": "New",
+    "newShort": "New",
     "claimCode": "MR Number",
     "mrNumber": "MR Number",
     "customerNumber": "Customer Number",
@@ -186,6 +186,7 @@
     "unassigned": "Unassigned Claim",
     "backToList": "Back to list",
     "saveAndBackToList": "Save claim and back",
+    "saveFailedToast": "Claim was not saved. Open it again and save.",
     "lockedInfo": {
       "closed": "Closed claim.",
       "locked": "Locked claim.",

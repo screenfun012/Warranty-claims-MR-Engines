@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "sonner";
 
 // Role hierarchy for permission checks
 const ROLE_LEVELS: Record<string, number> = {
@@ -114,7 +115,22 @@ export default function ClaimsPage() {
   const { user } = useUser();
   const queryClient = useQueryClient();
   const t = useTranslations();
-  
+
+  // When "Save and back" fails in background (optimistic nav), show toast so user knows to re-open and save
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { claimId } = (e as CustomEvent<{ claimId: string }>).detail ?? {};
+      toast.error(t("claims.saveFailedToast"), {
+        duration: 8000,
+        action: claimId
+          ? { label: t("common.open"), onClick: () => router.push(`/claims/${claimId}`) }
+          : undefined,
+      });
+    };
+    window.addEventListener("claim-save-failed", handler);
+    return () => window.removeEventListener("claim-save-failed", handler);
+  }, [t, router]);
+
   // Helper to get status label (empty status would cause t("claims.status.") → INSUFFICIENT_PATH)
   const getStatusLabel = (status: string) => {
     if (status == null || String(status).trim() === "") return status ?? "";
@@ -491,7 +507,7 @@ export default function ClaimsPage() {
           >
             <Plus className="h-4 w-4 sm:mr-2 shrink-0" />
             <span className="hidden sm:inline">{t("claims.newClaim")}</span>
-            <span className="sm:hidden">{t("claims.new")}</span>
+            <span className="sm:hidden">{t("claims.newShort")}</span>
           </Button>
         </div>
       </div>
@@ -819,7 +835,11 @@ export default function ClaimsPage() {
             assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,
             claimArrival: (
               <span className="text-muted-foreground text-xs">
-                {claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : new Date(claim.createdAt).toLocaleDateString()}
+                {(() => {
+                  const raw = claim.claimArrivalDate || claim.createdAt;
+                  const d = new Date(raw);
+                  return `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()}`;
+                })()}
               </span>
             ),
             ...(isSuperAdmin ? {

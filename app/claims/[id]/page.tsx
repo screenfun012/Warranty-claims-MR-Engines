@@ -199,7 +199,6 @@ export default function ClaimDetailPage() {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const PATCH_DEBOUNCE_MS = 500;
   const [isSaving, setIsSaving] = useState(false);
-  const [savingAndBack, setSavingAndBack] = useState(false);
   
   // Helper to get status label
   const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
@@ -293,7 +292,10 @@ export default function ClaimDetailPage() {
         }
         const data = await res.json();
         if (data.claim) {
-          queryClient.setQueryData(["claim", claimId], data.claim);
+          // Merge server response with current cache so user edits made while PATCH was in-flight aren't lost
+          const liveCache = queryClient.getQueryData<Claim>(["claim", claimId]);
+          const merged = liveCache ? { ...data.claim, ...liveCache, id: data.claim.id } : data.claim;
+          queryClient.setQueryData(["claim", claimId], merged);
           queryClient.invalidateQueries({ queryKey: ["statistics"] });
           queryClient.setQueriesData<{ claims: Claim[]; pagination: unknown }>(
             { queryKey: ["claims", "filtered"], exact: false },
@@ -429,29 +431,19 @@ export default function ClaimDetailPage() {
             <Button
               variant="default"
               size="sm"
-              onClick={async () => {
-                queryClient.prefetchQuery({
-                  queryKey: ["claims", "filtered", [], "", "", false, 1, 10],
-                  queryFn: async () => {
-                    const res = await fetch("/api/claims?page=1&limit=10");
-                    if (!res.ok) throw new Error("Failed");
-                    const data = await res.json();
-                    return { claims: data.claims ?? [], pagination: data.pagination ?? null };
-                  },
-                  staleTime: 60 * 1000,
+              onClick={() => {
+                // Navigate immediately so operator isn't stuck waiting for slow PATCH on live
+                router.push("/claims");
+                // Save in background; if it fails, list page will show toast
+                sendCurrentClaimToServer(true).then((ok) => {
+                  if (!ok) {
+                    window.dispatchEvent(new CustomEvent("claim-save-failed", { detail: { claimId } }));
+                  }
                 });
-                setSavingAndBack(true);
-                try {
-                  const ok = await sendCurrentClaimToServer(true);
-                  if (ok) router.push("/claims");
-                } finally {
-                  setSavingAndBack(false);
-                }
               }}
-              disabled={savingAndBack}
               className="h-8 text-xs sm:text-sm"
             >
-              {savingAndBack ? t("common.loading") : t("claims.saveAndBackToList")}
+              {t("claims.saveAndBackToList")}
             </Button>
           )}
           <Button 
