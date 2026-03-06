@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { logActivityFromRequest } from "@/lib/activity-log";
+import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 
 export async function DELETE(
   request: NextRequest,
@@ -110,6 +111,12 @@ export async function DELETE(
         status: claim.status,
         attachmentsDeleted: claim.attachments.length,
       },
+    }).catch(console.error);
+
+    // Notify other clients so claims list refreshes (does not affect Synology/folder deletion)
+    triggerEvent(CHANNELS.CLAIMS, EVENTS.CLAIM_DELETED, {
+      claimId: id,
+      claimCode: claim.claimCodeRaw,
     }).catch(console.error);
 
     return NextResponse.json({ 

@@ -945,12 +945,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         {/* Odluka o reklamaciji (Prihvaćeno / Odbijeno) */}
         <div>
           <Label className="text-sm font-medium mb-2 block">{t("claims.metadata.acceptanceDecision")}</Label>
-          <div className="flex flex-wrap gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+          <div className="flex flex-wrap gap-6">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="acceptance-approved"
                 checked={claim.status === "APPROVED"}
-                onChange={() => {
+                onCheckedChange={() => {
                   if (isReadOnly) return;
                   const isDeselecting = claim.status === "APPROVED";
                   onUpdate({
@@ -959,15 +959,16 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   });
                 }}
                 disabled={isReadOnly}
-                className="h-4 w-4 rounded border-input"
               />
-              <span className="text-sm">{t("claims.status.APPROVED")}</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
+              <Label htmlFor="acceptance-approved" className="text-sm font-normal cursor-pointer">
+                {t("claims.status.APPROVED")}
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="acceptance-rejected"
                 checked={claim.status === "REJECTED"}
-                onChange={() => {
+                onCheckedChange={() => {
                   if (isReadOnly) return;
                   const isDeselecting = claim.status === "REJECTED";
                   onUpdate({
@@ -976,10 +977,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   });
                 }}
                 disabled={isReadOnly}
-                className="h-4 w-4 rounded border-input"
               />
-              <span className="text-sm">{t("claims.status.REJECTED")}</span>
-            </label>
+              <Label htmlFor="acceptance-rejected" className="text-sm font-normal cursor-pointer">
+                {t("claims.status.REJECTED")}
+              </Label>
+            </div>
           </div>
         </div>
 

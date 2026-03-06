@@ -6,9 +6,11 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { ensureIdleStarted } from "@/lib/email/mailSyncScheduler";
 
 export async function GET() {
   try {
+    ensureIdleStarted();
     // VIEWER+ can read inbox
     await requirePermission(PERMISSIONS.INBOX_READ);
     

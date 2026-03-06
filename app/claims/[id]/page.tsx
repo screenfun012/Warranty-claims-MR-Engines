@@ -295,6 +295,17 @@ export default function ClaimDetailPage() {
         if (data.claim) {
           queryClient.setQueryData(["claim", claimId], data.claim);
           queryClient.invalidateQueries({ queryKey: ["statistics"] });
+          queryClient.setQueriesData<{ claims: Claim[]; pagination: unknown }>(
+            { queryKey: ["claims", "filtered"], exact: false },
+            (old) => {
+              if (!old?.claims?.length) return old;
+              const idx = old.claims.findIndex((c) => c.id === data.claim.id);
+              if (idx === -1) return old;
+              const next = { ...old, claims: [...old.claims] };
+              next.claims[idx] = { ...next.claims[idx], ...data.claim };
+              return next;
+            }
+          );
           queryClient.invalidateQueries({ queryKey: ["claims"] });
         }
         return true;
@@ -308,7 +319,7 @@ export default function ClaimDetailPage() {
       .finally(() => { if (!silent) setIsSaving(false); });
   }, [claimId, queryClient]);
 
-  const updateClaim = useCallback(async (updates: Partial<Claim> | Claim) => {
+  const updateClaim = useCallback((updates: Partial<Claim> | Claim) => {
     try {
       const updateKeys = Object.keys(updates);
 
@@ -327,11 +338,12 @@ export default function ClaimDetailPage() {
         delete (updateData as Record<string, unknown>).customer;
       }
 
-      if (claim) {
+      const current = queryClient.getQueryData<Claim>(["claim", claimId]) ?? claim;
+      if (current) {
         const nextClaim = {
-          ...claim,
+          ...current,
           ...updateData,
-          ...(customerFromUpdates !== undefined && { customer: customerFromUpdates }),
+          ...(customerFromUpdates !== undefined && { customer: customerFromUpdates as Claim["customer"] }),
         };
         queryClient.setQueryData(["claim", claimId], nextClaim);
       }
@@ -418,6 +430,16 @@ export default function ClaimDetailPage() {
               variant="default"
               size="sm"
               onClick={async () => {
+                queryClient.prefetchQuery({
+                  queryKey: ["claims", "filtered", [], "", "", false, 1, 10],
+                  queryFn: async () => {
+                    const res = await fetch("/api/claims?page=1&limit=10");
+                    if (!res.ok) throw new Error("Failed");
+                    const data = await res.json();
+                    return { claims: data.claims ?? [], pagination: data.pagination ?? null };
+                  },
+                  staleTime: 60 * 1000,
+                });
                 setSavingAndBack(true);
                 try {
                   const ok = await sendCurrentClaimToServer(true);

@@ -233,6 +233,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
         const targetLangConfig = LANGUAGES.find(l => l.code === targetLang);
         if (targetLangConfig) {
           onUpdate({ [targetLangConfig.field]: data.translated });
+          setTargetTexts((prev) => ({ ...prev, [targetLang]: data.translated }));
         }
       } else {
         const errorMessage = data.error || t("common.error");
@@ -404,7 +405,7 @@ export function ClaimOverview({ claim, onUpdate, isReadOnly = false }: ClaimOver
           className="gap-2"
         >
           <Languages className="h-4 w-4" />
-          {translating ? t("claims.overview.translating") : t("inbox.translate")}
+          {translating ? t("claims.overview.translating") : t("claims.overview.translate.button")}
         </Button>
       </div>
     </Card>

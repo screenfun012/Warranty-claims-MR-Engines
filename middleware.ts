@@ -13,6 +13,7 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/auth/profile") return NextResponse.next();
   if (pathname === "/pending-approval") return NextResponse.next();
   if (pathname === "/api/auth/check-approval") return NextResponse.next();
+  if (pathname === "/api/internal/start-mail-sync") return NextResponse.next();
   if (pathname === "/login") return NextResponse.redirect(new URL("/auth/login", request.url));
 
   if (pathname === "/") {
