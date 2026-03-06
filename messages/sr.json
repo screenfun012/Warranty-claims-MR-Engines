@@ -281,7 +281,8 @@
       "customer": {
         "updateError": "Greška pri ažuriranju kupca",
         "createError": "Greška pri kreiranju kupca"
-      }
+      },
+      "acceptanceDecision": "Odluka o reklamaciji"
     },
     "delete": {
       "title": "Brisanje reklamacije",
@@ -383,6 +384,7 @@
       "swapLanguages": "Zameni jezike",
       "translating": "Prevođenje...",
       "translate": {
+        "button": "Prevedi",
         "sameLanguage": "Izvorni i ciljni jezik ne mogu biti isti",
         "invalidSource": "Nevažeći izvorni jezik",
         "noEmailBody": "Nema teksta email poruke za prevod",

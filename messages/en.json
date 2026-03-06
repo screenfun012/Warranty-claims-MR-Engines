@@ -283,7 +283,8 @@
       "customer": {
         "updateError": "Failed to update customer",
         "createError": "Failed to create customer"
-      }
+      },
+      "acceptanceDecision": "Claim decision (Accepted / Rejected)"
     },
     "delete": {
       "title": "Delete Claim",
@@ -385,6 +386,7 @@
       "swapLanguages": "Swap Languages",
       "translating": "Translating...",
       "translate": {
+        "button": "Translate",
         "sameLanguage": "Source and target languages cannot be the same",
         "invalidSource": "Invalid source language",
         "noEmailBody": "No email body text to translate",

@@ -87,6 +87,7 @@ interface ClaimMetadataProps {
       id: string;
       name: string;
     }[];
+    claimAcceptanceStatus?: string | null;
   };
   onUpdate: (updates: Record<string, unknown>) => void;
   isReadOnly?: boolean;
@@ -939,6 +940,47 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           <Label htmlFor="isDomesticMarket" className="text-sm font-medium cursor-pointer">
             {t("claims.metadata.domesticMarket")}
           </Label>
+        </div>
+
+        {/* Odluka o reklamaciji (Prihvaćeno / Odbijeno) */}
+        <div>
+          <Label className="text-sm font-medium mb-2 block">{t("claims.metadata.acceptanceDecision")}</Label>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={claim.status === "APPROVED"}
+                onChange={() => {
+                  if (isReadOnly) return;
+                  const isDeselecting = claim.status === "APPROVED";
+                  onUpdate({
+                    status: isDeselecting ? "IN_ANALYSIS" : "APPROVED",
+                    claimAcceptanceStatus: isDeselecting ? null : "ACCEPTED",
+                  });
+                }}
+                disabled={isReadOnly}
+                className="h-4 w-4 rounded border-input"
+              />
+              <span className="text-sm">{t("claims.status.APPROVED")}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={claim.status === "REJECTED"}
+                onChange={() => {
+                  if (isReadOnly) return;
+                  const isDeselecting = claim.status === "REJECTED";
+                  onUpdate({
+                    status: isDeselecting ? "IN_ANALYSIS" : "REJECTED",
+                    claimAcceptanceStatus: isDeselecting ? null : "REJECTED",
+                  });
+                }}
+                disabled={isReadOnly}
+                className="h-4 w-4 rounded border-input"
+              />
+              <span className="text-sm">{t("claims.status.REJECTED")}</span>
+            </label>
+          </div>
         </div>
 
         {/* Server Folder Path (read-only). Folder se automatski kreira kada se popune Firma i MR Code. */}
