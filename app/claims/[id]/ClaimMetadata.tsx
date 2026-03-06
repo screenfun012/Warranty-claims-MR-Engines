@@ -580,12 +580,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             {t("claims.metadata.customerCompany")} <span className="text-red-500">*</span>
           </Label>
           <Select
-            value={claim.customer?.company ?? ""}
+            value={claim.customer?.company || "__empty__"}
             onValueChange={(value) => {
               if (value === "__add_new__") {
                 setShowAddCompany(true);
+              } else if (value === "__clear__") {
+                handleCustomerUpdate("company", "");
               } else {
-                handleCustomerUpdate('company', value);
+                handleCustomerUpdate("company", value);
               }
             }}
             disabled={isReadOnly}
@@ -594,13 +596,22 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               <SelectValue placeholder={t("claims.metadata.selectCompany")} />
             </SelectTrigger>
             <SelectContent>
+              {claim.customer?.company && (
+                <SelectItem value="__clear__" className="text-destructive font-medium">
+                  <X className="h-4 w-4 inline mr-2" />
+                  {t("common.clear")}
+                </SelectItem>
+              )}
+              <SelectItem value="__empty__" className="hidden" disabled>
+                {t("claims.metadata.selectCompany")}
+              </SelectItem>
               {companies.map((company) => (
                 <SelectItem key={company} value={company}>
                   {company}
                 </SelectItem>
               ))}
-              <SelectItem 
-                value="__add_new__" 
+              <SelectItem
+                value="__add_new__"
                 className="text-primary font-medium"
               >
                 <Plus className="h-4 w-4 inline mr-2" />
@@ -696,13 +707,16 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             {t("claims.metadata.assignedWorker")}
           </Label>
           <Select
-            value={assignedWorkerName}
+            value={assignedWorkerName || "__empty__"}
             onValueChange={(value) => {
               if (value === "__add_new__") {
                 setShowAddWorker(true);
+              } else if (value === "__clear__") {
+                setAssignedWorkerName("");
+                handleFieldBlur("assignedWorkerName", "");
               } else {
                 setAssignedWorkerName(value);
-                handleFieldBlur('assignedWorkerName', value);
+                handleFieldBlur("assignedWorkerName", value);
               }
             }}
             disabled={isReadOnly}
@@ -711,13 +725,22 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               <SelectValue placeholder={t("claims.metadata.selectWorker")} />
             </SelectTrigger>
             <SelectContent>
+              {assignedWorkerName && (
+                <SelectItem value="__clear__" className="text-destructive font-medium">
+                  <X className="h-4 w-4 inline mr-2" />
+                  {t("common.clear")}
+                </SelectItem>
+              )}
+              <SelectItem value="__empty__" className="hidden" disabled>
+                {t("claims.metadata.selectWorker")}
+              </SelectItem>
               {workers.map((worker) => (
                 <SelectItem key={worker} value={worker}>
                   {worker}
                 </SelectItem>
               ))}
-              <SelectItem 
-                value="__add_new__" 
+              <SelectItem
+                value="__add_new__"
                 className="text-primary font-medium"
               >
                 <Plus className="h-4 w-4 inline mr-2" />
