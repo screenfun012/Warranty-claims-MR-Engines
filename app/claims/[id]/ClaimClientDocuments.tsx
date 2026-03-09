@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,75 @@ const FileViewerModal = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-0 w-0 overflow-hidden" /> }
 );
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+
+/** Thumbnail that loads /api/files/[id] via fetch (credentials) and shows blob; placeholder on error so images always render. */
+function DocumentThumbnail({
+  attachmentId,
+  alt,
+  className,
+}: {
+  attachmentId: string;
+  alt: string;
+  className?: string;
+}) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    let revoked = false;
+    setFailed(false);
+    setBlobUrl(null);
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    fetch(`/api/files/${attachmentId}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error(res.statusText);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (revoked) return;
+        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        setBlobUrl(url);
+      })
+      .catch(() => {
+        if (!revoked) setFailed(true);
+      });
+    return () => {
+      revoked = true;
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
+  }, [attachmentId]);
+
+  if (failed) {
+    return (
+      <div className={`flex items-center justify-center bg-muted/50 ${className ?? ""}`}>
+        <ImageIcon className="h-10 w-10 text-muted-foreground" />
+      </div>
+    );
+  }
+  if (!blobUrl) {
+    return (
+      <div className={`flex items-center justify-center bg-muted/30 animate-pulse ${className ?? ""}`}>
+        <ImageIcon className="h-8 w-8 text-muted-foreground/50" />
+      </div>
+    );
+  }
+  return (
+    <img
+      src={blobUrl}
+      alt={alt}
+      className={className ?? "w-full h-full object-cover"}
+    />
+  );
+}
 
 interface ClaimClientDocumentsProps {
   claim: any;
@@ -220,8 +289,8 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                 setViewerOpen(true);
               }}>
                 <div className="aspect-square bg-muted/30 rounded-lg overflow-hidden mb-2">
-                  <img
-                    src={`/api/files/${attachment.id}`}
+                  <DocumentThumbnail
+                    attachmentId={attachment.id}
                     alt={attachment.fileName || t("claims.documents.image")}
                     className="w-full h-full object-cover"
                   />

@@ -99,6 +99,59 @@ export function FileViewerModal({
   const [excelHtml, setExcelHtml] = useState<string | null>(null);
   const [docLoadError, setDocLoadError] = useState<string | null>(null);
 
+  // For images/videos/PDF from /api/files/*, fetch with credentials and use blob URL so they actually display
+  const [mediaBlobUrl, setMediaBlobUrl] = useState<string | null>(null);
+  const [mediaLoadError, setMediaLoadError] = useState(false);
+  const mediaBlobUrlRef = useRef<string | null>(null);
+  const isImageOrVideoOrPdf = (m?: string) =>
+    isImage(m) || isVideo(m) || isPdf(m);
+  useEffect(() => {
+    const url = currentFile?.url;
+    if (!url || !isImageOrVideoOrPdf(currentFile?.mimeType)) {
+      if (mediaBlobUrlRef.current) {
+        URL.revokeObjectURL(mediaBlobUrlRef.current);
+        mediaBlobUrlRef.current = null;
+      }
+      setMediaBlobUrl(null);
+      setMediaLoadError(false);
+      return;
+    }
+    if (!url.startsWith("/api/")) {
+      if (mediaBlobUrlRef.current) {
+        URL.revokeObjectURL(mediaBlobUrlRef.current);
+        mediaBlobUrlRef.current = null;
+      }
+      setMediaBlobUrl(url);
+      setMediaLoadError(false);
+      return;
+    }
+    setMediaBlobUrl(null);
+    setMediaLoadError(false);
+    let revoked = false;
+    fetch(url, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Fetch failed");
+        return res.blob();
+      })
+      .then((blob) => {
+        if (revoked) return;
+        if (mediaBlobUrlRef.current) URL.revokeObjectURL(mediaBlobUrlRef.current);
+        const createdUrl = URL.createObjectURL(blob);
+        mediaBlobUrlRef.current = createdUrl;
+        setMediaBlobUrl(createdUrl);
+      })
+      .catch(() => {
+        if (!revoked) setMediaLoadError(true);
+      });
+    return () => {
+      revoked = true;
+      if (mediaBlobUrlRef.current) {
+        URL.revokeObjectURL(mediaBlobUrlRef.current);
+        mediaBlobUrlRef.current = null;
+      }
+    };
+  }, [currentFile?.id, currentFile?.url, currentFile?.mimeType]);
+
   useEffect(() => {
     if (!currentFile || (!isDocx(currentFile.mimeType) && !isExcel(currentFile.mimeType))) {
       setDocxHtml(null);
@@ -393,35 +446,59 @@ export function FileViewerModal({
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseUp}
               >
-                <img
-                  ref={imageRef}
-                  src={currentFile.url}
-                  alt={currentFile.fileName || "Image"}
-                  className={`object-contain select-none file-viewer-img ${isDragging ? "file-viewer-img-no-transition" : ""}`}
-                  draggable={false}
-                />
+                {mediaLoadError && (
+                  <p className="text-destructive p-4">Failed to load image.</p>
+                )}
+                {(mediaBlobUrl || (!currentFile.url.startsWith("/api/") && currentFile.url)) && !mediaLoadError && (
+                  <img
+                    ref={imageRef}
+                    src={mediaBlobUrl || currentFile.url}
+                    alt={currentFile.fileName || "Image"}
+                    className={`object-contain select-none file-viewer-img ${isDragging ? "file-viewer-img-no-transition" : ""}`}
+                    draggable={false}
+                  />
+                )}
+                {currentFile.url.startsWith("/api/") && !mediaBlobUrl && !mediaLoadError && (
+                  <p className="text-muted-foreground p-4">Loading image…</p>
+                )}
               </div>
             ) : isPdf(currentFile.mimeType) ? (
               <div className="w-full h-full min-h-0 flex-1 flex flex-col">
-                <iframe
-                  src={currentFile.url}
-                  className="min-h-0 flex-1 w-full border-0"
-                  title={currentFile.fileName || "PDF"}
-                />
+                {mediaLoadError && (
+                  <p className="text-destructive p-4">Failed to load PDF.</p>
+                )}
+                {(mediaBlobUrl || (!currentFile.url.startsWith("/api/") && currentFile.url)) && !mediaLoadError && (
+                  <iframe
+                    src={mediaBlobUrl || currentFile.url}
+                    className="min-h-0 flex-1 w-full border-0"
+                    title={currentFile.fileName || "PDF"}
+                  />
+                )}
+                {currentFile.url.startsWith("/api/") && !mediaBlobUrl && !mediaLoadError && (
+                  <p className="text-muted-foreground p-4">Loading PDF…</p>
+                )}
               </div>
             ) : isVideo(currentFile.mimeType) ? (
               <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-end overflow-hidden p-4 pb-20">
-                <div className="file-viewer-video-container w-full max-w-full max-h-[calc(100%-3.5rem)] min-h-0 flex flex-col items-center justify-center overflow-hidden">
-                  <video
-                    ref={videoRef}
-                    className="file-viewer-video max-w-full max-h-full w-auto object-contain"
-                    playsInline
-                    preload="metadata"
-                    src={currentFile.url}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
+                {mediaLoadError && (
+                  <p className="text-destructive p-4">Failed to load video.</p>
+                )}
+                {(mediaBlobUrl || (!currentFile.url.startsWith("/api/") && currentFile.url)) && !mediaLoadError && (
+                  <div className="file-viewer-video-container w-full max-w-full max-h-[calc(100%-3.5rem)] min-h-0 flex flex-col items-center justify-center overflow-hidden">
+                    <video
+                      ref={videoRef}
+                      className="file-viewer-video max-w-full max-h-full w-auto object-contain"
+                      playsInline
+                      preload="metadata"
+                      src={mediaBlobUrl || currentFile.url}
+                    >
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                )}
+                {currentFile.url.startsWith("/api/") && !mediaBlobUrl && !mediaLoadError && (
+                  <p className="text-muted-foreground p-4">Loading video…</p>
+                )}
               </div>
             ) : isDocx(currentFile.mimeType) ? (
               <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
