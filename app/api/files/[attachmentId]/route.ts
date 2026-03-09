@@ -2,18 +2,25 @@
  * API route for serving attachment files
  * GET /api/files/[attachmentId]
  * Storage: Synology (WebDAV) or local filesystem.
+ * Auth: same pattern as other API routes (getSession from next context) so it works on live.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { readAttachmentFile, getAttachmentFilePath } from "@/lib/files/fileStorage";
 import { existsSync } from "fs";
+import { getSession } from "@/lib/auth/get-session";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ attachmentId: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { attachmentId } = await params;
 
     const prisma = await getPrisma();

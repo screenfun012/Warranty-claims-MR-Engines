@@ -23,10 +23,12 @@ function DocumentThumbnail({
   attachmentId,
   alt,
   className,
+  openLabel = "Open",
 }: {
   attachmentId: string;
   alt: string;
   className?: string;
+  openLabel?: string;
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -66,8 +68,17 @@ function DocumentThumbnail({
 
   if (failed) {
     return (
-      <div className={`flex items-center justify-center bg-muted/50 ${className ?? ""}`}>
+      <div className={`flex flex-col items-center justify-center gap-1 bg-muted/50 ${className ?? ""}`}>
         <ImageIcon className="h-10 w-10 text-muted-foreground" />
+        <a
+          href={`/api/files/${attachmentId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {openLabel}
+        </a>
       </div>
     );
   }
@@ -293,6 +304,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                     attachmentId={attachment.id}
                     alt={attachment.fileName || t("claims.documents.image")}
                     className="w-full h-full object-cover"
+                    openLabel={t("common.open")}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground truncate" title={attachment.fileName}>

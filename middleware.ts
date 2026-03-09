@@ -14,6 +14,8 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/pending-approval") return NextResponse.next();
   if (pathname === "/api/auth/check-approval") return NextResponse.next();
   if (pathname === "/api/internal/start-mail-sync") return NextResponse.next();
+  // /api/files/* — auth done inside route so fetch() with credentials works reliably for img/video
+  if (pathname.startsWith("/api/files/")) return NextResponse.next();
   if (pathname === "/login") return NextResponse.redirect(new URL("/auth/login", request.url));
 
   if (pathname === "/") {

@@ -447,7 +447,17 @@ export function FileViewerModal({
                 onMouseLeave={handleMouseUp}
               >
                 {mediaLoadError && (
-                  <p className="text-destructive p-4">Failed to load image.</p>
+                  <div className="flex flex-col items-center gap-2 p-4 text-center">
+                    <p className="text-destructive">Failed to load image.</p>
+                    <a
+                      href={currentFile.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Open in new tab
+                    </a>
+                  </div>
                 )}
                 {(mediaBlobUrl || (!currentFile.url.startsWith("/api/") && currentFile.url)) && !mediaLoadError && (
                   <img
@@ -465,7 +475,12 @@ export function FileViewerModal({
             ) : isPdf(currentFile.mimeType) ? (
               <div className="w-full h-full min-h-0 flex-1 flex flex-col">
                 {mediaLoadError && (
-                  <p className="text-destructive p-4">Failed to load PDF.</p>
+                  <div className="flex flex-col items-center gap-2 p-4 text-center">
+                    <p className="text-destructive">Failed to load PDF.</p>
+                    <a href={currentFile.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                      Open in new tab
+                    </a>
+                  </div>
                 )}
                 {(mediaBlobUrl || (!currentFile.url.startsWith("/api/") && currentFile.url)) && !mediaLoadError && (
                   <iframe
@@ -481,7 +496,12 @@ export function FileViewerModal({
             ) : isVideo(currentFile.mimeType) ? (
               <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-end overflow-hidden p-4 pb-20">
                 {mediaLoadError && (
-                  <p className="text-destructive p-4">Failed to load video.</p>
+                  <div className="flex flex-col items-center gap-2 p-4 text-center">
+                    <p className="text-destructive">Failed to load video.</p>
+                    <a href={currentFile.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
+                      Open in new tab
+                    </a>
+                  </div>
                 )}
                 {(mediaBlobUrl || (!currentFile.url.startsWith("/api/") && currentFile.url)) && !mediaLoadError && (
                   <div className="file-viewer-video-container w-full max-w-full max-h-[calc(100%-3.5rem)] min-h-0 flex flex-col items-center justify-center overflow-hidden">
