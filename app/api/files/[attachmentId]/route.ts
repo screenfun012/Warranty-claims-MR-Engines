@@ -57,15 +57,21 @@ export async function GET(
         const filePath = getAttachmentFilePath(attachment.filePath);
         if (!existsSync(filePath)) {
           console.error(`[files/${attachmentId}] File not found on disk: ${filePath}`);
-          return NextResponse.json({ error: "File not found on disk" }, { status: 404 });
+          return NextResponse.json({
+            error: "File not found on disk",
+            code: "FILE_NOT_ON_DISK",
+            filePath: attachment.filePath,
+          }, { status: 404 });
         }
       }
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[files/${attachmentId}] Failed to read file: ${errorMessage}`);
-      return NextResponse.json({ 
-        error: "File not found", 
+      const isNasNotFound = /not found on NAS|File not found on NAS/i.test(errorMessage);
+      return NextResponse.json({
+        error: isNasNotFound ? "File not found on storage (NAS). It may not have been synced or may have been moved." : "File not found",
+        code: isNasNotFound ? "FILE_NOT_ON_NAS" : "FILE_NOT_FOUND",
         details: errorMessage,
-        filePath: attachment.filePath 
+        filePath: attachment.filePath,
       }, { status: 404 });
     }
   } catch (error) {

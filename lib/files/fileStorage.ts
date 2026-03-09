@@ -252,12 +252,25 @@ export async function saveAttachmentForClaim(params: {
       console.warn("Could not check for existing WebDAV file:", error);
     }
 
-    await webdavClient.putFileContents(finalPath, params.fileBuffer, {
-      overwrite: false,
-      contentLength: params.fileBuffer.length,
-    });
-    const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
-    return `webdav:${finalRelativePath}`;
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await webdavClient.putFileContents(finalPath, params.fileBuffer, {
+          overwrite: false,
+          contentLength: params.fileBuffer.length,
+        });
+        const exists = await webdavClient.exists(finalPath);
+        if (!exists) {
+          throw new Error(`WebDAV verify failed: file missing after write (attempt ${attempt}/${maxAttempts})`);
+        }
+        const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
+        return `webdav:${finalRelativePath}`;
+      } catch (err) {
+        console.error(`[saveAttachmentForClaim] WebDAV putFileContents attempt ${attempt}/${maxAttempts} failed:`, err);
+        if (attempt === maxAttempts) throw err;
+      }
+    }
+    throw new Error("Failed to save attachment to NAS after retries");
   }
 
   const basePath = await getClaimBasePath(claim);
@@ -304,12 +317,25 @@ export async function saveAttachmentForUnassignedThread(params: {
       console.warn("Could not check for existing WebDAV file:", error);
     }
 
-    await webdavClient.putFileContents(finalPath, params.fileBuffer, {
-      overwrite: false,
-      contentLength: params.fileBuffer.length,
-    });
-    const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
-    return `webdav:${finalRelativePath}`;
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await webdavClient.putFileContents(finalPath, params.fileBuffer, {
+          overwrite: false,
+          contentLength: params.fileBuffer.length,
+        });
+        const exists = await webdavClient.exists(finalPath);
+        if (!exists) {
+          throw new Error(`WebDAV verify failed: file missing after write (attempt ${attempt}/${maxAttempts})`);
+        }
+        const finalRelativePath = finalPath.replace(env.WEBDAV_BASE_PATH, '').replace(/^\//, '');
+        return `webdav:${finalRelativePath}`;
+      } catch (err) {
+        console.error(`[saveAttachmentForUnassignedThread] WebDAV putFileContents attempt ${attempt}/${maxAttempts} failed:`, err);
+        if (attempt === maxAttempts) throw err;
+      }
+    }
+    throw new Error("Failed to save attachment to NAS after retries");
   }
 
   const basePath = getUnassignedThreadPath(params.threadId);

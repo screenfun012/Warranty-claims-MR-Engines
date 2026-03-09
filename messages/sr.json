@@ -427,6 +427,7 @@
       "extracting": "Ekstraktovanje...",
       "extractSuccess": "Tekst uspešno ekstraktovan",
       "extractError": "Greška pri ekstraktovanju teksta",
+      "repairFromEmail": "Ponovo preuzmi sa maila",
       "delete": "Obriši dokument",
       "deleting": "Brisanje...",
       "originalText": "Originalni tekst",

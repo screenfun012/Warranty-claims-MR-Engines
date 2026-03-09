@@ -102,6 +102,10 @@ export function FileViewerModal({
   // For images/videos/PDF from /api/files/*, fetch with credentials and use blob URL so they actually display
   const [mediaBlobUrl, setMediaBlobUrl] = useState<string | null>(null);
   const [mediaLoadError, setMediaLoadError] = useState(false);
+  const [mediaLoadErrorMessage, setMediaLoadErrorMessage] = useState<string | null>(null);
+  const [mediaErrorCode, setMediaErrorCode] = useState<string | null>(null);
+  const [mediaReloadKey, setMediaReloadKey] = useState(0);
+  const [repairing, setRepairing] = useState(false);
   const mediaBlobUrlRef = useRef<string | null>(null);
   const isImageOrVideoOrPdf = (m?: string) =>
     isImage(m) || isVideo(m) || isPdf(m);
@@ -114,6 +118,8 @@ export function FileViewerModal({
       }
       setMediaBlobUrl(null);
       setMediaLoadError(false);
+      setMediaLoadErrorMessage(null);
+      setMediaErrorCode(null);
       return;
     }
     if (!url.startsWith("/api/")) {
@@ -123,25 +129,45 @@ export function FileViewerModal({
       }
       setMediaBlobUrl(url);
       setMediaLoadError(false);
+      setMediaLoadErrorMessage(null);
+      setMediaErrorCode(null);
       return;
     }
     setMediaBlobUrl(null);
     setMediaLoadError(false);
+    setMediaLoadErrorMessage(null);
+    setMediaErrorCode(null);
     let revoked = false;
     fetch(url, { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Fetch failed");
+      .then(async (res) => {
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const code = (errBody as { code?: string }).code;
+          if (code === "FILE_NOT_ON_NAS") {
+            if (!revoked) {
+              setMediaErrorCode("FILE_NOT_ON_NAS");
+              setMediaLoadErrorMessage("File not found on storage (NAS). It may not have been synced.");
+              setMediaLoadError(true);
+            }
+            return;
+          }
+          throw new Error("Fetch failed");
+        }
         return res.blob();
       })
       .then((blob) => {
-        if (revoked) return;
+        if (revoked || !blob) return;
         if (mediaBlobUrlRef.current) URL.revokeObjectURL(mediaBlobUrlRef.current);
         const createdUrl = URL.createObjectURL(blob);
         mediaBlobUrlRef.current = createdUrl;
         setMediaBlobUrl(createdUrl);
       })
       .catch(() => {
-        if (!revoked) setMediaLoadError(true);
+        if (!revoked) {
+          setMediaLoadErrorMessage(null);
+          setMediaErrorCode(null);
+          setMediaLoadError(true);
+        }
       });
     return () => {
       revoked = true;
@@ -150,7 +176,28 @@ export function FileViewerModal({
         mediaBlobUrlRef.current = null;
       }
     };
-  }, [currentFile?.id, currentFile?.url, currentFile?.mimeType]);
+  }, [currentFile?.id, currentFile?.url, currentFile?.mimeType, mediaReloadKey]);
+
+  const handleRepairAttachment = useCallback(async () => {
+    if (!currentFile?.id) return;
+    setRepairing(true);
+    try {
+      const res = await fetch(`/api/attachments/${currentFile.id}/repair`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setMediaReloadKey((k) => k + 1);
+      } else {
+        alert(data.error || "Repair failed.");
+      }
+    } catch {
+      alert("Repair request failed.");
+    } finally {
+      setRepairing(false);
+    }
+  }, [currentFile?.id]);
 
   useEffect(() => {
     if (!currentFile || (!isDocx(currentFile.mimeType) && !isExcel(currentFile.mimeType))) {
@@ -448,7 +495,12 @@ export function FileViewerModal({
               >
                 {mediaLoadError && (
                   <div className="flex flex-col items-center gap-2 p-4 text-center">
-                    <p className="text-destructive">Failed to load image.</p>
+                    <p className="text-destructive">{mediaLoadErrorMessage || "Failed to load image."}</p>
+                    {mediaErrorCode === "FILE_NOT_ON_NAS" && currentFile.id && (
+                      <Button variant="secondary" size="sm" disabled={repairing} onClick={handleRepairAttachment}>
+                        {repairing ? "..." : "Re-download from email"}
+                      </Button>
+                    )}
                     <a
                       href={currentFile.url}
                       target="_blank"
@@ -476,7 +528,12 @@ export function FileViewerModal({
               <div className="w-full h-full min-h-0 flex-1 flex flex-col">
                 {mediaLoadError && (
                   <div className="flex flex-col items-center gap-2 p-4 text-center">
-                    <p className="text-destructive">Failed to load PDF.</p>
+                    <p className="text-destructive">{mediaLoadErrorMessage || "Failed to load PDF."}</p>
+                    {mediaErrorCode === "FILE_NOT_ON_NAS" && currentFile.id && (
+                      <Button variant="secondary" size="sm" disabled={repairing} onClick={handleRepairAttachment}>
+                        {repairing ? "..." : "Re-download from email"}
+                      </Button>
+                    )}
                     <a href={currentFile.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
                       Open in new tab
                     </a>
@@ -497,7 +554,12 @@ export function FileViewerModal({
               <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-end overflow-hidden p-4 pb-20">
                 {mediaLoadError && (
                   <div className="flex flex-col items-center gap-2 p-4 text-center">
-                    <p className="text-destructive">Failed to load video.</p>
+                    <p className="text-destructive">{mediaLoadErrorMessage || "Failed to load video."}</p>
+                    {mediaErrorCode === "FILE_NOT_ON_NAS" && currentFile.id && (
+                      <Button variant="secondary" size="sm" disabled={repairing} onClick={handleRepairAttachment}>
+                        {repairing ? "..." : "Re-download from email"}
+                      </Button>
+                    )}
                     <a href={currentFile.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline">
                       Open in new tab
                     </a>

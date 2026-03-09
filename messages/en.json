@@ -429,6 +429,7 @@
       "extracting": "Extracting...",
       "extractSuccess": "Text extracted successfully",
       "extractError": "Failed to extract text",
+      "repairFromEmail": "Re-download from email",
       "delete": "Delete Document",
       "deleting": "Deleting...",
       "originalText": "Original Text",

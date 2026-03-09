@@ -24,27 +24,41 @@ function DocumentThumbnail({
   alt,
   className,
   openLabel = "Open",
+  repairLabel = "Ponovo preuzmi sa maila",
 }: {
   attachmentId: string;
   alt: string;
   className?: string;
   openLabel?: string;
+  repairLabel?: string;
 }) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [repairing, setRepairing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const blobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     let revoked = false;
     setFailed(false);
+    setErrorCode(null);
     setBlobUrl(null);
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
     fetch(`/api/files/${attachmentId}`, { credentials: "include" })
-      .then((res) => {
-        if (!res.ok) throw new Error(res.statusText);
+      .then(async (res) => {
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          const code = (errBody as { code?: string }).code;
+          if (!revoked) setErrorCode(code ?? null);
+          const msg = code === "FILE_NOT_ON_NAS"
+            ? "Fajl nije na skladištu (NAS)."
+            : res.statusText;
+          throw new Error(msg);
+        }
         return res.blob();
       })
       .then((blob) => {
@@ -64,12 +78,45 @@ function DocumentThumbnail({
         blobUrlRef.current = null;
       }
     };
-  }, [attachmentId]);
+  }, [attachmentId, refreshKey]);
+
+  const handleRepair = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setRepairing(true);
+    try {
+      const res = await fetch(`/api/attachments/${attachmentId}/repair`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        setRefreshKey((k) => k + 1);
+      } else {
+        alert(data.error || "Popravka nije uspela.");
+      }
+    } catch (err) {
+      alert("Greška pri pozivu popravke.");
+    } finally {
+      setRepairing(false);
+    }
+  };
 
   if (failed) {
+    const isNasError = errorCode === "FILE_NOT_ON_NAS";
     return (
       <div className={`flex flex-col items-center justify-center gap-1 bg-muted/50 ${className ?? ""}`}>
         <ImageIcon className="h-10 w-10 text-muted-foreground" />
+        {isNasError && (
+          <button
+            type="button"
+            disabled={repairing}
+            className="text-xs text-primary hover:underline disabled:opacity-50"
+            onClick={handleRepair}
+          >
+            {repairing ? "..." : repairLabel}
+          </button>
+        )}
         <a
           href={`/api/files/${attachmentId}`}
           target="_blank"
@@ -305,6 +352,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                     alt={attachment.fileName || t("claims.documents.image")}
                     className="w-full h-full object-cover"
                     openLabel={t("common.open")}
+                    repairLabel={t("claims.documents.repairFromEmail")}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground truncate" title={attachment.fileName}>

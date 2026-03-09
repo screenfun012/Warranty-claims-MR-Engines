@@ -459,3 +459,63 @@ async function parseMessageBody(
     };
   }
 }
+
+/**
+ * Fetch attachments for a single message by its Message-ID header.
+ * Used for "repair" when file was not saved to NAS (e.g. empty folder).
+ * @param messageId - Message-ID value (with or without angle brackets)
+ * @returns Attachments array or empty if message not found / no attachments
+ */
+export async function fetchMessageAttachmentsByMessageId(
+  messageId: string
+): Promise<Array<{ filename: string; mimeType: string; buffer: Buffer }>> {
+  if (!messageId?.trim()) return [];
+  const client = getImapClient();
+  let connected = false;
+  try {
+    await client.connect();
+    connected = true;
+    await client.mailboxOpen("INBOX");
+    const toTry = [
+      messageId.trim(),
+      messageId.trim().startsWith("<") ? messageId.trim() : `<${messageId.trim()}>`,
+      messageId.trim().replace(/^<|>$/g, ""),
+    ].filter((v, i, a) => a.indexOf(v) === i);
+    let uids: number[] = [];
+    for (const id of toTry) {
+      const result = await client.search(
+        { header: { "Message-ID": id } },
+        { uid: true, limit: 1 }
+      );
+      const list = Array.isArray(result) ? result : [];
+      uids = list
+        .map((m: any) => (typeof m === "number" ? m : m?.uid ?? m?.seq ?? m))
+        .filter((v) => v != null && !isNaN(Number(v)))
+        .map((v) => Number(v));
+      if (uids.length > 0) break;
+    }
+    if (uids.length === 0) {
+      console.log(`[fetchMessageAttachmentsByMessageId] No message found for Message-ID: ${messageId}`);
+      return [];
+    }
+    const uidStr = String(uids[0]);
+    const fullMessage = await client.fetchOne(
+      uidStr,
+      { source: true, bodyStructure: true },
+      { uid: true }
+    );
+    if (!fullMessage?.source) {
+      console.warn(`[fetchMessageAttachmentsByMessageId] No source for UID ${uidStr}`);
+      return [];
+    }
+    const source = fullMessage.source instanceof Buffer ? fullMessage.source : Buffer.from(fullMessage.source || "");
+    const parsed = await parseMessageBody(source, fullMessage.bodyStructure || undefined);
+    return parsed.attachments || [];
+  } finally {
+    if (connected) {
+      try {
+        await client.logout();
+      } catch (_) {}
+    }
+  }
+}
