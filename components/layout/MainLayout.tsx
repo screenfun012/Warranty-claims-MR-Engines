@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   SidebarInset,
@@ -25,9 +25,12 @@ import { ClaimBreadcrumbProvider, useClaimBreadcrumb } from "@/components/claim-
 
 function PageTitle({ pathname }: { pathname: string | null }) {
   const t = useTranslations();
+  const searchParams = useSearchParams();
   const { label: claimBreadcrumbLabel } = useClaimBreadcrumb();
 
   if (!pathname) return null;
+
+  const fromInbox = searchParams?.get("from") === "inbox";
 
   const getBreadcrumbs = (path: string): Array<{ label: string; href: string }> => {
     const parts = path.split("/").filter(Boolean);
@@ -45,6 +48,9 @@ function PageTitle({ pathname }: { pathname: string | null }) {
           breadcrumbs.push({ label: t("claims.new.createButton"), href: currentPath + "/new" });
           return;
         } else if (parts[index + 1]) {
+          if (fromInbox) {
+            breadcrumbs.push({ label: t("nav.inbox"), href: "/inbox" });
+          }
           breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
           const segmentLabel =
             claimBreadcrumbLabel?.trim() ||

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
-import { createClaimFolder } from "@/lib/files/fileStorage";
+import { createClaimFolder, moveAttachmentFromUnassignedToClaim, deleteUnassignedThreadFolder } from "@/lib/files/fileStorage";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 import { logActivityFromRequest } from "@/lib/activity-log";
 
@@ -409,6 +409,21 @@ export async function POST(request: NextRequest) {
               console.log(`[create-claim] Linked attachment ${attachment.id} to claim ${claim.id}`);
             }
 
+            // Move file from _unassigned to claim folder on NAS so documents live under claim path
+            if (attachment.filePath.startsWith("webdav:_unassigned/")) {
+              const newPath = await moveAttachmentFromUnassignedToClaim(
+                { filePath: attachment.filePath, fileName: attachment.fileName, mimeType: attachment.mimeType },
+                claim
+              );
+              if (newPath) {
+                await prisma.attachment.update({
+                  where: { id: attachment.id },
+                  data: { filePath: newPath },
+                });
+                console.log(`[create-claim] Moved attachment ${attachment.id} to claim folder: ${newPath}`);
+              }
+            }
+
             const isImage = attachment.mimeType.startsWith("image/");
             const isPdf = attachment.mimeType === "application/pdf";
             const isDocx = attachment.mimeType.includes("wordprocessingml") || 
@@ -465,6 +480,9 @@ export async function POST(request: NextRequest) {
             // Continue with next attachment instead of failing entire claim creation
           }
         }
+
+        // Remove temporary unassigned folder now that thread has a claim destination
+        await deleteUnassignedThreadFolder(emailThreadId);
 
         console.log(`[create-claim] Summary: ${photosCreated} photos, ${documentsCreated} documents created`);
         // NOTE: Email se NE šalje pri kreiranju reklamacije

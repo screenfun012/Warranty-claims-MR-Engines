@@ -428,6 +428,39 @@ export async function readAttachmentFile(relativePathOrUrl: string): Promise<Buf
   return await fs.readFile(absolutePath);
 }
 
+/**
+ * If attachment is stored under _unassigned (thread folder), copy it to the claim folder
+ * and return the new filePath. Caller should update attachment.filePath in DB.
+ * Returns null if path is not webdav:_unassigned/ or if read/save fails.
+ */
+export async function moveAttachmentFromUnassignedToClaim(
+  attachment: { filePath: string; fileName: string; mimeType: string },
+  claim: Claim & { customer?: { name: string | null; company?: string | null } | null }
+): Promise<string | null> {
+  if (!attachment.filePath.startsWith("webdav:_unassigned/")) {
+    return null;
+  }
+  try {
+    const buffer = await readAttachmentFile(attachment.filePath);
+    const newPath = await saveAttachmentForClaim({
+      claim,
+      fileBuffer: buffer,
+      originalFileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      subfolder: "03_attachments",
+    });
+    try {
+      await deleteAttachmentFile(attachment.filePath);
+    } catch (e) {
+      console.warn("[moveAttachmentFromUnassignedToClaim] Could not delete old unassigned file:", e);
+    }
+    return newPath;
+  } catch (err) {
+    console.error("[moveAttachmentFromUnassignedToClaim]", err);
+    return null;
+  }
+}
+
 export async function deleteAttachmentFile(relativePathOrUrl: string): Promise<void> {
   if (relativePathOrUrl.startsWith('webdav:')) {
     if (!webdavClient) return;
@@ -448,6 +481,38 @@ export async function deleteAttachmentFile(relativePathOrUrl: string): Promise<v
     await fs.unlink(absolutePath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+}
+
+/**
+ * Delete the temporary unassigned folder for a thread once it has been linked to a claim.
+ * Call after moving all attachments to the claim folder to free space.
+ */
+export async function deleteUnassignedThreadFolder(threadId: string): Promise<void> {
+  const baseKey = getUnassignedThreadKey(threadId);
+
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      const webdavPath = getWebDAVPath(baseKey);
+      const exists = await webdavClient.exists(webdavPath);
+      if (exists) {
+        await webdavClient.deleteFile(webdavPath);
+        console.log(`[deleteUnassignedThreadFolder] Deleted WebDAV folder: ${baseKey}`);
+      }
+    } catch (error) {
+      console.warn("[deleteUnassignedThreadFolder] Could not delete folder:", error);
+    }
+    return;
+  }
+
+  try {
+    const dirPath = path.join(path.resolve(env.FILE_ROOT_PATH), "_unassigned", threadId);
+    await fs.rm(dirPath, { recursive: true, force: true });
+    console.log(`[deleteUnassignedThreadFolder] Deleted local folder: ${dirPath}`);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.warn("[deleteUnassignedThreadFolder] Could not delete folder:", error);
+    }
   }
 }
 

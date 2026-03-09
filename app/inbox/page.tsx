@@ -379,7 +379,7 @@ export default function InboxPage() {
                       className="cursor-pointer"
                       onClick={(e) => {
                         e.stopPropagation();
-                        router.push(`/claims/${thread.claim!.id}`);
+                        router.push(`/claims/${thread.claim!.id}?from=inbox`);
                       }}
                     >
                       {thread.claim.claimCodeRaw || t("inbox.viewClaim")}
@@ -600,7 +600,7 @@ function ThreadDetail({
         // Navigate immediately - claim is already created and persisted
         const claimId = data.claim.id;
         console.log(`[handleCreateClaim] Navigating to /claims/${claimId} (type: ${typeof claimId})`);
-        router.push(`/claims/${claimId}?refresh=${Date.now()}`);
+        router.push(`/claims/${claimId}?from=inbox&refresh=${Date.now()}`);
       } else {
         const errorData = await res.json();
         alert(t("claims.new.error.failed") + ": " + (errorData.error || t("common.error")));
@@ -627,7 +627,7 @@ function ThreadDetail({
         fetchFullThread();
         onThreadUpdated(); // This will refresh threads and update unread count
         // Navigate to claim with refresh parameter to force reload
-        router.push(`/claims/${claimId}?refresh=${Date.now()}`);
+        router.push(`/claims/${claimId}?from=inbox&refresh=${Date.now()}`);
       } else {
         const errorData = await res.json();
         alert(t("inbox.linkClaim.error") + ": " + (errorData.error || t("common.error")));
@@ -737,7 +737,7 @@ function ThreadDetail({
             <Badge 
               variant="secondary"
               className="cursor-pointer"
-              onClick={() => router.push(`/claims/${fullThread.claim!.id}`)}
+              onClick={() => router.push(`/claims/${fullThread.claim!.id}?from=inbox`)}
             >
               {fullThread.claim.claimCodeRaw || "View Claim"}
             </Badge>

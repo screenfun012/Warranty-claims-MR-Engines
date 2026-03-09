@@ -5,6 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
+import { moveAttachmentFromUnassignedToClaim, deleteUnassignedThreadFolder } from "@/lib/files/fileStorage";
 
 export async function POST(
   request: NextRequest,
@@ -22,9 +23,10 @@ export async function POST(
       );
     }
 
-    // Verify claim exists
+    // Verify claim exists (with customer for folder path)
     const claim = await prisma.claim.findUnique({
       where: { id: claimId },
+      include: { customer: true },
     });
 
     if (!claim) {
@@ -100,6 +102,21 @@ export async function POST(
         console.log(`[link-claim] Linked attachment ${attachment.id} to claim ${claimId}`);
       }
 
+      // Move file from _unassigned to claim folder on NAS so documents live under claim path
+      if (attachment.filePath.startsWith("webdav:_unassigned/") && claim) {
+        const newPath = await moveAttachmentFromUnassignedToClaim(
+          { filePath: attachment.filePath, fileName: attachment.fileName, mimeType: attachment.mimeType },
+          claim
+        );
+        if (newPath) {
+          await prisma.attachment.update({
+            where: { id: attachment.id },
+            data: { filePath: newPath },
+          });
+          console.log(`[link-claim] Moved attachment ${attachment.id} to claim folder: ${newPath}`);
+        }
+      }
+
       const isImage = attachment.mimeType.startsWith("image/");
       const isPdf = attachment.mimeType === "application/pdf";
       const isDocx = attachment.mimeType.includes("wordprocessingml") || 
@@ -152,6 +169,9 @@ export async function POST(
     }
 
     console.log(`[link-claim] Summary: ${photosCreated} photos, ${documentsCreated} documents, ${attachmentsSkipped} skipped`);
+
+    // Remove temporary unassigned folder now that thread has a claim destination
+    await deleteUnassignedThreadFolder(threadId);
 
     return NextResponse.json({
       success: true,
