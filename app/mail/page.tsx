@@ -263,6 +263,11 @@ export default function MailPage() {
                       className="min-h-[160px] p-3 text-base focus:outline-none focus:ring-0 prose prose-sm dark:prose-invert max-w-none"
                       data-placeholder={t("body")}
                       suppressContentEditableWarning
+                      onPaste={(e) => {
+                        e.preventDefault();
+                        const text = e.clipboardData.getData("text/plain");
+                        document.execCommand("insertText", false, text);
+                      }}
                     />
                   </div>
                 </div>

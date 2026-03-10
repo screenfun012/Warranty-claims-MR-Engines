@@ -8,6 +8,8 @@ import { getPrisma } from "@/lib/db/prisma";
 import { sendEmailAndSave } from "@/lib/email/smtpClient";
 import { readAttachmentFile, saveAttachmentForClaim } from "@/lib/files/fileStorage";
 import { getClaimStatusEmailTemplate, getClaimProcessingEmailTemplate } from "@/lib/email/emailTemplates";
+import { getEmailSignatureHtml, getEmailSignatureText } from "@/lib/email/emailSignature";
+import { sanitizeEmailHtml } from "@/lib/email/sanitizeEmailHtml";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(
@@ -158,7 +160,7 @@ export async function POST(
     let emailText = body.text || body.body;
     let emailHtml = body.html;
 
-    // Plain email: use only what was sent, no template
+    // Plain email: use only what was sent, no template; sanitize and append signature
     if (isPlainEmail) {
       if (!emailText && !emailHtml) {
         return NextResponse.json(
@@ -169,6 +171,15 @@ export async function POST(
       if (!emailHtml && emailText) {
         emailHtml = `<p>${String(emailText).replace(/\n/g, "<br>")}</p>`;
       }
+      if (emailHtml) emailHtml = sanitizeEmailHtml(emailHtml);
+      const baseUrl = request.nextUrl.origin ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+        "http://localhost:3000";
+      const signatureHtml = getEmailSignatureHtml(baseUrl);
+      const signatureText = getEmailSignatureText();
+      emailHtml = (emailHtml || "<p></p>") + signatureHtml;
+      emailText = (emailText || "") + signatureText;
     } else {
       // Get base URL for logo and links (templates only)
       const baseUrl = request.nextUrl.origin ||

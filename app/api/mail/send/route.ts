@@ -8,6 +8,7 @@ import { getSession } from "@/lib/auth/get-session";
 import { getEmailConfig } from "@/lib/config/envLoader";
 import { sendEmail } from "@/lib/email/smtpClient";
 import { getEmailSignatureHtml, getEmailSignatureText } from "@/lib/email/emailSignature";
+import { sanitizeEmailHtml } from "@/lib/email/sanitizeEmailHtml";
 import { saveSentMailToNas } from "@/lib/files/fileStorage";
 import { requireMinimumRole, createPermissionError, ROLES } from "@/lib/auth/permissions";
 
@@ -80,7 +81,8 @@ export async function POST(request: NextRequest) {
     "http://localhost:3000";
   const signatureHtml = getEmailSignatureHtml(baseUrl);
   const signatureText = getEmailSignatureText();
-  const mainHtml = bodyHtml ?? (body ? body.replace(/\n/g, "<br>") : "");
+  let mainHtml = bodyHtml ?? (body ? body.replace(/\n/g, "<br>") : "");
+  mainHtml = sanitizeEmailHtml(mainHtml);
   const html = (mainHtml ? (mainHtml.startsWith("<") ? mainHtml : `<p>${mainHtml}</p>`) : "<p></p>") + signatureHtml;
   const text = (body || "") + signatureText;
 

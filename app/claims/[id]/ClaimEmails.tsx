@@ -5,11 +5,10 @@ import { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Paperclip, FileText, Image as ImageIcon, Mail, Check } from "lucide-react";
+import { Paperclip, FileText, Image as ImageIcon, Mail, Check, Bold, Italic, Underline, List, ListOrdered } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const FileViewerModal = dynamic(
@@ -77,6 +76,12 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
   });
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  const execFormat = (cmd: string, value?: string) => {
+    document.execCommand(cmd, false, value);
+    bodyRef.current?.focus();
+  };
 
   // Sync reply "To" when claim changes
   const prevClaimIdRef = useRef<string | null>(null);
@@ -149,13 +154,14 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
       alert(t("claims.emails.subjectRequired"));
       return;
     }
-    if (!replyForm.text?.trim()) {
+    const bodyText = bodyRef.current?.innerText?.trim() ?? "";
+    const bodyHtmlContent = bodyRef.current?.innerHTML?.trim() ?? "";
+    if (!bodyText && !bodyHtmlContent) {
       alert(t("claims.emails.bodyRequired"));
       return;
     }
     setSending(true);
     try {
-      // Mail tab: send plain email only (subject, body, attachments). No status template.
       const res = await fetch(`/api/claims/${claim.id}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -164,7 +170,8 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           to: replyForm.to.trim(),
           cc: replyForm.cc?.trim() || undefined,
           subject: replyForm.subject.trim(),
-          text: replyForm.text.trim(),
+          text: bodyText,
+          html: bodyHtmlContent || undefined,
           attachmentIds: selectedAttachmentIds,
         }),
       });
@@ -176,6 +183,7 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         } else {
           alert(t("claims.emails.sendSuccess"));
         }
+        if (bodyRef.current) bodyRef.current.innerHTML = "";
         setReplyForm({ ...replyForm, text: "" });
         setSelectedAttachmentIds([]);
         onUpdate?.({});
@@ -384,11 +392,27 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
           </div>
           <div>
             <Label>{t("claims.emails.message")}</Label>
-            <Textarea
-              value={replyForm.text}
-              onChange={(e) => setReplyForm({ ...replyForm, text: e.target.value })}
-              rows={8}
-            />
+            <div className="rounded-md border overflow-hidden">
+              <div className="flex items-center gap-1 p-1 border-b bg-muted/30">
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("bold")} title="Bold"><Bold className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("italic")} title="Italic"><Italic className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("underline")} title="Underline"><Underline className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("insertUnorderedList")} title="Bullet list"><List className="h-4 w-4" /></Button>
+                <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("insertOrderedList")} title="Numbered list"><ListOrdered className="h-4 w-4" /></Button>
+              </div>
+              <div
+                ref={bodyRef}
+                contentEditable
+                className="min-h-[160px] p-3 text-base focus:outline-none focus:ring-0 prose prose-sm dark:prose-invert max-w-none"
+                data-placeholder={t("claims.emails.message")}
+                suppressContentEditableWarning
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const text = e.clipboardData.getData("text/plain");
+                  document.execCommand("insertText", false, text);
+                }}
+              />
+            </div>
           </div>
 
           <div>
