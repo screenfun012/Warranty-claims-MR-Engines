@@ -91,6 +91,233 @@ export function getUnassignedThreadPath(threadId: string): string {
   return path.join(rootPath, "_unassigned", threadId);
 }
 
+/** Base folder for generic sent mail archive (same root as claims, e.g. REKLAMACIJE area on NAS) */
+const SENT_MAIL_ARCHIVE_BASE = "Poslati_mailovi";
+
+function sanitizeSubjectForFolderName(subject: string): string {
+  const s = (subject || "Bez naslova")
+    .replace(/[/\\:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+  return s.slice(0, 120) || "Bez_naslova";
+}
+
+export type SaveSentMailToNasParams = {
+  from: string;
+  to: string;
+  cc?: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  messageId?: string;
+  sentAt: Date;
+  attachments?: Array<{ filename: string; buffer: Buffer; contentType?: string }>;
+};
+
+/**
+ * Save a sent (generic) email to NAS under Poslati_mailovi/[subject]/ so we don't fill the DB.
+ * Folder name = email subject. Contents: metadata.json, body.html, body.txt, and attachment files.
+ * Returns the relative folder path (e.g. Poslati_mailovi/Naslov_maila) for reference.
+ */
+export async function saveSentMailToNas(params: SaveSentMailToNasParams): Promise<string | null> {
+  const folderName = sanitizeSubjectForFolderName(params.subject);
+  let relativeDir = `${SENT_MAIL_ARCHIVE_BASE}/${folderName}`;
+  let suffix = 0;
+  const baseDir = relativeDir;
+
+  const exists = async (p: string): Promise<boolean> => {
+    if (USE_WEBDAV && webdavClient) {
+      try {
+        return await webdavClient.exists(getWebDAVPath(p));
+      } catch {
+        return false;
+      }
+    }
+    try {
+      await fs.access(path.join(path.resolve(env.FILE_ROOT_PATH), p));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  while (await exists(relativeDir)) {
+    suffix++;
+    relativeDir = `${baseDir}_${suffix}`;
+  }
+
+  await ensureDir(relativeDir);
+
+  const metadata = {
+    from: params.from,
+    to: params.to,
+    cc: params.cc ?? null,
+    subject: params.subject,
+    messageId: params.messageId ?? null,
+    sentAt: params.sentAt.toISOString(),
+  };
+
+  const writeFile = async (relativePath: string, content: Buffer | string): Promise<void> => {
+    const buf = typeof content === "string" ? Buffer.from(content, "utf-8") : content;
+    if (USE_WEBDAV && webdavClient) {
+      const fullPath = getWebDAVPath(`${relativeDir}/${relativePath}`);
+      await webdavClient.putFileContents(fullPath, buf, { overwrite: true });
+    } else {
+      const fullPath = path.join(path.resolve(env.FILE_ROOT_PATH), relativeDir, relativePath);
+      await fs.writeFile(fullPath, buf);
+    }
+  };
+
+  await writeFile("metadata.json", JSON.stringify(metadata, null, 2));
+  if (params.text) await writeFile("body.txt", params.text);
+  if (params.html) await writeFile("body.html", params.html);
+
+  if (params.attachments?.length) {
+    for (let i = 0; i < params.attachments.length; i++) {
+      const att = params.attachments[i];
+      const safeName = (att.filename || "attachment").replace(/[/\\:*?"<>|]/g, "_");
+      const name = params.attachments.length > 1 ? `${String(i + 1).padStart(2, "0")}_${safeName}` : safeName;
+      await writeFile(name, att.buffer);
+    }
+  }
+
+  return relativeDir;
+}
+
+export type SentMailFolderInfo = {
+  folderName: string;
+  path: string;
+  subject: string;
+  to: string;
+  sentAt: string;
+};
+
+/**
+ * List sent mail folders on NAS (Poslati_mailovi/*). Reads metadata.json from each folder.
+ */
+export async function listSentMailFolders(): Promise<SentMailFolderInfo[]> {
+  const basePath = getWebDAVPath(SENT_MAIL_ARCHIVE_BASE);
+  const results: SentMailFolderInfo[] = [];
+
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      const exists = await webdavClient.exists(basePath);
+      if (!exists) return [];
+      const contents = await webdavClient.getDirectoryContents(basePath);
+      const items = Array.isArray(contents) ? contents : (contents as { data?: unknown[] }).data ?? [];
+      for (const item of items) {
+        const entry = item as { type?: string; basename?: string; filename?: string };
+        if (entry.type !== "directory" && entry.type !== "1") continue;
+        const name = entry.basename ?? entry.filename?.split("/").pop() ?? "";
+        if (!name || name.startsWith(".")) continue;
+        const relPath = `${SENT_MAIL_ARCHIVE_BASE}/${name}`;
+        try {
+          const metaPath = getWebDAVPath(`${relPath}/metadata.json`);
+          const raw = await webdavClient.getFileContents(metaPath, { format: "text" });
+          const text = typeof raw === "string" ? raw : Buffer.from(raw as ArrayBuffer).toString("utf-8");
+          const meta = JSON.parse(text) as { subject?: string; to?: string; sentAt?: string };
+          results.push({
+            folderName: name,
+            path: relPath,
+            subject: meta.subject ?? name,
+            to: meta.to ?? "",
+            sentAt: meta.sentAt ?? "",
+          });
+        } catch {
+          results.push({ folderName: name, path: relPath, subject: name, to: "", sentAt: "" });
+        }
+      }
+      results.sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+    } catch (err) {
+      console.warn("[listSentMailFolders]", err);
+    }
+    return results;
+  }
+
+  try {
+    const dirPath = path.join(path.resolve(env.FILE_ROOT_PATH), SENT_MAIL_ARCHIVE_BASE);
+    const names = await fs.readdir(dirPath, { withFileTypes: true });
+    for (const d of names) {
+      if (!d.isDirectory()) continue;
+      const relPath = `${SENT_MAIL_ARCHIVE_BASE}/${d.name}`;
+      try {
+        const metaPath = path.join(dirPath, d.name, "metadata.json");
+        const text = await fs.readFile(metaPath, "utf-8");
+        const meta = JSON.parse(text) as { subject?: string; to?: string; sentAt?: string };
+        results.push({
+          folderName: d.name,
+          path: relPath,
+          subject: meta.subject ?? d.name,
+          to: meta.to ?? "",
+          sentAt: meta.sentAt ?? "",
+        });
+      } catch {
+        results.push({ folderName: d.name, path: relPath, subject: d.name, to: "", sentAt: "" });
+      }
+    }
+    results.sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+  } catch {
+    // folder may not exist yet
+  }
+  return results;
+}
+
+/**
+ * List file names in a sent mail folder (e.g. Poslati_mailovi/Subject).
+ */
+export async function listSentMailFolderFiles(relativeFolderPath: string): Promise<string[]> {
+  const normalized = relativeFolderPath.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/\/$/, "");
+  if (!normalized.startsWith(SENT_MAIL_ARCHIVE_BASE + "/") || normalized.includes("..")) {
+    return [];
+  }
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      const fullPath = getWebDAVPath(normalized);
+      const contents = await webdavClient.getDirectoryContents(fullPath);
+      const items = Array.isArray(contents) ? contents : (contents as { data?: unknown[] }).data ?? [];
+      return items
+        .map((item: unknown) => {
+          const e = item as { basename?: string; filename?: string };
+          return e.basename ?? e.filename?.split("/").pop();
+        })
+        .filter((n): n is string => !!n && !n.startsWith("."));
+    } catch {
+      return [];
+    }
+  }
+  try {
+    const dirPath = path.join(path.resolve(env.FILE_ROOT_PATH), normalized);
+    return await fs.readdir(dirPath);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Read a file from sent mail archive. Path must be under Poslati_mailovi/ and must not contain ..
+ */
+export async function readSentMailFile(relativePath: string): Promise<Buffer | null> {
+  const normalized = relativePath.replace(/\\/g, "/").replace(/\/+/g, "/");
+  if (!normalized.startsWith(SENT_MAIL_ARCHIVE_BASE + "/") || normalized.includes("..")) {
+    return null;
+  }
+  if (USE_WEBDAV && webdavClient) {
+    try {
+      const fullPath = getWebDAVPath(normalized);
+      const data = await webdavClient.getFileContents(fullPath, { format: "binary" });
+      return Buffer.from(data as ArrayBuffer);
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const fullPath = path.join(path.resolve(env.FILE_ROOT_PATH), normalized);
+    return await fs.readFile(fullPath);
+  } catch {
+    return null;
+  }
+}
+
 async function ensureDir(dirPath: string): Promise<void> {
   if (USE_WEBDAV && webdavClient) {
     try {

@@ -52,16 +52,23 @@ function PageTitle({ pathname }: { pathname: string | null }) {
             breadcrumbs.push({ label: t("nav.inbox"), href: "/inbox" });
           }
           breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
+          const claimIdParts = parts.slice(index + 1);
+          const claimPath = `/claims/${claimIdParts.join("/")}`;
           const segmentLabel =
             claimBreadcrumbLabel?.trim() ||
-            `${t("nav.claims")} ${parts[index + 1].slice(0, 8)}...`;
-          breadcrumbs.push({ label: segmentLabel, href: `${currentPath}/${parts[index + 1]}` });
+            (claimIdParts[0]?.length ? `${t("nav.claims")} ${claimIdParts[0].slice(0, 8)}...` : claimPath);
+          breadcrumbs.push({ label: segmentLabel, href: claimPath });
           return;
         } else {
           breadcrumbs.push({ label: t("nav.claims"), href: "/claims" });
         }
+      } else if (parts[0] === "claims" && index > 0) {
+        // Skip extra segments that are part of claim id (e.g. /claims/3249/26 → 3249 and 26)
+        return;
       } else if (part === "inbox") {
         breadcrumbs.push({ label: t("nav.inbox"), href: "/inbox" });
+      } else if (part === "mail") {
+        breadcrumbs.push({ label: t("nav.mail"), href: "/mail" });
       } else if (part === "settings") {
         breadcrumbs.push({ label: t("nav.settings"), href: "/settings" });
       } else if (part === "admin" && parts[index + 1] === "users") {

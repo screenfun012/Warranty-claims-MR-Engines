@@ -65,6 +65,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "inbox": "Inbox",
+    "mail": "Mail",
     "claims": "Claims",
     "statistics": "Statistics",
     "settings": "Settings",
@@ -161,6 +162,25 @@
     "markAsUnread": "Mark as unread",
     "reply": "Reply",
     "originalMessage": "Original message"
+  },
+  "mail": {
+    "title": "Mail",
+    "sendTab": "Send mail",
+    "sentTab": "Sent mail",
+    "to": "To",
+    "cc": "CC",
+    "subject": "Subject",
+    "body": "Message",
+    "attachments": "Attachments",
+    "sendButton": "Send",
+    "sending": "Sending...",
+    "sendSuccess": "Email sent and saved to NAS.",
+    "sendError": "Failed to send.",
+    "sentListTitle": "Sent mail",
+    "noSent": "No sent emails.",
+    "viewMail": "View",
+    "backToList": "Back to list",
+    "attachmentsLabel": "Attachments"
   },
   "claims": {
     "title": "Claims",

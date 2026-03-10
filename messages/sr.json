@@ -65,6 +65,7 @@
   "nav": {
     "dashboard": "Početna",
     "inbox": "Pristiglo",
+    "mail": "Mail",
     "claims": "Reklamacije",
     "statistics": "Statistika",
     "settings": "Podešavanja",
@@ -159,6 +160,25 @@
     "markAsUnread": "Označi kao nepročitano",
     "reply": "Odgovor",
     "originalMessage": "Prva poruka"
+  },
+  "mail": {
+    "title": "Mail",
+    "sendTab": "Pošalji mail",
+    "sentTab": "Poslati mailovi",
+    "to": "Prima",
+    "cc": "CC",
+    "subject": "Naslov",
+    "body": "Poruka",
+    "attachments": "Prilozi",
+    "sendButton": "Pošalji",
+    "sending": "Šaljem...",
+    "sendSuccess": "Mail je poslat i sačuvan na NAS.",
+    "sendError": "Greška pri slanju.",
+    "sentListTitle": "Poslati mailovi",
+    "noSent": "Nema poslanih mailova.",
+    "viewMail": "Pogledaj",
+    "backToList": "Nazad na listu",
+    "attachmentsLabel": "Prilozi"
   },
   "claims": {
     "title": "Reklamacije",
