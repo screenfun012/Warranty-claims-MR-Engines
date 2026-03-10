@@ -523,6 +523,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             disabled={isReadOnly}
             className="h-9"
           />
+        </div>
+
         {/* Customer Number */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
