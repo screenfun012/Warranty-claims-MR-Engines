@@ -37,6 +37,7 @@ interface Claim {
   claimCodeRaw: string | null;
   claimPrefix: string | null;
   status: string;
+  claimAcceptanceStatus?: string | null;
   isLocked: boolean | null;
   customer: {
     id: string;
@@ -136,6 +137,12 @@ export default function ClaimsPage() {
     if (status == null || String(status).trim() === "") return status ?? "";
     const msg = t(`claims.status.${status}` as any);
     return typeof msg === "string" ? msg : status;
+  };
+  // We do not use CLOSED; show Prihvaćeno/Odbijeno for legacy CLOSED claims
+  const getDisplayStatus = (claim: Claim): string => {
+    if (claim.status !== "CLOSED") return claim.status;
+    if (claim.claimAcceptanceStatus === "REJECTED") return "REJECTED";
+    return "APPROVED"; // ACCEPTED or legacy CLOSED without acceptance
   };
   
   // Get user role
@@ -829,7 +836,7 @@ export default function ClaimsPage() {
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
               </span>
             ),
-            status: <StatusBadge status={claim.status} label={getStatusLabel(claim.status)} />,
+            status: <StatusBadge status={getDisplayStatus(claim)} label={getStatusLabel(getDisplayStatus(claim))} />,
             customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.company || "-"}</span>,
             engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
             assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,

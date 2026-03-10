@@ -26,19 +26,28 @@ export function sanitizeEmailHtml(html: string): string {
     return ` style="${withoutBackground}"`;
   });
 
-  // Ensure list and block elements display as block (fixes items showing side-by-side)
-  const blockTags = ["li", "ul", "ol", "p", "div"];
-  for (const tag of blockTags) {
+  // Ensure block/list display: li = list-item (keeps bullets/numbers), ul/ol/p/div = block
+  const listItemDisplay = "list-item";
+  const blockDisplay = "block";
+  const blockTags: Array<{ tag: string; display: string; extraStyle?: string }> = [
+    { tag: "li", display: listItemDisplay },
+    { tag: "ul", display: blockDisplay, extraStyle: "list-style-type: disc; margin: 0.5em 0; padding-left: 1.5em;" },
+    { tag: "ol", display: blockDisplay, extraStyle: "list-style-type: decimal; margin: 0.5em 0; padding-left: 1.5em;" },
+    { tag: "p", display: blockDisplay },
+    { tag: "div", display: blockDisplay },
+  ];
+  for (const { tag, display, extraStyle } of blockTags) {
+    const styleValue = extraStyle ? `display: ${display}; ${extraStyle}` : `display: ${display}`;
     const openTagRegex = new RegExp(`<${tag}(\\s[^>]*)?>`, "gi");
     out = out.replace(openTagRegex, (match) => {
-      const inner = match.slice(tag.length + 1, -1).trim(); // content between tag name and >
+      const inner = match.slice(tag.length + 1, -1).trim();
       const styleMatch = inner.match(/style="([^"]*)"/i);
       if (styleMatch) {
         const style = styleMatch[1].replace(/\s*;\s*$/, "");
-        const newStyle = style ? `${style}; display: block` : "display: block";
+        const newStyle = style ? `${style}; ${styleValue}` : styleValue;
         return `<${tag} ${inner.replace(/style="[^"]*"/i, `style="${newStyle}"`)}>`;
       }
-      return inner ? `<${tag} style="display: block;" ${inner}>` : `<${tag} style="display: block;">`;
+      return inner ? `<${tag} style="${styleValue};" ${inner}>` : `<${tag} style="${styleValue};">`;
     });
   }
 

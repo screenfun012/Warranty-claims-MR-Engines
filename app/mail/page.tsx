@@ -58,8 +58,8 @@ export default function MailPage() {
   };
 
   const execFormat = (cmd: string, value?: string) => {
-    document.execCommand(cmd, false, value);
     bodyRef.current?.focus();
+    document.execCommand(cmd, false, value ?? undefined);
   };
 
   const [sentFolders, setSentFolders] = useState<SentFolder[]>([]);
@@ -251,11 +251,11 @@ export default function MailPage() {
                   <Label className="text-sm font-medium">{t("body")}</Label>
                   <div className="rounded-md border overflow-hidden">
                     <div className="flex items-center gap-1 p-1 border-b bg-muted/30">
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("bold")} title="Bold"><Bold className="h-4 w-4" /></Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("italic")} title="Italic"><Italic className="h-4 w-4" /></Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("underline")} title="Underline"><Underline className="h-4 w-4" /></Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("insertUnorderedList")} title="Bullet list"><List className="h-4 w-4" /></Button>
-                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => execFormat("insertOrderedList")} title="Numbered list"><ListOrdered className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("bold")} title="Bold"><Bold className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("italic")} title="Italic"><Italic className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("underline")} title="Underline"><Underline className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertUnorderedList")} title="Bullet list"><List className="h-4 w-4" /></Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onMouseDown={(e) => e.preventDefault()} onClick={() => execFormat("insertOrderedList")} title="Numbered list"><ListOrdered className="h-4 w-4" /></Button>
                     </div>
                     <div
                       ref={bodyRef}

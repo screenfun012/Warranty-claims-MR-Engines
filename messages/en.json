@@ -312,7 +312,8 @@
         "error": "Error sending email",
         "sending": "Sending...",
         "sent": "Notification sent",
-        "sendNotification": "Confirm and send notification to client"
+        "sendNotification": "Confirm and send notification to client",
+        "sendProcessingNotification": "Send notification that claim is in progress"
       },
       "customer": {
         "updateError": "Failed to update customer",

@@ -153,6 +153,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [editingField, setEditingField] = useState<string | null>(null);
   const [notificationSent, setNotificationSent] = useState(!!claim.processingEmailSentAt);
   const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [statusNotificationSent, setStatusNotificationSent] = useState(false);
+  const [isSendingStatusNotification, setIsSendingStatusNotification] = useState(false);
   const prevClaimIdRef = useRef(claim.id);
 
   // Load departments, workers, and companies from API
@@ -267,10 +269,9 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     }
   };
 
-  // Send processing notification email
+  // Send processing notification email (samo za domaće tržište)
   const sendProcessingNotification = async () => {
     if (!claimCode || isSendingNotification) return;
-    
     setIsSendingNotification(true);
     try {
       const res = await fetch(`/api/claims/${claim.id}/send-email`, {
@@ -278,18 +279,40 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "processing" }),
       });
-      
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || t("claims.metadata.email.error"));
       }
-      
       setNotificationSent(true);
     } catch (error) {
       alert(error instanceof Error ? error.message : t("claims.metadata.email.error"));
       setNotificationSent(false);
     } finally {
       setIsSendingNotification(false);
+    }
+  };
+
+  // Pošalji mail klijentu o statusu reklamacije (template) — samo za domaće tržište
+  const sendStatusNotification = async () => {
+    if (isSendingStatusNotification || statusNotificationSent) return;
+    const status = claim.status === "APPROVED" ? "ACCEPTED" : claim.status === "REJECTED" ? "REJECTED" : null;
+    if (!status) return;
+    setIsSendingStatusNotification(true);
+    try {
+      const res = await fetch(`/api/claims/${claim.id}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimAcceptanceStatus: status }),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || t("claims.metadata.email.error"));
+      }
+      setStatusNotificationSent(true);
+    } catch (error) {
+      alert(error instanceof Error ? error.message : t("claims.metadata.email.error"));
+    } finally {
+      setIsSendingStatusNotification(false);
     }
   };
 
@@ -500,45 +523,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             disabled={isReadOnly}
             className="h-9"
           />
-          {claimCode && claim.status === "IN_ANALYSIS" && !isReadOnly && (
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="notificationConfirm"
-                checked={notificationSent}
-                disabled={isSendingNotification || notificationSent}
-                onChange={(e) => {
-                  if (e.target.checked && !notificationSent) {
-                    sendProcessingNotification();
-                  }
-                }}
-                className="h-4 w-4 rounded border-input cursor-pointer disabled:cursor-not-allowed"
-              />
-              <label 
-                htmlFor="notificationConfirm" 
-                className={`text-sm flex items-center gap-2 cursor-pointer ${notificationSent ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}
-              >
-                {isSendingNotification ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    {t("claims.metadata.email.sending")}
-                  </>
-                ) : notificationSent ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4" />
-                    {t("claims.metadata.email.sent")}
-                  </>
-                ) : (
-                  <>
-                    <Mail className="h-4 w-4" />
-                    {t("claims.metadata.email.sendNotification")}
-                  </>
-                )}
-              </label>
-            </div>
-          )}
-        </div>
-
         {/* Customer Number */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
@@ -950,7 +934,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           </Label>
         </div>
 
-        {/* Odluka o reklamaciji (Prihvaćeno / Odbijeno) */}
+        {/* Odluka o reklamaciji (Prihvaćeno / Odbijeno) — uvek vidljivo */}
         <div>
           <Label className="text-sm font-medium mb-2 block">{t("claims.metadata.acceptanceDecision")}</Label>
           <div className="flex flex-wrap gap-6">
@@ -991,6 +975,57 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               </Label>
             </div>
           </div>
+          {/* Jedan checkbox: "Potvrdi i pošalji obaveštenje klijentu" — samo za domaće; gleda status (U obradi / Prihvaćeno / Odbijeno) i šalje odgovarajući mail */}
+          {isDomesticMarket && ((claim.status === "IN_ANALYSIS" && claimCode) || claim.status === "APPROVED" || claim.status === "REJECTED") && (
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="notificationConfirm"
+                checked={
+                  (claim.status === "IN_ANALYSIS" && notificationSent) ||
+                  ((claim.status === "APPROVED" || claim.status === "REJECTED") && statusNotificationSent)
+                }
+                disabled={
+                  (claim.status === "IN_ANALYSIS" && (isSendingNotification || notificationSent)) ||
+                  ((claim.status === "APPROVED" || claim.status === "REJECTED") && (isSendingStatusNotification || statusNotificationSent))
+                }
+                onChange={(e) => {
+                  if (!e.target.checked) return;
+                  if (claim.status === "IN_ANALYSIS" && !notificationSent) {
+                    sendProcessingNotification();
+                  } else if ((claim.status === "APPROVED" || claim.status === "REJECTED") && !statusNotificationSent) {
+                    sendStatusNotification();
+                  }
+                }}
+                className="h-4 w-4 rounded border-input cursor-pointer disabled:cursor-not-allowed"
+              />
+              <label
+                htmlFor="notificationConfirm"
+                className={`text-sm flex items-center gap-2 cursor-pointer ${
+                  (claim.status === "IN_ANALYSIS" && notificationSent) || ((claim.status === "APPROVED" || claim.status === "REJECTED") && statusNotificationSent)
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {isSendingNotification || isSendingStatusNotification ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {t("claims.metadata.email.sending")}
+                  </>
+                ) : (claim.status === "IN_ANALYSIS" && notificationSent) || ((claim.status === "APPROVED" || claim.status === "REJECTED") && statusNotificationSent) ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4" />
+                    {t("claims.metadata.email.sent")}
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    {t("claims.metadata.email.sendNotification")}
+                  </>
+                )}
+              </label>
+            </div>
+          )}
         </div>
 
         {/* Server Folder Path (read-only). Folder se automatski kreira kada se popune Firma i MR Code. */}

@@ -50,9 +50,11 @@ if (USE_WEBDAV) {
 type ClaimForFolder = Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean };
 
 async function getClaimBaseKey(claim: ClaimForFolder): Promise<string> {
+  let customerName: string | null = null;
   let companyName: string | null = null;
   if (claim.customer) {
-    companyName = claim.customer.company || claim.customer.name;
+    customerName = claim.customer.name ?? null;
+    companyName = claim.customer.company ?? null;
   } else if (claim.customerId) {
     try {
       const prismaClient = await getPrisma();
@@ -60,19 +62,33 @@ async function getClaimBaseKey(claim: ClaimForFolder): Promise<string> {
         where: { id: claim.customerId },
         select: { name: true, company: true },
       });
-      companyName = customer?.company || customer?.name || null;
+      customerName = customer?.name ?? null;
+      companyName = customer?.company ?? null;
     } catch (error) {
       console.warn(`[getClaimBaseKey] Failed to load customer for claim ${claim.id}:`, error);
     }
   }
-  const isDomestic = !!claim.isDomesticMarket;
-  const sanitizedCompanyName =
-    isDomestic && !companyName?.trim()
-      ? "Domestic"
-      : sanitizeCustomerNameForPath(companyName);
   const sanitizedClaimCode = claim.claimCodeRaw
     ? sanitizeClaimCodeForPath(claim.claimCodeRaw)
     : claim.id;
+
+  const isDomestic = !!claim.isDomesticMarket;
+  if (isDomestic) {
+    // Domaće tržište: Ime Kupca (Kompanija Kupca) + MR Code
+    const namePart = [customerName?.trim(), companyName?.trim()].filter(Boolean);
+    const folderLabel =
+      namePart.length === 2
+        ? `${namePart[0]} (${namePart[1]})`
+        : namePart.length === 1
+          ? namePart[0]
+          : "Domestic";
+    const sanitizedLabel = sanitizeCustomerNameForPath(folderLabel);
+    return `${sanitizedLabel} - ${sanitizedClaimCode}`;
+  }
+
+  // Strano tržište: Kompanija kupca + MR Code
+  const companyOrName = companyName?.trim() || customerName?.trim() || null;
+  const sanitizedCompanyName = sanitizeCustomerNameForPath(companyOrName);
   return `${sanitizedCompanyName} - ${sanitizedClaimCode}`;
 }
 

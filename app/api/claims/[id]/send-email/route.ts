@@ -113,33 +113,26 @@ export async function POST(
       );
     }
 
-    // Determine recipient - use provided "to" or auto-detect from last inbound message
+    // Determine recipient - use provided "to" or auto-detect from last inbound message (processing / status template)
     let recipientEmail = body.to;
-    if (!recipientEmail && body.type === "processing") {
-      // Auto-detect recipient from last inbound message
+    const needsAutoRecipient = !recipientEmail && (body.type === "processing" || (body.claimAcceptanceStatus && (body.claimAcceptanceStatus === "ACCEPTED" || body.claimAcceptanceStatus === "REJECTED")));
+    if (needsAutoRecipient) {
       const lastInboundMessage = claim.emailThreads[0]?.messages?.[0];
       recipientEmail = lastInboundMessage?.from || null;
-      
       if (recipientEmail) {
-        // Extract email address if in format "Name <email@domain.com>"
         const emailMatch = recipientEmail.match(/<([^>]+)>/) || recipientEmail.match(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/);
         if (emailMatch) {
           recipientEmail = emailMatch[1] || emailMatch[0];
         }
-        
-        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(recipientEmail)) {
           recipientEmail = null;
         }
-        
-        // Skip system emails
         const invalidEmails = ['cpanel@', 'noreply@', 'no-reply@', 'mailer-daemon@', 'postmaster@', 'bounce@', 'return@'];
         if (recipientEmail && invalidEmails.some(invalid => recipientEmail!.toLowerCase().includes(invalid))) {
           recipientEmail = null;
         }
       }
-      
       if (!recipientEmail) {
         return NextResponse.json(
           { error: "Ne mogu pronaći email adresu primaoca. Proverite da reklamacija ima povezan email thread sa validnim pošiljaocem." },
@@ -283,8 +276,17 @@ export async function POST(
       }
     }
 
-    // Plain email (Mail tab): do not update processingEmailSentAt or close claim
-    if (!isPlainEmail) {
+    // Plain email (Mail tab): zaključaj reklamaciju (isLocked = true); ne menja se status
+    if (isPlainEmail) {
+      try {
+        await prisma.claim.update({
+          where: { id },
+          data: { isLocked: true, updatedAt: new Date() },
+        });
+      } catch (lockError) {
+        console.error("[send-email] Failed to lock claim after Mail tab send:", lockError);
+      }
+    } else {
       // After successful email send, update processingEmailSentAt if it was a processing email
       if (body._isProcessingEmail || body.type === "processing") {
         try {
@@ -301,28 +303,22 @@ export async function POST(
         }
       }
 
-      // After successful template/status email, close the claim (status = CLOSED)
-      // Plain email from Mail tab does NOT close the claim
+      // After successful template/status email: set status to APPROVED or REJECTED (we do not use CLOSED)
+      // Plain email from Mail tab does NOT change claim status
       try {
-        console.log(`[send-email] Closing claim ${id} after sending email to client`);
-        
-        const updateData: any = {
-          status: "CLOSED",
-          updatedAt: new Date(),
-        };
-        
-        if (body.claimAcceptanceStatus) {
-          updateData.claimAcceptanceStatus = body.claimAcceptanceStatus;
+        const updateData: any = { updatedAt: new Date() };
+        if (body.claimAcceptanceStatus === "ACCEPTED") {
+          updateData.status = "APPROVED";
+          updateData.claimAcceptanceStatus = "ACCEPTED";
+        } else if (body.claimAcceptanceStatus === "REJECTED") {
+          updateData.status = "REJECTED";
+          updateData.claimAcceptanceStatus = "REJECTED";
         }
-        
-        await prisma.claim.update({
-          where: { id },
-          data: updateData,
-        });
-        
-        console.log(`[send-email] Claim ${id} closed successfully with status: CLOSED`);
+        if (Object.keys(updateData).length > 1) {
+          await prisma.claim.update({ where: { id }, data: updateData });
+        }
       } catch (updateError) {
-        console.error("Error closing claim:", updateError);
+        console.error("Error updating claim status:", updateError);
         return NextResponse.json({
           success: true,
           emailMessageId: result.emailMessageId,
