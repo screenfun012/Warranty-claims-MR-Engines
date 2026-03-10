@@ -192,6 +192,7 @@ export default function MailPage() {
                   <TooltipContent><p>{t("signatureAuto")}</p></TooltipContent>
                 </Tooltip>
               </div>
+              <Input ref={fileInputRef} type="file" multiple className="hidden" />
 
               <fieldset className="rounded-lg border bg-muted/20 p-4 sm:p-5 space-y-4">
                 <legend className="text-sm font-semibold text-foreground px-1">{t("sectionRecipients")}</legend>
@@ -267,19 +268,9 @@ export default function MailPage() {
                 </div>
               </fieldset>
 
-              <fieldset className="rounded-lg border bg-muted/20 p-4 sm:p-5 space-y-4">
-                <legend className="text-sm font-semibold text-foreground px-1">{t("sectionAttachments")}</legend>
-                <div className="grid gap-1.5">
-                  <Label className="text-sm font-medium">{t("attachments")}</Label>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Input ref={fileInputRef} type="file" multiple className="w-full min-h-[44px] sm:min-h-10 file:mr-2 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium" />
-                    <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </div>
-                </div>
-                {sendMessage && (
-                  <p className={`text-sm ${sendMessage.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>{sendMessage.text}</p>
-                )}
-              </fieldset>
+              {sendMessage && (
+                <p className={`text-sm ${sendMessage.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>{sendMessage.text}</p>
+              )}
             </form>
           </Card>
         </TabsContent>
