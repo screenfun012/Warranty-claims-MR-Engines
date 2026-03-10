@@ -1,14 +1,13 @@
 /**
- * List files in one sent mail folder (for attachments etc).
- * GET /api/mail-archive/list?path=Poslati_mailovi/Subject
+ * GET /api/mail/config - returns mail config for the compose UI (e.g. from email).
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/get-session";
-import { listSentMailFolderFiles } from "@/lib/files/fileStorage";
+import { getEmailConfig } from "@/lib/config/envLoader";
 import { requireMinimumRole, createPermissionError, ROLES } from "@/lib/auth/permissions";
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     await requireMinimumRole(ROLES.ADMIN);
   } catch (error) {
@@ -24,11 +23,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const pathParam = request.nextUrl.searchParams.get("path");
-  if (!pathParam?.trim()) {
-    return NextResponse.json({ error: "path is required" }, { status: 400 });
-  }
-
-  const files = await listSentMailFolderFiles(pathParam.trim());
-  return NextResponse.json({ files });
+  const config = getEmailConfig();
+  return NextResponse.json({
+    fromEmail: config.smtpUserEmail ?? "",
+  });
 }

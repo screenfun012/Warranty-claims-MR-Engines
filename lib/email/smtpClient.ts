@@ -11,9 +11,11 @@ import { getEmailConfig } from "@/lib/config/envLoader";
 export interface SendEmailParams {
   to: string | string[];
   cc?: string | string[];
+  bcc?: string | string[];
   subject: string;
   text?: string;
   html?: string;
+  headers?: Record<string, string>;
   attachments?: Array<{
     filename: string;
     path?: string;
@@ -69,9 +71,11 @@ export async function sendEmail(params: SendEmailParams): Promise<{
     from: config.smtpUserEmail,
     to: Array.isArray(params.to) ? params.to.join(", ") : params.to,
     cc: params.cc ? (Array.isArray(params.cc) ? params.cc.join(", ") : params.cc) : undefined,
+    bcc: params.bcc ? (Array.isArray(params.bcc) ? params.bcc.join(", ") : params.bcc) : undefined,
     subject: params.subject,
     text: params.text,
     html: params.html,
+    headers: params.headers,
     attachments: params.attachments,
   };
 

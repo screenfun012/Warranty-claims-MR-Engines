@@ -106,6 +106,7 @@ export type SaveSentMailToNasParams = {
   from: string;
   to: string;
   cc?: string;
+  bcc?: string;
   subject: string;
   text?: string;
   html?: string;
@@ -152,6 +153,7 @@ export async function saveSentMailToNas(params: SaveSentMailToNasParams): Promis
     from: params.from,
     to: params.to,
     cc: params.cc ?? null,
+    bcc: params.bcc ?? null,
     subject: params.subject,
     messageId: params.messageId ?? null,
     sentAt: params.sentAt.toISOString(),

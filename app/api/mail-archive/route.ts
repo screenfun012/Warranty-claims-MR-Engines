@@ -6,11 +6,11 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/get-session";
 import { listSentMailFolders } from "@/lib/files/fileStorage";
-import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { requireMinimumRole, createPermissionError, ROLES } from "@/lib/auth/permissions";
 
 export async function GET() {
   try {
-    await requirePermission(PERMISSIONS.CLAIMS_READ);
+    await requireMinimumRole(ROLES.ADMIN);
   } catch (error) {
     const permError = createPermissionError(error);
     if (permError.status !== 500) {
