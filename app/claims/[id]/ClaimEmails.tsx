@@ -2,7 +2,6 @@
 
 import dynamic from "next/dynamic";
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +62,6 @@ const getOriginalSenderEmail = (claim: any): string => {
 };
 
 export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmailsProps) {
-  const router = useRouter();
   const t = useTranslations();
   const [sending, setSending] = useState(false);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<string[]>([]);
@@ -143,40 +141,31 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
   };
 
   const handleSendEmail = async () => {
+    if (!replyForm.to?.trim()) {
+      alert(t("claims.emails.recipientRequired"));
+      return;
+    }
+    if (!replyForm.subject?.trim()) {
+      alert(t("claims.emails.subjectRequired"));
+      return;
+    }
+    if (!replyForm.text?.trim()) {
+      alert(t("claims.emails.bodyRequired"));
+      return;
+    }
     setSending(true);
     try {
-      // Odluka se postavlja u tabu Podaci (Metadata); ovde samo proveravamo da je postavljena
-      const claimAcceptanceStatus = claim.status === "APPROVED" ? "ACCEPTED" : claim.status === "REJECTED" ? "REJECTED" : "";
-      if (!claimAcceptanceStatus) {
-        alert(t("claims.emails.selectStatus"));
-        setSending(false);
-        return;
-      }
-
-      // Build email body with acceptance message
-      let emailBody = replyForm.text;
-      if (claimAcceptanceStatus === "ACCEPTED") {
-        emailBody = emailBody 
-          ? `${emailBody}\n\n${t("claims.emails.acceptedMessage")}`
-          : t("claims.emails.acceptedMessage");
-      } else if (claimAcceptanceStatus === "REJECTED") {
-        emailBody = emailBody 
-          ? `${emailBody}\n\n${t("claims.emails.rejectedMessage")}`
-          : t("claims.emails.rejectedMessage");
-      }
-
-      // Get attachment IDs from selected internal files
-      const attachmentIds = selectedAttachmentIds;
-
-      // Send email - API will automatically set status to CLOSED
+      // Mail tab: send plain email only (subject, body, attachments). No status template.
       const res = await fetch(`/api/claims/${claim.id}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...replyForm,
-          text: emailBody,
-          attachmentIds,
-          claimAcceptanceStatus,
+          plainEmail: true,
+          to: replyForm.to.trim(),
+          cc: replyForm.cc?.trim() || undefined,
+          subject: replyForm.subject.trim(),
+          text: replyForm.text.trim(),
+          attachmentIds: selectedAttachmentIds,
         }),
       });
       const data = await res.json();
@@ -185,15 +174,11 @@ export function ClaimEmails({ claim, onUpdate, isReadOnly = false }: ClaimEmails
         if (data.warning) {
           alert(t("claims.emails.sendSuccess") + "\n\n" + t("common.warning") + ": " + data.warning);
         } else {
-          alert(t("claims.emails.sendSuccessClosed"));
+          alert(t("claims.emails.sendSuccess"));
         }
-        
-        // Reset form
         setReplyForm({ ...replyForm, text: "" });
         setSelectedAttachmentIds([]);
-        
-        // Navigate back to claims list (table view)
-        router.push("/claims");
+        onUpdate?.({});
       } else {
         alert(t("claims.emails.sendError") + ": " + (data.error || t("common.error")));
       }

@@ -45,8 +45,11 @@ export async function POST(
       return NextResponse.json({ error: "Claim not found" }, { status: 404 });
     }
 
+    // Plain email from Mail tab: only subject, body, attachments – no template, no close claim
+    const isPlainEmail = body.plainEmail === true;
+
     // Generate email subject early (needed for thread creation)
-    // We'll refine it later based on email type
+    // We'll refine it later based on email type (unless plain email)
     let emailSubject = body.subject;
     
     // If no subject provided, use default based on claim code
@@ -155,11 +158,23 @@ export async function POST(
     let emailText = body.text || body.body;
     let emailHtml = body.html;
 
-    // Get base URL for logo and links
-    const baseUrl = request.nextUrl.origin || 
-                   process.env.NEXT_PUBLIC_APP_URL || 
-                   (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-                   "http://localhost:3000";
+    // Plain email: use only what was sent, no template
+    if (isPlainEmail) {
+      if (!emailText && !emailHtml) {
+        return NextResponse.json(
+          { error: "Telo poruke je obavezno" },
+          { status: 400 }
+        );
+      }
+      if (!emailHtml && emailText) {
+        emailHtml = `<p>${String(emailText).replace(/\n/g, "<br>")}</p>`;
+      }
+    } else {
+      // Get base URL for logo and links (templates only)
+      const baseUrl = request.nextUrl.origin ||
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+        "http://localhost:3000";
 
     if (body.type === "processing") {
       // Processing email - claim is being worked on
@@ -206,6 +221,7 @@ export async function POST(
       // If custom body is provided but no HTML, create simple HTML
       emailHtml = `<p>${(body.text || body.body).replace(/\n/g, '<br>')}</p>`;
     }
+    } // end non-plainEmail branch
 
     // Send email
     const result = await sendEmailAndSave({
@@ -256,65 +272,61 @@ export async function POST(
       }
     }
 
-    // After successful email send, update processingEmailSentAt if it was a processing email
-    if (body._isProcessingEmail || body.type === "processing") {
+    // Plain email (Mail tab): do not update processingEmailSentAt or close claim
+    if (!isPlainEmail) {
+      // After successful email send, update processingEmailSentAt if it was a processing email
+      if (body._isProcessingEmail || body.type === "processing") {
+        try {
+          await prisma.claim.update({
+            where: { id },
+            data: {
+              processingEmailSentAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+          console.log(`[send-email] Updated processingEmailSentAt for claim ${id}`);
+        } catch (updateError) {
+          console.error("Error updating processingEmailSentAt:", updateError);
+        }
+      }
+
+      // After successful template/status email, close the claim (status = CLOSED)
+      // Plain email from Mail tab does NOT close the claim
       try {
+        console.log(`[send-email] Closing claim ${id} after sending email to client`);
+        
+        const updateData: any = {
+          status: "CLOSED",
+          updatedAt: new Date(),
+        };
+        
+        if (body.claimAcceptanceStatus) {
+          updateData.claimAcceptanceStatus = body.claimAcceptanceStatus;
+        }
+        
         await prisma.claim.update({
           where: { id },
-          data: {
-            processingEmailSentAt: new Date(),
-            updatedAt: new Date(),
-          },
+          data: updateData,
         });
-        console.log(`[send-email] Updated processingEmailSentAt for claim ${id}`);
+        
+        console.log(`[send-email] Claim ${id} closed successfully with status: CLOSED`);
       } catch (updateError) {
-        console.error("Error updating processingEmailSentAt:", updateError);
+        console.error("Error closing claim:", updateError);
+        return NextResponse.json({
+          success: true,
+          emailMessageId: result.emailMessageId,
+          messageId: result.messageId,
+          processingEmailSent: body._isProcessingEmail || body.type === "processing",
+          warning: "Email sent successfully, but failed to update claim status. Please refresh the page.",
+        }, { status: 200 });
       }
-    }
-
-    // After successful email send, ALWAYS close the claim (status = CLOSED)
-    // This ensures that once an email is sent to client, the claim is closed
-    try {
-      console.log(`[send-email] Closing claim ${id} after sending email to client`);
-      
-      // Use Prisma update for Turso compatibility (works with both SQLite and Turso)
-      // When email is sent, claim is closed
-      // Default behavior: CLOSED status = locked (no need to set isLocked explicitly)
-      // We set isLocked to null/undefined so default behavior applies
-      const updateData: any = {
-        status: "CLOSED",
-        // Don't set isLocked - CLOSED status = locked by default
-        updatedAt: new Date(),
-      };
-      
-      if (body.claimAcceptanceStatus) {
-        updateData.claimAcceptanceStatus = body.claimAcceptanceStatus;
-      }
-      
-      await prisma.claim.update({
-        where: { id },
-        data: updateData,
-      });
-      
-      console.log(`[send-email] Claim ${id} closed successfully with status: CLOSED`);
-    } catch (updateError) {
-      console.error("Error closing claim:", updateError);
-      // Don't fail the email send if status update fails, but log it
-      // Return error in response so frontend knows to refetch
-      return NextResponse.json({
-        success: true,
-        emailMessageId: result.emailMessageId,
-        messageId: result.messageId,
-        processingEmailSent: body._isProcessingEmail || body.type === "processing",
-        warning: "Email sent successfully, but failed to update claim status. Please refresh the page.",
-      }, { status: 200 });
     }
 
     return NextResponse.json({
       success: true,
       emailMessageId: result.emailMessageId,
       messageId: result.messageId,
-      processingEmailSent: body._isProcessingEmail || body.type === "processing",
+      processingEmailSent: !isPlainEmail && (body._isProcessingEmail || body.type === "processing"),
     });
   } catch (error) {
     console.error("Error sending email:", error);
