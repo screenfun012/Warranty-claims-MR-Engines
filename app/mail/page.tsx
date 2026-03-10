@@ -111,80 +111,80 @@ export default function MailPage() {
     `/api/mail-archive/content?path=${encodeURIComponent(path + "/" + file)}`;
 
   return (
-    <div className="container max-w-4xl py-6">
-      <h1 className="text-2xl font-semibold mb-6">{t("title")}</h1>
+    <div className="w-full min-h-0 px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-5xl mx-auto">
+      <h1 className="text-xl sm:text-2xl font-semibold mb-4 sm:mb-6">{t("title")}</h1>
 
       <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as "send" | "sent"); if (v === "sent") loadSentList(); setSelectedMail(null); setMailDetail(null); }}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="send" className="flex items-center gap-2">
-            <Send className="h-4 w-4" />
-            {t("sendTab")}
+        <TabsList className="grid w-full grid-cols-2 h-11 sm:h-12">
+          <TabsTrigger value="send" className="flex items-center justify-center gap-2 text-sm sm:text-base min-h-[44px] sm:min-h-0">
+            <Send className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t("sendTab")}</span>
           </TabsTrigger>
-          <TabsTrigger value="sent" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            {t("sentTab")}
+          <TabsTrigger value="sent" className="flex items-center justify-center gap-2 text-sm sm:text-base min-h-[44px] sm:min-h-0">
+            <Mail className="h-4 w-4 shrink-0" />
+            <span className="truncate">{t("sentTab")}</span>
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="send" className="mt-6">
-          <Card className="p-6">
-            <form onSubmit={handleSend} className="space-y-4">
-              <div>
-                <Label htmlFor="to">{t("to")} *</Label>
-                <Input id="to" type="text" value={to} onChange={(e) => setTo(e.target.value)} placeholder="email@example.com" required className="mt-1" />
+        <TabsContent value="send" className="mt-4 sm:mt-6">
+          <Card className="p-4 sm:p-6 w-full">
+            <form onSubmit={handleSend} className="space-y-4 sm:space-y-5">
+              <div className="grid gap-1.5">
+                <Label htmlFor="to" className="text-sm font-medium">{t("to")} *</Label>
+                <Input id="to" type="email" inputMode="email" value={to} onChange={(e) => setTo(e.target.value)} placeholder="email@example.com" required className="w-full min-h-[44px] sm:min-h-10" />
               </div>
-              <div>
-                <Label htmlFor="cc">{t("cc")}</Label>
-                <Input id="cc" type="text" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc@example.com" className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="cc" className="text-sm font-medium">{t("cc")}</Label>
+                <Input id="cc" type="text" inputMode="email" value={cc} onChange={(e) => setCc(e.target.value)} placeholder="cc@example.com" className="w-full min-h-[44px] sm:min-h-10" />
               </div>
-              <div>
-                <Label htmlFor="subject">{t("subject")} *</Label>
-                <Input id="subject" type="text" value={subject} onChange={(e) => setSubject(e.target.value)} required className="mt-1" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="subject" className="text-sm font-medium">{t("subject")} *</Label>
+                <Input id="subject" type="text" value={subject} onChange={(e) => setSubject(e.target.value)} required className="w-full min-h-[44px] sm:min-h-10" />
               </div>
-              <div>
-                <Label htmlFor="body">{t("body")}</Label>
-                <Textarea id="body" value={body} onChange={(e) => setBody(e.target.value)} rows={8} className="mt-1 resize-y" />
+              <div className="grid gap-1.5">
+                <Label htmlFor="body" className="text-sm font-medium">{t("body")}</Label>
+                <Textarea id="body" value={body} onChange={(e) => setBody(e.target.value)} rows={6} className="w-full min-h-[120px] sm:min-h-[160px] resize-y text-base" />
               </div>
-              <div>
-                <Label>{t("attachments")}</Label>
-                <div className="mt-1 flex items-center gap-2">
-                  <Input ref={fileInputRef} type="file" multiple className="max-w-sm" />
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+              <div className="grid gap-1.5">
+                <Label className="text-sm font-medium">{t("attachments")}</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Input ref={fileInputRef} type="file" multiple className="w-full min-h-[44px] sm:min-h-10 file:mr-2 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium" />
+                  <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
                 </div>
               </div>
               {sendMessage && (
-                <p className={sendMessage.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}>{sendMessage.text}</p>
+                <p className={`text-sm ${sendMessage.type === "success" ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>{sendMessage.text}</p>
               )}
-              <Button type="submit" disabled={sending}>
+              <Button type="submit" disabled={sending} className="w-full sm:w-auto min-h-[44px] sm:min-h-10 px-6">
                 {sending ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />{t("sending")}</> : t("sendButton")}
               </Button>
             </form>
           </Card>
         </TabsContent>
 
-        <TabsContent value="sent" className="mt-6">
+        <TabsContent value="sent" className="mt-4 sm:mt-6">
           {selectedMail ? (
-            <div>
-              <Button variant="ghost" size="sm" className="mb-4" onClick={() => { setSelectedMail(null); setMailDetail(null); }}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                {t("backToList")}
+            <div className="w-full">
+              <Button variant="ghost" size="sm" className="mb-4 min-h-[44px] sm:min-h-9 px-3" onClick={() => { setSelectedMail(null); setMailDetail(null); }}>
+                <ArrowLeft className="h-4 w-4 mr-2 shrink-0" />
+                <span className="truncate">{t("backToList")}</span>
               </Button>
-              <Card className="p-6">
+              <Card className="p-4 sm:p-6 w-full overflow-hidden">
                 {detailLoading ? (
                   <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> {tCommon("loading")}</div>
                 ) : mailDetail ? (
-                  <div className="space-y-4">
-                    <div className="text-sm text-muted-foreground">
+                  <div className="space-y-4 overflow-hidden">
+                    <div className="text-sm text-muted-foreground break-words">
                       <p><strong>To:</strong> {(mailDetail.metadata as { to?: string }).to}</p>
                       {(mailDetail.metadata as { cc?: string }).cc && <p><strong>CC:</strong> {(mailDetail.metadata as { cc?: string }).cc}</p>}
                       <p><strong>Subject:</strong> {(mailDetail.metadata as { subject?: string }).subject}</p>
                       <p><strong>Sent:</strong> {(mailDetail.metadata as { sentAt?: string }).sentAt ? new Date((mailDetail.metadata as { sentAt?: string }).sentAt as string).toLocaleString() : ""}</p>
                     </div>
                     {mailDetail.bodyHtml && (
-                      <div className="border rounded-md p-4 bg-muted/30 prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: mailDetail.bodyHtml }} />
+                      <div className="border rounded-md p-4 bg-muted/30 prose prose-sm dark:prose-invert max-w-none overflow-x-auto break-words" dangerouslySetInnerHTML={{ __html: mailDetail.bodyHtml }} />
                     )}
                     {!mailDetail.bodyHtml && mailDetail.bodyText && (
-                      <pre className="whitespace-pre-wrap border rounded-md p-4 bg-muted/30 text-sm">{mailDetail.bodyText}</pre>
+                      <pre className="whitespace-pre-wrap break-words border rounded-md p-4 bg-muted/30 text-sm overflow-x-auto">{mailDetail.bodyText}</pre>
                     )}
                     {mailDetail.files.length > 0 && (
                       <div>
@@ -204,11 +204,11 @@ export default function MailPage() {
             </div>
           ) : (
             <>
-              <Button variant="outline" size="sm" className="mb-4" onClick={loadSentList} disabled={sentLoading}>
-                {sentLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              <Button variant="outline" size="sm" className="mb-4 min-h-[44px] sm:min-h-9 w-full sm:w-auto" onClick={loadSentList} disabled={sentLoading}>
+                {sentLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2 shrink-0" /> : null}
                 {tCommon("refresh")}
               </Button>
-              <Card className="p-6">
+              <Card className="p-4 sm:p-6 w-full">
                 {sentLoading ? (
                   <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> {tCommon("loading")}</div>
                 ) : sentFolders.length === 0 ? (
@@ -219,7 +219,7 @@ export default function MailPage() {
                       <li key={f.path}>
                         <button
                           type="button"
-                          className="w-full text-left flex items-center justify-between gap-4 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                          className="w-full text-left flex items-center justify-between gap-4 p-3 sm:p-4 rounded-lg border hover:bg-muted/50 transition-colors min-h-[52px] sm:min-h-0 touch-manipulation"
                           onClick={() => loadMailDetail(f)}
                         >
                           <div className="min-w-0">
