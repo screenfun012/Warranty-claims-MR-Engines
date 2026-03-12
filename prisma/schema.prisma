@@ -139,9 +139,14 @@ model Claim {
   serverFolderPath      String?
   summarySr             String?
   summaryEn             String?
-  summaryDe             String? // German (Beta)
-  summaryFr             String? // French (Beta)
-  summaryNl             String? // Dutch (Beta)
+  summaryDe             String?
+  summaryFr             String?
+  summaryNl             String?
+  summaryIt             String?
+  summaryPl             String?
+  summaryDa             String?
+  summaryEs             String?
+  summarySv             String?
   emailThreads          EmailThread[]
   attachments           Attachment[]
   clientDocuments       ClientDocument[]
@@ -201,7 +206,8 @@ model Attachment {
   textOriginal   String? // Extracted text from PDF
   textSr         String? // Serbian translation
   textEn         String? // English translation
-  clientDocument ClientDocument?
+  translationsJson String? // Other languages JSON: {"DE":"...","IT":"..."}
+  clientDocument   ClientDocument?
   photo          Photo?
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
@@ -218,6 +224,7 @@ model ClientDocument {
   textOriginal     String
   textSr           String?
   textEn           String?
+  translationsJson String?    // Other languages JSON: {"DE":"...","IT":"..."}
   documentType     String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

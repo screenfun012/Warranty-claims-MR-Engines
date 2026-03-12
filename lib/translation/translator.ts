@@ -39,24 +39,16 @@ class DeepLTranslator implements Translator {
 
   async translate(params: { text: string; sourceLang?: string; targetLang: string }): Promise<string> {
     try {
-      // Map language codes to DeepL format
-      // DeepL supported languages: https://www.deepl.com/docs-api/translating-text/
-      // DeepL supports Serbian (SR) - use it directly
+      // Map language codes to DeepL format (DeepL supported: SR, EN, DE, NL, FR, IT, PL, DA, ES, SV, ...)
       const targetLangMap: Record<string, string> = {
-        SR: "SR", // Serbian - DeepL supports it
-        EN: "EN", // English (DeepL accepts both EN and EN-US, but EN is more universal)
-        DE: "DE", // German
-        NL: "NL", // Dutch
-        FR: "FR", // French
+        SR: "SR", EN: "EN", DE: "DE", NL: "NL", FR: "FR",
+        IT: "IT", // Italian
+        PL: "PL", // Polish
+        DA: "DA", // Danish
+        ES: "ES", // Spanish
+        SV: "SV", // Swedish
       };
-
-      const sourceLangMap: Record<string, string> = {
-        SR: "SR", // Serbian - DeepL supports it
-        EN: "EN", // English
-        DE: "DE", // German
-        NL: "NL", // Dutch
-        FR: "FR", // French
-      };
+      const sourceLangMap: Record<string, string> = { ...targetLangMap };
 
       const targetLangUpper = params.targetLang.toUpperCase();
       const target = targetLangMap[targetLangUpper] || targetLangUpper;
@@ -195,11 +187,8 @@ class OpenAITranslator implements Translator {
     try {
       // Map language codes to full names for better translation
       const langNameMap: Record<string, string> = {
-        SR: "Serbian",
-        EN: "English",
-        DE: "German",
-        NL: "Dutch",
-        FR: "French",
+        SR: "Serbian", EN: "English", DE: "German", NL: "Dutch", FR: "French",
+        IT: "Italian", PL: "Polish", DA: "Danish", ES: "Spanish", SV: "Swedish",
       };
       
       const sourceLangName = params.sourceLang 

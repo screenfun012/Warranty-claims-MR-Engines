@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ResponsiveTable } from "@/components/responsive-table";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2, Search, Reply, Mail } from "lucide-react";
+import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2, Search, Reply, Mail, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { TRANSLATION_LANGUAGES } from "@/lib/translation/languages";
 
 const FileViewerModal = dynamic(
   () => import("@/components/file-viewer-modal").then((m) => ({ default: m.FileViewerModal })),
@@ -76,6 +77,7 @@ interface EmailThread {
       textOriginal: string | null;
       textSr: string | null;
       textEn: string | null;
+      translationsJson?: string | null;
     }>;
   }>;
   createdAt: string;
@@ -488,7 +490,17 @@ function ThreadDetail({
   const [claims, setClaims] = useState<Claim[]>([]);
   const [extracting, setExtracting] = useState<string | null>(null);
   const [translating, setTranslating] = useState<{ attachmentId: string; lang: string } | null>(null);
+  const [otherTargetLang, setOtherTargetLang] = useState<Record<string, string>>({});
   const [expandedAttachments, setExpandedAttachments] = useState<Set<string>>(new Set());
+
+  const getAttTranslations = (att: { translationsJson?: string | null }) => {
+    if (!att.translationsJson) return {} as Record<string, string>;
+    try {
+      return (typeof att.translationsJson === "string" ? JSON.parse(att.translationsJson) : att.translationsJson) || {};
+    } catch {
+      return {} as Record<string, string>;
+    }
+  };
   const [previewAttachment, setPreviewAttachment] = useState<{ id: string; fileName: string; mimeType: string } | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -1062,12 +1074,27 @@ function ThreadDetail({
                               </Button>
                             )}
                           </div>
-                          <Textarea
-                            value={attachment.textSr || ""}
-                            rows={6}
-                            readOnly
-                            placeholder={t("inbox.serbianTranslationPlaceholder")}
-                          />
+                          <div className="relative">
+                            {translating?.attachmentId === attachment.id && translating?.lang === "SR" && (
+                              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md border bg-background/90 backdrop-blur-sm">
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="h-6 w-6 animate-spin" />
+                                  <span className="text-sm font-medium">{t("inbox.translating")}</span>
+                                </div>
+                              </div>
+                            )}
+                            <Textarea
+                              value={
+                                translating?.attachmentId === attachment.id && translating?.lang === "SR"
+                                  ? (attachment.textOriginal || "")
+                                  : (attachment.textSr || "")
+                              }
+                              rows={6}
+                              readOnly
+                              placeholder={t("inbox.serbianTranslationPlaceholder")}
+                              className={translating?.attachmentId === attachment.id && translating?.lang === "SR" ? "opacity-60" : ""}
+                            />
+                          </div>
                         </div>
                         
                         <div>
@@ -1087,12 +1114,82 @@ function ThreadDetail({
                               </Button>
                             )}
                           </div>
-                          <Textarea
-                            value={attachment.textEn || ""}
-                            rows={6}
-                            readOnly
-                            placeholder={t("inbox.englishTranslationPlaceholder")}
-                          />
+                          <div className="relative">
+                            {translating?.attachmentId === attachment.id && translating?.lang === "EN" && (
+                              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md border bg-background/90 backdrop-blur-sm">
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="h-6 w-6 animate-spin" />
+                                  <span className="text-sm font-medium">{t("inbox.translating")}</span>
+                                </div>
+                              </div>
+                            )}
+                            <Textarea
+                              value={
+                                translating?.attachmentId === attachment.id && translating?.lang === "EN"
+                                  ? (attachment.textOriginal || "")
+                                  : (attachment.textEn || "")
+                              }
+                              rows={6}
+                              readOnly
+                              placeholder={t("inbox.englishTranslationPlaceholder")}
+                              className={translating?.attachmentId === attachment.id && translating?.lang === "EN" ? "opacity-60" : ""}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Other languages (DE, NL, FR, IT, PL, DA, ES, SV) */}
+                        <div>
+                          <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
+                            <Label>{t("inbox.otherLanguage")}</Label>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={otherTargetLang[attachment.id] || "DE"}
+                                onValueChange={(val) => setOtherTargetLang((prev) => ({ ...prev, [attachment.id]: val }))}
+                                disabled={!!translating?.attachmentId}
+                              >
+                                <SelectTrigger className="w-28 h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TRANSLATION_LANGUAGES.filter((l) => l.code !== "SR" && l.code !== "EN").map((l) => (
+                                    <SelectItem key={l.code} value={l.code}>{l.code}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTranslate(attachment.id, otherTargetLang[attachment.id] || "DE")}
+                                disabled={translating?.attachmentId === attachment.id && translating?.lang === (otherTargetLang[attachment.id] || "DE")}
+                              >
+                                <Languages className="h-4 w-4 mr-2" />
+                                {translating?.attachmentId === attachment.id && translating?.lang === (otherTargetLang[attachment.id] || "DE")
+                                  ? t("inbox.translating")
+                                  : t("inbox.translateTo")}
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="relative">
+                            {translating?.attachmentId === attachment.id && translating?.lang === (otherTargetLang[attachment.id] || "DE") && (
+                              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md border bg-background/90 backdrop-blur-sm">
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                  <Loader2 className="h-6 w-6 animate-spin" />
+                                  <span className="text-sm font-medium">{t("inbox.translating")}</span>
+                                </div>
+                              </div>
+                            )}
+                            <Textarea
+                              value={
+                                translating?.attachmentId === attachment.id && translating?.lang === (otherTargetLang[attachment.id] || "DE")
+                                  ? (attachment.textOriginal || "")
+                                  : (getAttTranslations(attachment)[otherTargetLang[attachment.id] || "DE"] || "")
+                              }
+                              rows={6}
+                              readOnly
+                              placeholder={t("inbox.otherLanguagePlaceholder")}
+                              className={translating?.attachmentId === attachment.id && translating?.lang === (otherTargetLang[attachment.id] || "DE") ? "opacity-60" : ""}
+                            />
+                          </div>
                         </div>
                       </div>
                     </Card>

@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Languages, FileText, Image as ImageIcon, Paperclip, Trash2, X } from "lucide-react";
+import { Languages, FileText, Image as ImageIcon, Paperclip, Trash2, X, Loader2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,56 @@ const FileViewerModal = dynamic(
   { ssr: false, loading: () => <Skeleton className="h-0 w-0 overflow-hidden" /> }
 );
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { TRANSLATION_LANGUAGES } from "@/lib/translation/languages";
+
+/** Attachment as returned from email thread messages */
+interface EmailMessageAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  filePath: string;
+  textOriginal?: string | null;
+  textSr?: string | null;
+  textEn?: string | null;
+  translationsJson?: string | null;
+  isProbablyLogo?: boolean;
+  isRelevant?: boolean;
+  source?: string;
+}
+
+/** Attachment enriched with message context (used in this tab) */
+interface ClientAttachment extends EmailMessageAttachment {
+  messageDate: string;
+  messageFrom?: string;
+  messageSubject?: string;
+}
+
+interface EmailMessage {
+  date: string;
+  from: string;
+  subject?: string;
+  direction: string;
+  attachments?: EmailMessageAttachment[];
+}
+
+interface EmailThread {
+  messages?: EmailMessage[];
+}
+
+interface ClientDocument {
+  id: string;
+  attachmentId?: string | null;
+  textOriginal: string;
+  textSr?: string | null;
+  textEn?: string | null;
+  translationsJson?: string | null;
+}
+
+interface ClaimForDocuments {
+  id: string;
+  emailThreads?: EmailThread[];
+  clientDocuments?: ClientDocument[];
+}
 
 /** Thumbnail that loads /api/files/[id] via fetch (credentials) and shows blob; placeholder on error so images always render. */
 function DocumentThumbnail({
@@ -146,7 +196,7 @@ function DocumentThumbnail({
 }
 
 interface ClaimClientDocumentsProps {
-  claim: any;
+  claim: ClaimForDocuments;
   isReadOnly?: boolean;
   onRefresh?: () => void;
 }
@@ -164,17 +214,17 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
   const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
 
   // Collect all attachments from INBOUND email messages (from client) AND internally uploaded documents
-  const clientAttachments = useMemo(() => {
-    const attachments: any[] = [];
+  const clientAttachments = useMemo((): ClientAttachment[] => {
+    const attachments: ClientAttachment[] = [];
     
     // Add attachments from INBOUND email messages (from client)
     if (claim.emailThreads) {
-      claim.emailThreads.forEach((thread: any) => {
+      claim.emailThreads.forEach((thread: EmailThread) => {
         if (thread.messages) {
-          thread.messages.forEach((message: any) => {
+          thread.messages.forEach((message: EmailMessage) => {
             // Only INBOUND messages (from client)
             if (message.direction === "INBOUND" && message.attachments) {
-              message.attachments.forEach((attachment: any) => {
+              message.attachments.forEach((attachment: EmailMessageAttachment) => {
                 // Skip logos and irrelevant attachments
                 if (!attachment.isProbablyLogo && attachment.isRelevant !== false) {
                   attachments.push({
@@ -273,15 +323,24 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
     );
   }
 
+  const getDocTranslations = (doc: { translationsJson?: string | null }): Record<string, string> => {
+    if (!doc.translationsJson) return {} as Record<string, string>;
+    try {
+      return (typeof doc.translationsJson === "string" ? JSON.parse(doc.translationsJson) : doc.translationsJson) || {};
+    } catch {
+      return {} as Record<string, string>;
+    }
+  };
+
   // Group attachments by type
-  const images = clientAttachments.filter((att: any) => 
+  const images = clientAttachments.filter((att: ClientAttachment) => 
     att.mimeType?.startsWith("image/") || 
     /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(att.fileName || "")
   );
-  const pdfs = clientAttachments.filter((att: any) => 
+  const pdfs = clientAttachments.filter((att: ClientAttachment) => 
     att.mimeType?.includes("pdf") || /\.pdf$/i.test(att.fileName || "")
   );
-  const documents = clientAttachments.filter((att: any) => {
+  const documents = clientAttachments.filter((att: ClientAttachment) => {
     const isImage = att.mimeType?.startsWith("image/") || 
                    /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(att.fileName || "");
     const isPdf = att.mimeType?.includes("pdf") || /\.pdf$/i.test(att.fileName || "");
@@ -289,8 +348,8 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
   });
 
   // Find clientDocument for PDFs (for text extraction)
-  const getClientDocument = (attachmentId: string) => {
-    return claim.clientDocuments?.find((doc: any) => doc.attachmentId === attachmentId);
+  const getClientDocument = (attachmentId: string): ClientDocument | undefined => {
+    return claim.clientDocuments?.find((doc: ClientDocument) => doc.attachmentId === attachmentId);
   };
 
   const handleDeleteClick = (attachmentId: string) => {
@@ -327,7 +386,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
   };
 
   // Check if attachment is internally uploaded (can be deleted)
-  const isInternalUpload = (attachment: any) => {
+  const isInternalUpload = (attachment: ClientAttachment) => {
     return attachment.source === "INTERNAL_TEARDOWN" || attachment.source === "OTHER";
   };
 
@@ -341,9 +400,9 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
             {t("claims.documents.images")} ({images.length})
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {images.map((attachment: any, index: number) => (
+            {images.map((attachment: ClientAttachment, index: number) => (
               <Card key={attachment.id} className="p-3 hover:shadow-md transition-shadow cursor-pointer" onClick={() => {
-                setViewerIndex(clientAttachments.findIndex((a: any) => a.id === attachment.id));
+                setViewerIndex(clientAttachments.findIndex((a: ClientAttachment) => a.id === attachment.id));
                 setViewerOpen(true);
               }}>
                 <div className="aspect-square bg-muted/30 rounded-lg overflow-hidden mb-2">
@@ -375,7 +434,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
             {t("claims.documents.pdfDocuments")} ({pdfs.length})
           </h3>
           <div className="space-y-4">
-            {pdfs.map((attachment: any) => {
+            {pdfs.map((attachment: ClientAttachment) => {
               const clientDoc = getClientDocument(attachment.id);
               return (
                 <Card key={attachment.id} className="p-6 hover:shadow-md transition-shadow">
@@ -398,7 +457,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          const pdfIndex = clientAttachments.findIndex((a: any) => a.id === attachment.id);
+                          const pdfIndex = clientAttachments.findIndex((a: ClientAttachment) => a.id === attachment.id);
                           setViewerIndex(pdfIndex >= 0 ? pdfIndex : 0);
                           setViewerOpen(true);
                         }}
@@ -453,32 +512,34 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                         <div className="flex items-center justify-between mb-2">
                           <Label>{t("inbox.serbianTranslation")}</Label>
                           <div className="flex items-center gap-2">
-                            <Select 
-                              value={sourceLang[clientDoc.id] || "auto"} 
+                            <Select
+                              value={sourceLang[clientDoc.id] || "auto"}
                               onValueChange={(val) => setSourceLang({ ...sourceLang, [clientDoc.id]: val })}
                               disabled={translating?.docId === clientDoc.id}
                             >
-                              <SelectTrigger className="w-24 h-8">
+                              <SelectTrigger className="w-28 h-8">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="auto">{t("claims.documents.auto")}</SelectItem>
-                                <SelectItem value="SR">SR</SelectItem>
-                                <SelectItem value="EN">EN</SelectItem>
+                                {TRANSLATION_LANGUAGES.map((l) => (
+                                  <SelectItem key={l.code} value={l.code}>{l.code}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <span className="text-sm">→</span>
-                            <Select 
-                              value={targetLang[clientDoc.id] || "SR"} 
+                            <Select
+                              value={targetLang[clientDoc.id] || "SR"}
                               onValueChange={(val) => setTargetLang({ ...targetLang, [clientDoc.id]: val })}
                               disabled={translating?.docId === clientDoc.id}
                             >
-                              <SelectTrigger className="w-24 h-8">
+                              <SelectTrigger className="w-28 h-8">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="SR">SR</SelectItem>
-                                <SelectItem value="EN">EN</SelectItem>
+                                {TRANSLATION_LANGUAGES.map((l) => (
+                                  <SelectItem key={l.code} value={l.code}>{l.code}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Button
@@ -488,16 +549,39 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                               disabled={translating?.docId === clientDoc.id || (sourceLang[clientDoc.id] || "auto") === (targetLang[clientDoc.id] || "SR")}
                             >
                               <Languages className="h-4 w-4 mr-2" />
-                              {translating?.docId === clientDoc.id && translating?.lang === "SR" ? t("inbox.translating") : t("inbox.translateToSR")}
+                              {translating?.docId === clientDoc.id && translating?.lang === (targetLang[clientDoc.id] || "SR") ? t("inbox.translating") : t("inbox.translateToSR")}
                             </Button>
                           </div>
                         </div>
-                        <Textarea
-                          value={clientDoc.textSr || ""}
-                          rows={6}
-                          readOnly
-                          placeholder={t("inbox.serbianTranslationPlaceholder")}
-                        />
+                        <div className="relative">
+                          {translating?.docId === clientDoc.id && translating?.lang === (targetLang[clientDoc.id] || "SR") && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md border bg-background/90 backdrop-blur-sm">
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <span className="text-sm font-medium">{t("inbox.translating")}</span>
+                              </div>
+                            </div>
+                          )}
+                          <Textarea
+                            value={(() => {
+                              const tgt = targetLang[clientDoc.id] || "SR";
+                              if (translating?.docId === clientDoc.id && translating?.lang === tgt) {
+                                const src = sourceLang[clientDoc.id];
+                                if (src === "EN") return clientDoc.textEn || "";
+                                if (src === "SR") return clientDoc.textSr || "";
+                                if (src && src !== "auto") return getDocTranslations(clientDoc)[src] || "";
+                                return clientDoc.textOriginal || "";
+                              }
+                              if (tgt === "SR") return clientDoc.textSr || "";
+                              if (tgt === "EN") return clientDoc.textEn || "";
+                              return getDocTranslations(clientDoc)[tgt] || "";
+                            })()}
+                            rows={6}
+                            readOnly
+                            placeholder={t("inbox.serbianTranslationPlaceholder")}
+                            className={translating?.docId === clientDoc.id && translating?.lang === (targetLang[clientDoc.id] || "SR") ? "opacity-60" : ""}
+                          />
+                        </div>
                       </div>
                       <div>
                         <div className="flex items-center justify-between mb-2">
@@ -511,24 +595,26 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                               <SelectTrigger className="w-24 h-8">
                                 <SelectValue />
                               </SelectTrigger>
-                              <SelectContent>
+                            <SelectContent>
                                 <SelectItem value="auto">{t("claims.documents.auto")}</SelectItem>
-                                <SelectItem value="SR">SR</SelectItem>
-                                <SelectItem value="EN">EN</SelectItem>
+                                {TRANSLATION_LANGUAGES.map((l) => (
+                                  <SelectItem key={l.code} value={l.code}>{l.code}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <span className="text-sm">→</span>
-                            <Select 
-                              value={targetLang[clientDoc.id] || "EN"} 
+                            <Select
+                              value={targetLang[clientDoc.id] || "EN"}
                               onValueChange={(val) => setTargetLang({ ...targetLang, [clientDoc.id]: val })}
                               disabled={translating?.docId === clientDoc.id}
                             >
-                              <SelectTrigger className="w-24 h-8">
+                              <SelectTrigger className="w-28 h-8">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="SR">SR</SelectItem>
-                                <SelectItem value="EN">EN</SelectItem>
+                                {TRANSLATION_LANGUAGES.map((l) => (
+                                  <SelectItem key={l.code} value={l.code}>{l.code}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <Button
@@ -538,16 +624,39 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                               disabled={translating?.docId === clientDoc.id || (sourceLang[clientDoc.id] || "auto") === (targetLang[clientDoc.id] || "EN")}
                             >
                               <Languages className="h-4 w-4 mr-2" />
-                              {translating?.docId === clientDoc.id && translating?.lang === "EN" ? t("inbox.translating") : t("inbox.translateToEN")}
+                              {translating?.docId === clientDoc.id && translating?.lang === (targetLang[clientDoc.id] || "EN") ? t("inbox.translating") : t("inbox.translateToEN")}
                             </Button>
                           </div>
                         </div>
-                        <Textarea
-                          value={clientDoc.textEn || ""}
-                          rows={6}
-                          readOnly
-                          placeholder={t("inbox.englishTranslationPlaceholder")}
-                        />
+                        <div className="relative">
+                          {translating?.docId === clientDoc.id && translating?.lang === (targetLang[clientDoc.id] || "EN") && (
+                            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-md border bg-background/90 backdrop-blur-sm">
+                              <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                <Loader2 className="h-6 w-6 animate-spin" />
+                                <span className="text-sm font-medium">{t("inbox.translating")}</span>
+                              </div>
+                            </div>
+                          )}
+                          <Textarea
+                            value={(() => {
+                              const tgt = targetLang[clientDoc.id] || "EN";
+                              if (translating?.docId === clientDoc.id && translating?.lang === tgt) {
+                                const src = sourceLang[clientDoc.id];
+                                if (src === "SR") return clientDoc.textSr || "";
+                                if (src === "EN") return clientDoc.textEn || "";
+                                if (src && src !== "auto") return getDocTranslations(clientDoc)[src] || "";
+                                return clientDoc.textOriginal || "";
+                              }
+                              if (tgt === "EN") return clientDoc.textEn || "";
+                              if (tgt === "SR") return clientDoc.textSr || "";
+                              return getDocTranslations(clientDoc)[tgt] || "";
+                            })()}
+                            rows={6}
+                            readOnly
+                            placeholder={t("inbox.englishTranslationPlaceholder")}
+                            className={translating?.docId === clientDoc.id && translating?.lang === (targetLang[clientDoc.id] || "EN") ? "opacity-60" : ""}
+                          />
+                        </div>
                       </div>
                     </div>
                   )}
@@ -566,7 +675,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
             {t("claims.documents.otherDocuments")} ({documents.length})
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {documents.map((attachment: any) => (
+            {documents.map((attachment: ClientAttachment) => (
               <Card key={attachment.id} className="p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex-1 min-w-0">
@@ -586,7 +695,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const docIndex = clientAttachments.findIndex((a: any) => a.id === attachment.id);
+                      const docIndex = clientAttachments.findIndex((a: ClientAttachment) => a.id === attachment.id);
                       setViewerIndex(docIndex >= 0 ? docIndex : 0);
                       setViewerOpen(true);
                     }}
@@ -627,7 +736,7 @@ export function ClaimClientDocuments({ claim, isReadOnly = false, onRefresh }: C
       <FileViewerModal
         open={viewerOpen}
         onOpenChange={setViewerOpen}
-        files={clientAttachments.map((attachment: any) => ({
+        files={clientAttachments.map((attachment: ClientAttachment) => ({
           id: attachment.id,
           url: `/api/files/${attachment.id}`,
           fileName: attachment.fileName || `Attachment ${attachment.id}`,

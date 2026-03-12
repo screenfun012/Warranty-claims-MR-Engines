@@ -25,7 +25,18 @@ export async function POST(
       return NextResponse.json({ error: "Attachment not found" }, { status: 404 });
     }
 
-    const textToTranslate = attachment.textOriginal;
+    const attAny = attachment as typeof attachment & { translationsJson?: string | null };
+    const translations: Record<string, string> = attAny.translationsJson
+      ? (typeof attAny.translationsJson === "string" ? JSON.parse(attAny.translationsJson) : attAny.translationsJson) || {}
+      : {};
+
+    let textToTranslate = attachment.textOriginal ?? "";
+    if (sourceLang && sourceLang !== "auto") {
+      if (sourceLang === "SR" && attachment.textSr) textToTranslate = attachment.textSr;
+      else if (sourceLang === "EN" && attachment.textEn) textToTranslate = attachment.textEn;
+      else if (translations[sourceLang]) textToTranslate = translations[sourceLang];
+    }
+
     if (!textToTranslate) {
       return NextResponse.json(
         { error: "No text to translate. Please extract text from PDF first." },
@@ -40,9 +51,13 @@ export async function POST(
       targetLang,
     });
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (targetLang === "SR") updateData.textSr = translated;
-    if (targetLang === "EN") updateData.textEn = translated;
+    else if (targetLang === "EN") updateData.textEn = translated;
+    else {
+      translations[targetLang] = translated;
+      updateData.translationsJson = JSON.stringify(translations);
+    }
 
     const updated = await prisma.attachment.update({
       where: { id },

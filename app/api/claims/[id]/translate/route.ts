@@ -27,20 +27,13 @@ export async function POST(
         targetLang: targetLang.toUpperCase(),
       });
 
-      // Save to summary field based on target language
-      const updateData: {
-        summaryEn?: string;
-        summarySr?: string;
-        summaryDe?: string;
-        summaryFr?: string;
-        summaryNl?: string;
-      } = {};
       const targetLangUpper = targetLang.toUpperCase();
-      if (targetLangUpper === "EN") updateData.summaryEn = translated;
-      else if (targetLangUpper === "SR") updateData.summarySr = translated;
-      else if (targetLangUpper === "DE") updateData.summaryDe = translated;
-      else if (targetLangUpper === "FR") updateData.summaryFr = translated;
-      else if (targetLangUpper === "NL") updateData.summaryNl = translated;
+      const summaryFieldMap: Record<string, string> = {
+        EN: "summaryEn", SR: "summarySr", DE: "summaryDe", FR: "summaryFr", NL: "summaryNl",
+        IT: "summaryIt", PL: "summaryPl", DA: "summaryDa", ES: "summaryEs", SV: "summarySv",
+      };
+      const updateData: Record<string, string> = {};
+      if (summaryFieldMap[targetLangUpper]) updateData[summaryFieldMap[targetLangUpper]] = translated;
 
       await prisma.claim.update({
         where: { id },
@@ -58,25 +51,18 @@ export async function POST(
       // Prefer text sent from frontend (what's on screen); fallback to DB so unsaved edits can be translated
       let textToTranslate = typeof text === "string" && text.trim() ? text.trim() : "";
       if (!textToTranslate) {
-        const claimWithSummaries = claim as typeof claim & {
-          summaryDe?: string | null;
-          summaryFr?: string | null;
-          summaryNl?: string | null;
+        const c = claim as typeof claim & { summaryIt?: string | null; summaryPl?: string | null; summaryDa?: string | null; summaryEs?: string | null; summarySv?: string | null };
+        const summaryByLang: Record<string, string | null | undefined> = {
+          SR: claim.summarySr, EN: claim.summaryEn, DE: (claim as typeof c).summaryDe, FR: (claim as typeof c).summaryFr, NL: (claim as typeof c).summaryNl,
+          IT: c.summaryIt, PL: c.summaryPl, DA: c.summaryDa, ES: c.summaryEs, SV: c.summarySv,
         };
-        if (sourceLangUpper === "SR") textToTranslate = claim.summarySr || "";
-        else if (sourceLangUpper === "EN") textToTranslate = claim.summaryEn || "";
-        else if (sourceLangUpper === "DE") textToTranslate = claimWithSummaries.summaryDe || "";
-        else if (sourceLangUpper === "FR") textToTranslate = claimWithSummaries.summaryFr || "";
-        else if (sourceLangUpper === "NL") textToTranslate = claimWithSummaries.summaryNl || "";
+        textToTranslate = summaryByLang[sourceLangUpper] || "";
       }
 
       if (!textToTranslate.trim()) {
         const langNames: Record<string, string> = {
-          SR: "Serbian",
-          EN: "English",
-          DE: "German",
-          FR: "French",
-          NL: "Dutch",
+          SR: "Serbian", EN: "English", DE: "German", FR: "French", NL: "Dutch",
+          IT: "Italian", PL: "Polish", DA: "Danish", ES: "Spanish", SV: "Swedish",
         };
         return NextResponse.json({ 
           error: `No ${langNames[sourceLangUpper] || sourceLangUpper} summary to translate` 
@@ -89,19 +75,13 @@ export async function POST(
         targetLang: targetLang.toUpperCase(),
       });
 
-      const updateData: {
-        summaryEn?: string;
-        summarySr?: string;
-        summaryDe?: string;
-        summaryFr?: string;
-        summaryNl?: string;
-      } = {};
       const targetLangUpper = targetLang.toUpperCase();
-      if (targetLangUpper === "EN") updateData.summaryEn = translated;
-      else if (targetLangUpper === "SR") updateData.summarySr = translated;
-      else if (targetLangUpper === "DE") updateData.summaryDe = translated;
-      else if (targetLangUpper === "FR") updateData.summaryFr = translated;
-      else if (targetLangUpper === "NL") updateData.summaryNl = translated;
+      const summaryFieldMap: Record<string, string> = {
+        EN: "summaryEn", SR: "summarySr", DE: "summaryDe", FR: "summaryFr", NL: "summaryNl",
+        IT: "summaryIt", PL: "summaryPl", DA: "summaryDa", ES: "summaryEs", SV: "summarySv",
+      };
+      const updateData: Record<string, string> = {};
+      if (summaryFieldMap[targetLangUpper]) updateData[summaryFieldMap[targetLangUpper]] = translated;
 
       await prisma.claim.update({
         where: { id },
@@ -119,14 +99,16 @@ export async function POST(
         return NextResponse.json({ error: "Document not found" }, { status: 404 });
       }
 
-      // Determine source text based on sourceLang
+      const docAny = doc as typeof doc & { translationsJson?: string | null };
+      const translations: Record<string, string> = docAny.translationsJson
+        ? (typeof docAny.translationsJson === "string" ? JSON.parse(docAny.translationsJson) : docAny.translationsJson) || {}
+        : {};
+
       let textToTranslate = doc.textOriginal;
       if (sourceLang && sourceLang !== "auto") {
-        if (sourceLang === "SR" && doc.textSr) {
-          textToTranslate = doc.textSr;
-        } else if (sourceLang === "EN" && doc.textEn) {
-          textToTranslate = doc.textEn;
-        }
+        if (sourceLang === "SR" && doc.textSr) textToTranslate = doc.textSr;
+        else if (sourceLang === "EN" && doc.textEn) textToTranslate = doc.textEn;
+        else if (translations[sourceLang]) textToTranslate = translations[sourceLang];
       }
 
       if (!textToTranslate) {
@@ -139,9 +121,13 @@ export async function POST(
         targetLang,
       });
 
-      const updateData: { textSr?: string; textEn?: string } = {};
+      const updateData: { textSr?: string; textEn?: string; translationsJson?: string } = {};
       if (targetLang === "SR") updateData.textSr = translated;
-      if (targetLang === "EN") updateData.textEn = translated;
+      else if (targetLang === "EN") updateData.textEn = translated;
+      else {
+        translations[targetLang] = translated;
+        updateData.translationsJson = JSON.stringify(translations);
+      }
 
       await prisma.clientDocument.update({
         where: { id: clientDocumentId },

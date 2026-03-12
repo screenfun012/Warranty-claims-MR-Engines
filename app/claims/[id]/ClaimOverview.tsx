@@ -28,9 +28,14 @@ interface LanguageConfig {
 const LANGUAGES: LanguageConfig[] = [
   { code: "SR", name: "Serbian", field: "summarySr" },
   { code: "EN", name: "English", field: "summaryEn" },
-  { code: "DE", name: "German", field: "summaryDe", isBeta: true },
-  { code: "FR", name: "French", field: "summaryFr", isBeta: true },
-  { code: "NL", name: "Dutch", field: "summaryNl", isBeta: true },
+  { code: "DE", name: "German", field: "summaryDe" },
+  { code: "NL", name: "Dutch", field: "summaryNl" },
+  { code: "FR", name: "French", field: "summaryFr" },
+  { code: "IT", name: "Italian", field: "summaryIt" },
+  { code: "PL", name: "Polish", field: "summaryPl" },
+  { code: "DA", name: "Danish", field: "summaryDa" },
+  { code: "ES", name: "Spanish", field: "summaryEs" },
+  { code: "SV", name: "Swedish", field: "summarySv" },
 ];
 
 import { getCleanEmailBody } from "@/lib/email/emailBodyCleaner";
