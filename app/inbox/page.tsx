@@ -182,6 +182,9 @@ export default function InboxPage() {
     });
   }, [threads, searchQuery]);
 
+  const unreadThreads = useMemo(() => filteredThreads.filter((t) => !t.viewedAt), [filteredThreads]);
+  const readThreads = useMemo(() => filteredThreads.filter((t) => t.viewedAt), [filteredThreads]);
+
   // Check for updates sa React Query - ovo trigger-uje sync u pozadini
   const { data: updateCheck } = useQuery({
     queryKey: ["inboxUpdates", lastCheckTime],
@@ -326,127 +329,189 @@ export default function InboxPage() {
             }}
           />
         ) : (
-          <Card className="p-4 hover:shadow-md transition-shadow">
-            <ResponsiveTable
-              headers={[
-                { key: "date", label: t("common.date") },
-                { key: "sender", label: t("inbox.from") },
-                { key: "subject", label: t("inbox.subject") },
-                { key: "claim", label: t("inbox.claim") },
-                { key: "actions", label: t("common.actions") },
-              ]}
-              data={filteredThreads.map((thread) => {
-                const lastMessage = thread.messages[thread.messages.length - 1];
-                const isUnread = !thread.viewedAt;
-                const isUnassigned = !thread.claimId; // Novo samo ako nije povezan sa claim-om
-                const showNewBadge = isUnassigned && isUnread;
-                return {
-                  date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
-                  sender: (
-                    <span className={isUnread ? "font-bold" : ""}>
-                      {thread.originalSender 
-                        ? thread.originalSender
-                            .replace(/&quot;/g, '"')
-                            .replace(/&amp;/g, '&')
-                            .replace(/&lt;/g, '<')
-                            .replace(/&gt;/g, '>')
-                        : "-"}
-                    </span>
-                  ),
-                  subject: (
-                    <div className="flex items-center gap-2 min-w-0 flex-wrap">
-                      <span className={isUnread ? "font-bold truncate" : "truncate"}>
-                        {thread.subjectOriginal}
-                      </span>
-                      {thread.threadStatus === "HAS_REPLIES" && (
-                        <Badge variant="secondary" className="shrink-0 text-xs">
-                          {t("inbox.dopisivanje")}{thread.messageCount != null ? ` (${thread.messageCount})` : ""}
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-lg font-semibold mb-3">{t("inbox.unreadSection")} ({unreadThreads.length})</h2>
+              <Card className="p-4 hover:shadow-md transition-shadow">
+                <ResponsiveTable
+                  headers={[
+                    { key: "date", label: t("common.date") },
+                    { key: "sender", label: t("inbox.from") },
+                    { key: "subject", label: t("inbox.subject") },
+                    { key: "claim", label: t("inbox.claim") },
+                    { key: "actions", label: t("common.actions") },
+                  ]}
+                  data={unreadThreads.map((thread) => {
+                    const lastMessage = thread.messages[thread.messages.length - 1];
+                    const isUnassigned = !thread.claimId;
+                    return {
+                      date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
+                      sender: (
+                        <span className="font-bold">
+                          {thread.originalSender
+                            ? thread.originalSender
+                                .replace(/&quot;/g, '"')
+                                .replace(/&amp;/g, "&")
+                                .replace(/&lt;/g, "<")
+                                .replace(/&gt;/g, ">")
+                            : "-"}
+                        </span>
+                      ),
+                      subject: (
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                          <span className="font-bold truncate">{thread.subjectOriginal}</span>
+                          {thread.threadStatus === "HAS_REPLIES" && (
+                            <Badge variant="secondary" className="shrink-0 text-xs">
+                              {t("inbox.dopisivanje")}{thread.messageCount != null ? ` (${thread.messageCount})` : ""}
+                            </Badge>
+                          )}
+                          {thread.threadStatus === "NEW_CLAIM" && (
+                            <Badge variant="outline" className="shrink-0 text-xs">
+                              {t("inbox.reklamacija")}
+                            </Badge>
+                          )}
+                          {isUnassigned && (
+                            <Badge variant="destructive" className="shrink-0 animate-pulse">
+                              {t("claims.status.NEW")}
+                            </Badge>
+                          )}
+                        </div>
+                      ),
+                      claim: thread.claim ? (
+                        <Badge
+                          variant="secondary"
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/claims/${thread.claim!.id}?from=inbox`);
+                          }}
+                        >
+                          {thread.claim.claimCodeRaw || t("inbox.viewClaim")}
                         </Badge>
-                      )}
-                      {thread.threadStatus === "NEW_CLAIM" && (
-                        <Badge variant="outline" className="shrink-0 text-xs">
-                          {t("inbox.reklamacija")}
-                        </Badge>
-                      )}
-                      {showNewBadge && (
-                        <Badge variant="destructive" className="shrink-0 animate-pulse">
-                          {t("claims.status.NEW")}
-                        </Badge>
-                      )}
-                    </div>
-                  ),
-                  claim: thread.claim ? (
-                    <Badge 
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        router.push(`/claims/${thread.claim!.id}?from=inbox`);
-                      }}
-                    >
-                      {thread.claim.claimCodeRaw || t("inbox.viewClaim")}
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline">{t("inbox.unassigned")}</Badge>
-                  ),
-                  actions: (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        // Mark thread as viewed when opened
-                        if (!thread.viewedAt) {
-                          try {
-                            const res = await fetch(`/api/inbox/${thread.id}/mark-viewed`, {
-                              method: "POST",
-                            });
-                            if (res.ok) {
-                              // Update thread in React Query cache immediately
-                              queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) => 
-                                old?.map(t => 
-                                  t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
-                                ) || []
-                              );
-                              // Trigger sidebar refresh
-                              queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                              window.dispatchEvent(new Event('inbox-updated'));
+                      ) : (
+                        <Badge variant="outline">{t("inbox.unassigned")}</Badge>
+                      ),
+                      actions: (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" });
+                              if (res.ok) {
+                                queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) =>
+                                  old?.map((t) => (t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t)) || []
+                                );
+                                queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                                window.dispatchEvent(new Event("inbox-updated"));
+                              }
+                            } catch (err) {
+                              console.error("Error marking thread as viewed:", err);
                             }
-                          } catch (error) {
-                            console.error("Error marking thread as viewed:", error);
-                          }
-                        }
-                        setSelectedThread(thread);
-                      }}
-                    >
-                      {t("common.view")}
-                    </Button>
-                  ),
-                };
-              })}
-              emptyMessage={searchQuery ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
-              onRowClick={(row, index) => {
-                const thread = filteredThreads[index];
-                if (!thread.viewedAt) {
-                  fetch(`/api/inbox/${thread.id}/mark-viewed`, {
-                    method: "POST",
-                  }).then((res) => {
-                    if (res.ok) {
-                      // Update thread in React Query cache immediately
-                      queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) => 
-                        old?.map(t => 
-                          t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t
-                        ) || []
-                      );
-                      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                      window.dispatchEvent(new Event('inbox-updated'));
-                    }
-                  }).catch(console.error);
-                }
-                setSelectedThread(thread);
-              }}
-            />
-          </Card>
+                            setSelectedThread(thread);
+                          }}
+                        >
+                          {t("common.view")}
+                        </Button>
+                      ),
+                    };
+                  })}
+                  emptyMessage={t("inbox.noUnread")}
+                  onRowClick={(row, index) => {
+                    const thread = unreadThreads[index];
+                    fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" }).then((res) => {
+                      if (res.ok) {
+                        queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) =>
+                          old?.map((t) => (t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t)) || []
+                        );
+                        queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                        window.dispatchEvent(new Event("inbox-updated"));
+                      }
+                    }).catch(console.error);
+                    setSelectedThread(thread);
+                  }}
+                />
+              </Card>
+            </section>
+            <section>
+              <h2 className="text-lg font-semibold mb-3">{t("inbox.readSection")} ({readThreads.length})</h2>
+              <Card className="p-4 hover:shadow-md transition-shadow">
+                <ResponsiveTable
+                  headers={[
+                    { key: "date", label: t("common.date") },
+                    { key: "sender", label: t("inbox.from") },
+                    { key: "subject", label: t("inbox.subject") },
+                    { key: "claim", label: t("inbox.claim") },
+                    { key: "actions", label: t("common.actions") },
+                  ]}
+                  data={readThreads.map((thread) => {
+                    const lastMessage = thread.messages[thread.messages.length - 1];
+                    return {
+                      date: lastMessage ? new Date(lastMessage.date).toLocaleDateString() : "-",
+                      sender: (
+                        <span>
+                          {thread.originalSender
+                            ? thread.originalSender
+                                .replace(/&quot;/g, '"')
+                                .replace(/&amp;/g, "&")
+                                .replace(/&lt;/g, "<")
+                                .replace(/&gt;/g, ">")
+                            : "-"}
+                        </span>
+                      ),
+                      subject: (
+                        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                          <span className="truncate">{thread.subjectOriginal}</span>
+                          {thread.threadStatus === "HAS_REPLIES" && (
+                            <Badge variant="secondary" className="shrink-0 text-xs">
+                              {t("inbox.dopisivanje")}{thread.messageCount != null ? ` (${thread.messageCount})` : ""}
+                            </Badge>
+                          )}
+                          {thread.threadStatus === "NEW_CLAIM" && (
+                            <Badge variant="outline" className="shrink-0 text-xs">
+                              {t("inbox.reklamacija")}
+                            </Badge>
+                          )}
+                        </div>
+                      ),
+                      claim: thread.claim ? (
+                        <Badge
+                          variant="secondary"
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/claims/${thread.claim!.id}?from=inbox`);
+                          }}
+                        >
+                          {thread.claim.claimCodeRaw || t("inbox.viewClaim")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">{t("inbox.unassigned")}</Badge>
+                      ),
+                      actions: (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedThread(thread);
+                          }}
+                        >
+                          {t("common.view")}
+                        </Button>
+                      ),
+                    };
+                  })}
+                  emptyMessage={t("inbox.noRead")}
+                  onRowClick={(row, index) => {
+                    const thread = readThreads[index];
+                    setSelectedThread(thread);
+                  }}
+                />
+              </Card>
+            </section>
+          </div>
         )}
       </div>
   );

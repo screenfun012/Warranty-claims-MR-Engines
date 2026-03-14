@@ -36,9 +36,7 @@ export async function GET() {
         },
         _count: { select: { messages: true } },
       },
-      orderBy: {
-        updatedAt: "desc",
-      },
+      orderBy: { createdAt: "asc" },
     });
 
     const threadsForResponse = threads.map(({ _count, ...t }) => ({
@@ -46,6 +44,18 @@ export async function GET() {
       threadStatus: t.threadStatus ?? "NEW_CLAIM",
       messageCount: _count?.messages ?? 0,
     }));
+
+    const latestMessageDate = (t: (typeof threadsForResponse)[0]) =>
+      t.messages?.[0]?.date ? new Date(t.messages[0].date).getTime() : new Date(t.createdAt).getTime();
+
+    threadsForResponse.sort((a, b) => {
+      const aUnread = !a.viewedAt;
+      const bUnread = !b.viewedAt;
+      if (aUnread && !bUnread) return -1;
+      if (!aUnread && bUnread) return 1;
+      return latestMessageDate(b) - latestMessageDate(a);
+    });
+
     return NextResponse.json({ threads: threadsForResponse });
   } catch (error) {
     console.error("Error fetching inbox:", error);
