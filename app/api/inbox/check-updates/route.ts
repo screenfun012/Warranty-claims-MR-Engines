@@ -10,6 +10,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { env } from "@/lib/config/env";
 import { isEmailConfigured } from "@/lib/config/envLoader";
+import { countEffectivelyUnreadThreads } from "@/lib/inbox/effectiveUnread";
 
 // Vercel serverless function config - increase timeout for large emails with many attachments
 export const maxDuration = 60; // 60 seconds (Pro plan limit)
@@ -63,13 +64,7 @@ export async function GET(request: Request) {
       ? new Date(lastUpdated) > new Date(lastCheck)
       : true; // If no lastCheck provided, assume there are updates
 
-    // Count unread threads
-    const unreadCount = await prisma.emailThread.count({
-      where: {
-        viewedAt: null,
-        claimId: null,
-      },
-    });
+    const unreadCount = await countEffectivelyUnreadThreads(prisma);
 
     return NextResponse.json({
       hasUpdates,

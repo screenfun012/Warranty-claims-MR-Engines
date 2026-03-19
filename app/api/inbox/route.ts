@@ -7,6 +7,7 @@ import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { ensureIdleStarted } from "@/lib/email/mailSyncScheduler";
+import { isThreadEffectivelyUnread } from "@/lib/inbox/effectiveUnread";
 
 export async function GET() {
   try {
@@ -28,6 +29,8 @@ export async function GET() {
             id: true,
             date: true,
             from: true,
+            bodyText: true,
+            attachments: { select: { id: true } },
           },
           orderBy: {
             date: "desc",
@@ -48,9 +51,12 @@ export async function GET() {
     const latestMessageDate = (t: (typeof threadsForResponse)[0]) =>
       t.messages?.[0]?.date ? new Date(t.messages[0].date).getTime() : new Date(t.createdAt).getTime();
 
+    const effectivelyUnread = (t: (typeof threadsForResponse)[0]) =>
+      isThreadEffectivelyUnread(t.viewedAt, t.messages?.[0]?.date ?? t.createdAt);
+
     threadsForResponse.sort((a, b) => {
-      const aUnread = !a.viewedAt;
-      const bUnread = !b.viewedAt;
+      const aUnread = effectivelyUnread(a);
+      const bUnread = effectivelyUnread(b);
       if (aUnread && !bUnread) return -1;
       if (!aUnread && bUnread) return 1;
       return latestMessageDate(b) - latestMessageDate(a);

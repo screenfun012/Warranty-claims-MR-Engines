@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { ensureIdleStarted } from "@/lib/email/mailSyncScheduler";
+import { countEffectivelyUnreadThreads } from "@/lib/inbox/effectiveUnread";
 
 // Cache stats for 5 seconds to reduce database load but keep it responsive
 let cachedStats: any = null;
@@ -232,19 +233,10 @@ export async function GET() {
       console.error("Error fetching recent claims:", error);
     }
 
-    // Get unread email threads count
+    // Outlook-style unread threads (all)
     let unreadEmailsCount = 0;
     try {
-      const unreadThreads = await prisma.emailThread.findMany({
-        where: {
-          viewedAt: null,
-          claimId: null,
-        },
-        select: {
-          id: true,
-        },
-      });
-      unreadEmailsCount = unreadThreads.length;
+      unreadEmailsCount = await countEffectivelyUnreadThreads(prisma);
     } catch (error) {
       console.error("Error fetching unread emails count:", error);
     }

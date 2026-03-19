@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { isEmailConfigured } from "@/lib/config/envLoader";
+import { countEffectivelyUnreadThreads } from "@/lib/inbox/effectiveUnread";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,10 +38,7 @@ export async function GET(request: NextRequest) {
     const approvedClaims = await prisma.claim.count({ where: { status: "APPROVED" } });
     const rejectedClaims = await prisma.claim.count({ where: { status: "REJECTED" } });
 
-    // Get unread emails
-    const unreadEmails = await prisma.emailThread.count({
-      where: { viewedAt: null },
-    });
+    const unreadEmails = await countEffectivelyUnreadThreads(prisma);
     const totalEmails = await prisma.emailThread.count();
 
     // Get other counts

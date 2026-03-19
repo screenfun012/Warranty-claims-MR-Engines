@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { ensureIdleStarted } from "@/lib/email/mailSyncScheduler";
+import { countEffectivelyUnreadThreads } from "@/lib/inbox/effectiveUnread";
 
 export async function GET() {
   try {
     ensureIdleStarted();
     const prisma = await getPrisma();
     
-    // Count unread email threads (threads that haven't been viewed/opened and are not linked to a claim)
-    // Use count() for better performance and SQLite compatibility
-    const unreadCount = await prisma.emailThread.count({
-      where: {
-        viewedAt: null,
-        claimId: null,
-      },
-    }).catch((dbError) => {
+    // Outlook-style: never opened OR new message after last viewedAt (all threads)
+    const unreadCount = await countEffectivelyUnreadThreads(prisma).catch((dbError) => {
       console.error("Database error in unread count:", dbError);
       throw dbError;
     });
