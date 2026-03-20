@@ -33,6 +33,7 @@ import { ResponsiveTable } from "@/components/responsive-table";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
+import * as XLSX from "xlsx";
 
 interface Claim {
   id: string;
@@ -232,7 +233,7 @@ export default function StatisticsPage() {
     }
   };
 
-  // Export to CSV
+  /** Excel .xlsx — pravi UTF-8 u ćelijama (CSV + Excel na Windows često kvare srpska slova). */
   const handleExport = useCallback(() => {
     const headers = [
       t("claims.mrNumber"),
@@ -252,39 +253,38 @@ export default function StatisticsPage() {
       t("claims.createdAt"),
     ];
 
-    const rows = sortedClaims.map(claim => [
-      claim.claimCodeRaw || "",
-      claim.customerNumber || "",
-      t(`claims.status.${claim.status}` as any) || claim.status,
-      claim.customer?.name || "",
-      claim.customer?.company || "",
-      claim.engineType || "",
-      claim.mrEngineCode || "",
-      claim.faultDepartment?.name || "",
-      claim.workerFault || "",
-      claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "",
-      claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
-      claim.assignedWorkerName || "",
-      claim.reason || "",
-      claim.isDomesticMarket ? t("common.yes") : t("common.no"),
-      new Date(claim.createdAt).toLocaleDateString(),
-    ]);
+    const rows = sortedClaims.map((claim) => {
+      const faultDeptStr =
+        claim.faultDepartments && claim.faultDepartments.length > 0
+          ? claim.faultDepartments.map((d) => d.name).join(", ")
+          : claim.faultDepartment?.name || "";
+      return [
+        claim.claimCodeRaw || "",
+        claim.customerNumber || "",
+        t(`claims.status.${claim.status}` as never) || claim.status,
+        claim.customer?.name || "",
+        claim.customer?.company || "",
+        claim.engineType || "",
+        claim.mrEngineCode || "",
+        faultDeptStr,
+        claim.workerFault || "",
+        claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "",
+        claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
+        claim.assignedWorkerName || "",
+        claim.reason || "",
+        claim.isDomesticMarket ? t("common.yes") : t("common.no"),
+        new Date(claim.createdAt).toLocaleDateString(),
+      ];
+    });
 
-    const csvContent = [
-      headers.join(","),
-      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `statistics_${new Date().toISOString().split("T")[0]}.csv`);
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  }, [sortedClaims]);
+    const aoa = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = headers.map(() => ({ wch: 18 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Statistika");
+    const dateStr = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `statistika_${dateStr}.xlsx`);
+  }, [sortedClaims, t]);
 
   // Clear all filters
   const clearFilters = () => {
@@ -342,7 +342,7 @@ export default function StatisticsPage() {
             disabled={sortedClaims.length === 0}
           >
             <Download className="h-4 w-4 shrink-0" />
-            <span className="hidden sm:inline">{t("statistics.exportCsv")}</span>
+            <span className="hidden sm:inline">{t("statistics.exportExcel")}</span>
             <span className="sm:hidden">{t("statistics.export")}</span>
           </Button>
         </div>

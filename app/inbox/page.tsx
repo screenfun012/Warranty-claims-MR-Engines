@@ -1,12 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Suspense } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -132,15 +131,32 @@ interface Claim {
   } | null;
 }
 
-const fetchThreads = async (): Promise<EmailThread[]> => {
-  const res = await fetch("/api/inbox");
+const INBOX_PAGE_SIZE = 150;
+
+type InboxPagePayload = {
+  threads: EmailThread[];
+  hasMore: boolean;
+  nextCursor: string | null;
+};
+
+const fetchInboxPage = async (cursor: string | null, q: string): Promise<InboxPagePayload> => {
+  const params = new URLSearchParams();
+  params.set("take", String(INBOX_PAGE_SIZE));
+  if (cursor) params.set("cursor", cursor);
+  const trimmed = q.trim();
+  if (trimmed) params.set("q", trimmed);
+  const res = await fetch(`/api/inbox?${params.toString()}`);
   if (!res.ok) {
     const text = await res.text();
     console.error("API error:", res.status, text);
     throw new Error(`API error: ${res.status}`);
   }
   const data = await res.json();
-  return data.threads || [];
+  return {
+    threads: data.threads || [],
+    hasMore: Boolean(data.hasMore),
+    nextCursor: data.nextCursor ?? null,
+  };
 };
 
 const checkForUpdates = async (lastCheck?: string | null): Promise<{ hasUpdates: boolean; lastUpdated: string }> => {
@@ -187,58 +203,79 @@ function InboxPageContent() {
   const folderPanelRef = usePanelRef();
   const [folderIconsOnly, setFolderIconsOnly] = useState(false);
 
-  useEffect(() => {
+  const applyFolderPanelSize = useCallback((icons: boolean) => {
+    const p = folderPanelRef.current;
+    if (!p) return;
     try {
-      if (localStorage.getItem("inbox-folder-icons-only") === "1") {
-        setFolderIconsOnly(true);
-      }
+      if (icons) p.resize("3.5rem");
+      else p.resize("15%");
     } catch {
       /* ignore */
     }
   }, []);
 
-  useEffect(() => {
+  /** One-time: read saved mode + resize before paint fights react-resizable-panels default. */
+  useLayoutEffect(() => {
+    let icons = false;
     try {
-      localStorage.setItem("inbox-folder-icons-only", folderIconsOnly ? "1" : "0");
+      icons = localStorage.getItem("inbox-folder-icons-only") === "1";
     } catch {
       /* ignore */
     }
-  }, [folderIconsOnly]);
+    setFolderIconsOnly(icons);
+    queueMicrotask(() => applyFolderPanelSize(icons));
+  }, [applyFolderPanelSize]);
 
-  /** Resize folder panel when switching full labels vs icon rail */
-  useEffect(() => {
-    const id = window.setTimeout(() => {
-      const p = folderPanelRef.current;
-      if (!p) return;
+  const toggleFolderIconsOnly = useCallback(() => {
+    setFolderIconsOnly((prev) => {
+      const next = !prev;
       try {
-        if (folderIconsOnly) {
-          p.resize("3.5rem");
-        } else {
-          p.resize("15%");
-        }
+        localStorage.setItem("inbox-folder-icons-only", next ? "1" : "0");
       } catch {
         /* ignore */
       }
-    }, 50);
-    return () => clearTimeout(id);
-  }, [folderIconsOnly]);
+      queueMicrotask(() => applyFolderPanelSize(next));
+      return next;
+    });
+  }, [applyFolderPanelSize]);
 
-  // Fetch threads sa React Query
-  const { 
-    data: threads = [], 
+  // Fetch threads sa paginacijom (prva stranica brza; "Učitaj još" za starije)
+  const {
+    data: inboxPages,
     isLoading: loading,
-    refetch: refetchThreads 
-  } = useQuery({
-    queryKey: ["inboxThreads"],
-    queryFn: fetchThreads,
-    refetchInterval: 20_000,
-    refetchIntervalInBackground: false,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["inboxThreads", searchQuery],
+    queryFn: ({ pageParam }) => fetchInboxPage(pageParam, searchQuery),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
     staleTime: 30 * 1000,
   });
 
-  // Get last updated time from threads
+  const threads = useMemo(
+    () => inboxPages?.pages.flatMap((p) => p.threads) ?? [],
+    [inboxPages]
+  );
+
+  const refetchThreads = useCallback(() => {
+    void queryClient.resetQueries({
+      queryKey: ["inboxThreads"],
+      exact: false,
+    });
+  }, [queryClient]);
+
+  /** Max updatedAt so polling compares to real newest thread (list is sorted by unread, not by date). */
   const lastCheckTime = useMemo(() => {
-    return threads.length > 0 ? threads[0]?.updatedAt : null;
+    if (threads.length === 0) return null;
+    let max = "";
+    for (const t of threads) {
+      const u = t.updatedAt;
+      if (u && (!max || u > max)) max = u;
+    }
+    return max || null;
   }, [threads]);
 
   // Listen for inbox-updated events
@@ -259,22 +296,7 @@ function InboxPageContent() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Filter threads based on search query with Serbian Latin support (memoized)
-  const filteredThreads = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return threads;
-    }
-
-    const normalizedQuery = normalizeSerbianLatin(searchQuery);
-    return threads.filter((thread) => {
-      const subject = normalizeSerbianLatin(thread.subjectOriginal || "");
-      const sender = normalizeSerbianLatin(thread.originalSender || "");
-      const claimCode = normalizeSerbianLatin(thread.claim?.claimCodeRaw || "");
-      
-      return subject.includes(normalizedQuery) || sender.includes(normalizedQuery) || claimCode.includes(normalizedQuery);
-    });
-  }, [threads, searchQuery]);
-
+  /** Pretraga: server šalje `q` (ceo inbox + paginacija); klijent ne filtrira ponovo. */
   const outlookBucketLabels = useMemo(
     () => ({
       today: t("inbox.groupToday"),
@@ -287,18 +309,22 @@ function InboxPageContent() {
   );
 
   const outlookGroups = useMemo(
-    () => groupThreadsByOutlookBuckets(filteredThreads, outlookBucketLabels),
-    [filteredThreads, outlookBucketLabels]
+    () => groupThreadsByOutlookBuckets(threads, outlookBucketLabels),
+    [threads, outlookBucketLabels]
   );
 
-  // Check for updates sa React Query - ovo trigger-uje sync u pozadini
+  // Poll lightly after lista je učitana (check-updates ne blokira na IMAP)
   const { data: updateCheck } = useQuery({
     queryKey: ["inboxUpdates", lastCheckTime],
     queryFn: () => checkForUpdates(lastCheckTime),
-    enabled: !!lastCheckTime && !document.hidden,
-    refetchInterval: 30000, // 30 sekundi - trigger-uje sync svakih 30 sekundi
+    enabled:
+      !!lastCheckTime &&
+      !loading &&
+      typeof document !== "undefined" &&
+      !document.hidden,
+    refetchInterval: 60_000,
     refetchIntervalInBackground: false,
-    staleTime: 15 * 1000, // 15 sekundi - data je fresh 15 sekundi
+    staleTime: 30 * 1000,
   });
 
   // Refetch kada se detektuju update-i
@@ -369,9 +395,18 @@ function InboxPageContent() {
       fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" })
         .then((res) => {
           if (res.ok) {
-            queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) =>
-              old?.map((x) => (x.id === thread.id ? { ...x, viewedAt: new Date().toISOString() } : x)) || []
-            );
+            queryClient.setQueryData<InfiniteData<InboxPagePayload>>(["inboxThreads"], (old) => {
+              if (!old?.pages) return old;
+              return {
+                ...old,
+                pages: old.pages.map((page) => ({
+                  ...page,
+                  threads: page.threads.map((x) =>
+                    x.id === thread.id ? { ...x, viewedAt: new Date().toISOString() } : x
+                  ),
+                })),
+              };
+            });
             queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
             window.dispatchEvent(new Event("inbox-updated"));
           }
@@ -459,15 +494,37 @@ function InboxPageContent() {
                       {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
                     </div>
                   ) : (
-                    <OutlookMailList
-                      groups={outlookGroups}
-                      selectedThreadId={selectedThread?.id ?? null}
-                      emphasizeUnread
-                      onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
-                      router={router}
-                      claimLabel={t("inbox.viewClaim")}
-                      unassignedLabel={t("inbox.unassigned")}
-                    />
+                    <>
+                      <OutlookMailList
+                        groups={outlookGroups}
+                        selectedThreadId={selectedThread?.id ?? null}
+                        emphasizeUnread
+                        onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
+                        router={router}
+                        claimLabel={t("inbox.viewClaim")}
+                        unassignedLabel={t("inbox.unassigned")}
+                      />
+                      {hasNextPage ? (
+                        <div className="border-t border-border p-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => fetchNextPage()}
+                            disabled={isFetchingNextPage}
+                          >
+                            {isFetchingNextPage ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                                {t("inbox.loadingMoreThreads")}
+                              </>
+                            ) : (
+                              t("inbox.loadMoreThreads")
+                            )}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </>
                   )}
                 </div>
               </>
@@ -539,7 +596,7 @@ function InboxPageContent() {
                       variant="ghost"
                       className="h-8 w-8 shrink-0"
                       title={folderIconsOnly ? t("inbox.folderShowLabels") : t("inbox.folderIconsOnly")}
-                      onClick={() => setFolderIconsOnly((v) => !v)}
+                      onClick={toggleFolderIconsOnly}
                     >
                       {folderIconsOnly ? (
                         <ChevronRight className="h-4 w-4" />
@@ -673,15 +730,37 @@ function InboxPageContent() {
                         {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
                       </div>
                     ) : (
-                      <OutlookMailList
-                        groups={outlookGroups}
-                        selectedThreadId={selectedThread?.id ?? null}
-                        emphasizeUnread
-                        onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
-                        router={router}
-                        claimLabel={t("inbox.viewClaim")}
-                        unassignedLabel={t("inbox.unassigned")}
-                      />
+                      <>
+                        <OutlookMailList
+                          groups={outlookGroups}
+                          selectedThreadId={selectedThread?.id ?? null}
+                          emphasizeUnread
+                          onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
+                          router={router}
+                          claimLabel={t("inbox.viewClaim")}
+                          unassignedLabel={t("inbox.unassigned")}
+                        />
+                        {hasNextPage ? (
+                          <div className="border-t border-border p-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full"
+                              onClick={() => fetchNextPage()}
+                              disabled={isFetchingNextPage}
+                            >
+                              {isFetchingNextPage ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin" />
+                                  {t("inbox.loadingMoreThreads")}
+                                </>
+                              ) : (
+                                t("inbox.loadMoreThreads")
+                              )}
+                            </Button>
+                          </div>
+                        ) : null}
+                      </>
                     )}
                   </div>
                 </div>

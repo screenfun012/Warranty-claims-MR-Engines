@@ -18,7 +18,8 @@ export const runtime = 'nodejs';
 
 // Track last sync time to avoid too frequent syncs
 let lastSyncTime: number = 0;
-const MIN_SYNC_INTERVAL = 5 * 1000; // Minimum 5 seconds between syncs (fast email detection)
+/** Do not block JSON response on IMAP — was making inbox feel "3 days to load". */
+const MIN_SYNC_INTERVAL = 45 * 1000;
 
 export async function GET(request: Request) {
   try {
@@ -26,26 +27,25 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const lastCheck = searchParams.get("lastCheck"); // ISO timestamp
 
-    // ALWAYS trigger sync when check-updates is called (fast, lightweight)
-    // Frontend polls every 5 seconds, so this provides near real-time email detection
     const now = Date.now();
-    const shouldSync = 
-      env.MAIL_SYNC_ENABLED && 
-      isEmailConfigured() && 
-      (now - lastSyncTime) >= MIN_SYNC_INTERVAL;
+    const shouldSync =
+      env.MAIL_SYNC_ENABLED &&
+      isEmailConfigured() &&
+      now - lastSyncTime >= MIN_SYNC_INTERVAL;
 
     if (shouldSync) {
-      // Trigger sync immediately (frontend will wait for response)
-      // This makes every check-updates call a real sync check
-      try {
-        const result = await syncNewEmails();
-        lastSyncTime = Date.now();
-        if (result.newMessages > 0) {
-          console.log(`[CheckUpdates] Synced ${result.newMessages} new messages, ${result.newThreads} new threads`);
-        }
-      } catch (error) {
-        console.error("[CheckUpdates] Error syncing emails:", error);
-      }
+      lastSyncTime = Date.now();
+      void syncNewEmails()
+        .then((result) => {
+          if (result.newMessages > 0) {
+            console.log(
+              `[CheckUpdates] Synced ${result.newMessages} new messages, ${result.newThreads} new threads`
+            );
+          }
+        })
+        .catch((error) => {
+          console.error("[CheckUpdates] Error syncing emails:", error);
+        });
     }
 
     // Get the most recent thread update time
@@ -70,7 +70,6 @@ export async function GET(request: Request) {
       hasUpdates,
       lastUpdated: lastUpdated.toISOString(),
       unreadCount,
-      threadCount: await prisma.emailThread.count(),
     });
   } catch (error) {
     console.error("Error checking inbox updates:", error);
