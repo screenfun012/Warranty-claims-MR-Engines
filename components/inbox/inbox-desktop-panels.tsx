@@ -42,7 +42,7 @@ export function InboxDesktopPanels({ folder, list, detail, className, folderPane
     <Group
       orientation="horizontal"
       id="mr-inbox-3col"
-      className={cn("h-full min-h-0 w-full flex-1", className)}
+      className={cn("h-full min-h-0 w-full min-w-0 flex-1", className)}
     >
       <Panel
         id="folders"

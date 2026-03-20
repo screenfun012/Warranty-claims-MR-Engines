@@ -183,13 +183,22 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <ClaimBreadcrumbProvider>
         <SidebarProvider>
           <AppSidebar />
-          <SidebarInset>
+          <SidebarInset className="min-h-0">
             <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
               <SidebarTriggerWithTooltip />
               <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />
               <PageTitle pathname={pathname} />
             </header>
-            <main className="flex-1 overflow-auto bg-background/50">{children}</main>
+            <main
+              className={cn(
+                "flex-1 bg-background/50",
+                pathname === "/inbox"
+                  ? "flex min-h-0 flex-col overflow-hidden"
+                  : "overflow-auto"
+              )}
+            >
+              {children}
+            </main>
           </SidebarInset>
         </SidebarProvider>
       </ClaimBreadcrumbProvider>

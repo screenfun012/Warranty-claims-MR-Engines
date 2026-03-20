@@ -48,11 +48,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { SentMailArchive } from "@/components/inbox/sent-mail-archive";
-import {
-  InboxDesktopPanels,
-  InboxFolderToggleButton,
-  type InboxFolderPanelApi,
-} from "@/components/inbox/inbox-desktop-panels";
+import { InboxDesktopPanels, type InboxFolderPanelApi } from "@/components/inbox/inbox-desktop-panels";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TRANSLATION_LANGUAGES } from "@/lib/translation/languages";
 import {
@@ -395,23 +391,23 @@ function InboxPageContent() {
 
   if (loading) {
     return (
-      <div className="p-4 lg:p-6 space-y-4">
-        <div className="flex items-center justify-between gap-4">
+      <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 lg:gap-4 lg:p-6">
+        <div className="flex shrink-0 items-center justify-between gap-4">
           <Skeleton className="h-9 w-48" />
           <Skeleton className="h-10 w-36" />
         </div>
-        <div className="flex gap-2 min-h-[480px] rounded-xl border border-border overflow-hidden">
-          <Skeleton className="hidden lg:block w-52 shrink-0" />
-          <Skeleton className="flex-1 max-w-md" />
-          <Skeleton className="hidden lg:block flex-1" />
+        <div className="flex min-h-0 flex-1 gap-2 overflow-hidden rounded-xl border border-border">
+          <Skeleton className="hidden w-52 shrink-0 lg:block" />
+          <Skeleton className="max-w-md flex-1" />
+          <Skeleton className="hidden flex-1 lg:block" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 lg:p-6 min-h-0 lg:min-h-[calc(100vh-5rem)]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
+    <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 lg:gap-4 lg:p-6">
+      <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{t("inbox.title")}</h1>
         <Button
           onClick={handleSync}
@@ -433,7 +429,7 @@ function InboxPageContent() {
 
       <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card/40 shadow-sm">
         {/* Mobile / tablet: lista + detalj (bez folder kolone) */}
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
+        <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
           <div
             className={cn(
               "flex min-h-0 w-full shrink-0 flex-col border-b border-border bg-background",
@@ -523,10 +519,10 @@ function InboxPageContent() {
         </div>
 
         {/* Desktop: 3 resizable kolone, nezavisni scroll po panelu */}
-        <div className="hidden min-h-0 flex-1 overflow-hidden lg:flex">
+        <div className="hidden h-full min-h-0 flex-1 overflow-hidden lg:flex">
           <InboxDesktopPanels
             folderPanelRef={folderPanelRef}
-            folder={(api: InboxFolderPanelApi) => (
+            folder={(_api: InboxFolderPanelApi) => (
               <div className="flex h-full min-h-0 flex-col overflow-hidden">
                 <div className="flex shrink-0 items-center justify-between gap-1 border-b border-border px-1 py-1.5">
                   {!folderIconsOnly ? (
@@ -536,7 +532,7 @@ function InboxPageContent() {
                   ) : (
                     <span className="sr-only">{t("mail.title")}</span>
                   )}
-                  <div className="ml-auto flex items-center gap-0.5">
+                  <div className="ml-auto flex items-center">
                     <Button
                       type="button"
                       size="icon"
@@ -551,9 +547,6 @@ function InboxPageContent() {
                         <PanelLeftClose className="h-4 w-4" />
                       )}
                     </Button>
-                    {!folderIconsOnly ? (
-                      <InboxFolderToggleButton api={api} label={t("inbox.folderCollapseToggle")} />
-                    ) : null}
                   </div>
                 </div>
                 {folderIconsOnly ? (
@@ -746,15 +739,15 @@ export default function InboxPage() {
   return (
     <Suspense
       fallback={
-        <div className="p-4 lg:p-6 space-y-4">
-          <div className="flex items-center justify-between gap-4">
+        <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 lg:gap-4 lg:p-6">
+          <div className="flex shrink-0 items-center justify-between gap-4">
             <Skeleton className="h-9 w-48" />
             <Skeleton className="h-10 w-36" />
           </div>
-          <div className="flex gap-2 min-h-[480px] rounded-xl border border-border overflow-hidden">
-            <Skeleton className="hidden lg:block w-52 shrink-0" />
-            <Skeleton className="flex-1 max-w-md" />
-            <Skeleton className="hidden lg:block flex-1" />
+          <div className="flex min-h-0 flex-1 gap-2 overflow-hidden rounded-xl border border-border">
+            <Skeleton className="hidden w-52 shrink-0 lg:block" />
+            <Skeleton className="max-w-md flex-1" />
+            <Skeleton className="hidden flex-1 lg:block" />
           </div>
         </div>
       }
@@ -1125,7 +1118,7 @@ function ThreadDetail({
   return (
     <div
       className={cn(
-        readingPane && "flex min-h-0 flex-1 flex-col overflow-hidden",
+        readingPane && "flex h-full min-h-0 flex-1 flex-col overflow-hidden",
         readingPane && "lg:pl-2 lg:pr-4 lg:pt-2"
       )}
     >
