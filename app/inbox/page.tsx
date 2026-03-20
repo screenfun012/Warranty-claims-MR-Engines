@@ -453,7 +453,7 @@ function InboxPageContent() {
                     />
                   </div>
                 </div>
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
                   {totalInList === 0 ? (
                     <div className="p-8 text-center text-sm text-muted-foreground">
                       {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
@@ -655,7 +655,7 @@ function InboxPageContent() {
                   <SentMailArchive />
                 </div>
               ) : (
-                <>
+                <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
                   <div className="shrink-0 border-b border-border px-3 py-2">
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -667,7 +667,7 @@ function InboxPageContent() {
                       />
                     </div>
                   </div>
-                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
                     {totalInList === 0 ? (
                       <div className="p-8 text-center text-sm text-muted-foreground">
                         {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
@@ -684,7 +684,7 @@ function InboxPageContent() {
                       />
                     )}
                   </div>
-                </>
+                </div>
               )
             }
             detail={
@@ -693,17 +693,19 @@ function InboxPageContent() {
                   {t("inbox.sentSelectHint")}
                 </div>
               ) : selectedThread ? (
-                <ThreadDetail
-                  key={selectedThread.id}
-                  readingPane
-                  thread={selectedThread}
-                  onBack={clearSelectionAndRefresh}
-                  onThreadUpdated={() => {
-                    refetchThreads();
-                    queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                    window.dispatchEvent(new Event("inbox-updated"));
-                  }}
-                />
+                <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+                  <ThreadDetail
+                    key={selectedThread.id}
+                    readingPane
+                    thread={selectedThread}
+                    onBack={clearSelectionAndRefresh}
+                    onThreadUpdated={() => {
+                      refetchThreads();
+                      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                      window.dispatchEvent(new Event("inbox-updated"));
+                    }}
+                  />
+                </div>
               ) : showCompose && canUseMailCompose ? (
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
                   <EmailComposePanel
@@ -1257,7 +1259,7 @@ function ThreadDetail({
       )}
         </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4 [scrollbar-gutter:stable]">
       <div className="space-y-3">
         {sortedMessages.map((message, index) => {
           const sentAt = new Date(message.date).toLocaleString(undefined, {

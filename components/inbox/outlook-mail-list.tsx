@@ -125,7 +125,7 @@ export function OutlookMailList({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-col">
       {groups.map((group) => (
         <div key={group.label}>
           <div className="sticky top-0 z-[1] bg-muted/90 backdrop-blur-sm border-b border-border px-3 py-1.5">

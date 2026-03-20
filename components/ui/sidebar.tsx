@@ -139,7 +139,8 @@ function SidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex min-h-svh w-full",
+            // Cap height to viewport so nested flex (e.g. inbox panes) get a real max height; inner mains use overflow-auto/scroll.
+            "group/sidebar-wrapper has-data-[variant=inset]:bg-sidebar flex h-dvh max-h-dvh min-h-0 w-full overflow-hidden",
             className
           )}
           {...props}

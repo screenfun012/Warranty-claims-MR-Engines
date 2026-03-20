@@ -183,7 +183,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <ClaimBreadcrumbProvider>
         <SidebarProvider>
           <AppSidebar />
-          <SidebarInset className="min-h-0">
+          <SidebarInset className="min-h-0 h-full min-w-0 overflow-hidden">
             <header className="flex h-16 shrink-0 items-center gap-4 px-6 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-all duration-200">
               <SidebarTriggerWithTooltip />
               <Separator orientation="vertical" className="h-6 transition-opacity duration-200" />

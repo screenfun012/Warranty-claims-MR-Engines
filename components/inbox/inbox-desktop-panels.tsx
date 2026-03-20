@@ -52,20 +52,20 @@ export function InboxDesktopPanels({ folder, list, detail, className, folderPane
         maxSize="32%"
         collapsible
         collapsedSize="3%"
-        className="flex min-h-0 min-w-0"
+        className="flex min-h-0 min-w-0 overflow-hidden"
       >
         <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-muted/35">
           {folder(api)}
         </div>
       </Panel>
       <Separator className="w-2 shrink-0 bg-border hover:bg-primary/30 data-[separator]:transition-colors" />
-      <Panel id="list" defaultSize="30%" minSize="16%" maxSize="52%" className="flex min-h-0 min-w-0">
-        <div className="flex h-full min-h-0 w-full flex-col overflow-hidden border-r border-border bg-background">
+      <Panel id="list" defaultSize="30%" minSize="16%" maxSize="52%" className="flex min-h-0 min-w-0 overflow-hidden">
+        <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden border-r border-border bg-background">
           {list}
         </div>
       </Panel>
       <Separator className="w-2 shrink-0 bg-border hover:bg-primary/30" />
-      <Panel id="detail" defaultSize="56%" minSize="28%" className="flex min-h-0 min-w-0">
+      <Panel id="detail" defaultSize="56%" minSize="28%" className="flex min-h-0 min-w-0 overflow-hidden">
         <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-muted/10">{detail}</div>
       </Panel>
     </Group>
