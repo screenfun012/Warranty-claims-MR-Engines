@@ -7,6 +7,7 @@
 import nodemailer from "nodemailer";
 import { getPrisma } from "@/lib/db/prisma";
 import { getEmailConfig } from "@/lib/config/envLoader";
+import { saveOutboundRawEmailToStorage } from "@/lib/files/fileStorage";
 
 export interface SendEmailParams {
   to: string | string[];
@@ -105,6 +106,7 @@ export async function sendEmailAndSave(params: SendEmailParams & {
   const prisma = await getPrisma();
   const config = getEmailConfig();
 
+  const sentAt = new Date();
   const emailMessage = await prisma.emailMessage.create({
     data: {
       emailThreadId: params.emailThreadId,
@@ -116,9 +118,34 @@ export async function sendEmailAndSave(params: SendEmailParams & {
       bodyText: params.text,
       bodyHtml: params.html,
       messageId: sendResult.messageId,
-      date: new Date(),
+      date: sentAt,
     },
   });
+
+  try {
+    const rawPath = await saveOutboundRawEmailToStorage(params.emailThreadId, emailMessage.id, {
+      from: config.smtpUserEmail,
+      to: Array.isArray(params.to) ? params.to.join(", ") : params.to,
+      cc: params.cc ? (Array.isArray(params.cc) ? params.cc.join(", ") : params.cc) : undefined,
+      subject: params.subject,
+      text: params.text,
+      html: params.html,
+      messageId: sendResult.messageId,
+      date: sentAt,
+    });
+    if (rawPath) {
+      await prisma.emailMessage.update({
+        where: { id: emailMessage.id },
+        data: {
+          rawSourcePath: rawPath,
+          bodyText: null,
+          bodyHtml: null,
+        },
+      });
+    }
+  } catch (e) {
+    console.error("[sendEmailAndSave] Outbound .eml save failed:", e);
+  }
 
   return {
     emailMessageId: emailMessage.id,

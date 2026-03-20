@@ -11,6 +11,7 @@ import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/aut
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 import { logActivityFromRequest } from "@/lib/activity-log";
 import { createClaimFolder, claimHasProperFolderMetadata, renameClaimFolderIfNeeded } from "@/lib/files/fileStorage";
+import { hydrateEmailMessages } from "@/lib/email/hydrateRawEmail";
 
 export async function GET(
   request: NextRequest,
@@ -122,7 +123,14 @@ export async function GET(
     }
 
     console.log(`[GET /api/claims/${id}] Successfully fetched claim`);
-    return NextResponse.json({ claim });
+
+    const emailThreadsHydrated = await Promise.all(
+      claim.emailThreads.map(async (et) => ({
+        ...et,
+        messages: await hydrateEmailMessages(et.messages),
+      }))
+    );
+    return NextResponse.json({ claim: { ...claim, emailThreads: emailThreadsHydrated } });
   } catch (error) {
     console.error("Error fetching claim:", error);
     const permError = createPermissionError(error);
@@ -545,7 +553,7 @@ export async function PATCH(
       }
     }
 
-    // When company or MR code changes and folder already exists, rename folder on server so old name is not left behind
+    // When domestic↔international, company/name, or MR code changes and folder exists: rename on NAS so one source of truth (no duplicates)
     if (claim?.serverFolderPath) {
       const newFolderPath = await renameClaimFolderIfNeeded(claim);
       if (newFolderPath) {

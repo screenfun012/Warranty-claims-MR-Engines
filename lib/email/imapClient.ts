@@ -10,6 +10,8 @@ import { cleanEmailBodyText, extractTextFromHtml } from "./emailBodyCleaner";
 
 export interface FetchedMessage {
   uid: string;
+  /** Full RFC822 source from IMAP — saved to NAS as .eml */
+  rawSource?: Buffer;
   headers: {
     from: string;
     to: string;
@@ -284,8 +286,15 @@ export async function fetchNewMessagesSince(
           };
         }
         
+        const rawBuf = Buffer.isBuffer(source)
+          ? source
+          : source
+            ? Buffer.from(source as ArrayBuffer | Uint8Array | string)
+            : undefined;
+
         const result = {
           uid: actualUid,
+          rawSource: rawBuf,
           headers,
           bodyText: bodyParts?.text,
           bodyHtml: bodyParts?.html,

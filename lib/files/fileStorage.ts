@@ -110,6 +110,140 @@ export function getUnassignedThreadPath(threadId: string): string {
 /** Base folder for generic sent mail archive (same root as claims, e.g. REKLAMACIJE area on NAS) */
 const SENT_MAIL_ARCHIVE_BASE = "Poslati_mailovi";
 
+/**
+ * Raw mail files under WEBDAV_BASE_PATH (WARRANTY root on Synology).
+ * inbound: IMAP sync writes full RFC822 .eml
+ * outbound: sent mail snapshot .eml
+ */
+export const EMAILS_STORAGE_ROOT = "Emails";
+
+function toWebdavRef(relativePath: string): string {
+  const normalized = relativePath.replace(/^\/+/, "");
+  return `webdav:${normalized}`;
+}
+
+/**
+ * Save inbound IMAP raw source to NAS/local storage. Returns webdav:... or relative path for local.
+ */
+export async function saveInboundRawEmailToStorage(
+  threadId: string,
+  emailMessageId: string,
+  rawBuffer: Buffer
+): Promise<string | null> {
+  if (!rawBuffer?.length) return null;
+  const safeThread = threadId.replace(/[/\\:*?"<>|]/g, "_");
+  const safeMsg = emailMessageId.replace(/[/\\:*?"<>|]/g, "_");
+  const relativePath = `${EMAILS_STORAGE_ROOT}/inbound/${safeThread}/${safeMsg}.eml`;
+  const dirOnly = `${EMAILS_STORAGE_ROOT}/inbound/${safeThread}`;
+
+  try {
+    await ensureDir(dirOnly);
+    if (USE_WEBDAV && webdavClient) {
+      const fullPath = getWebDAVPath(relativePath);
+      await webdavClient.putFileContents(fullPath, rawBuffer, { overwrite: true });
+      console.log(`[saveInboundRawEmailToStorage] WebDAV: ${relativePath} (${rawBuffer.length} bytes)`);
+      return toWebdavRef(relativePath);
+    }
+    const localPath = path.join(path.resolve(env.FILE_ROOT_PATH), relativePath);
+    await fs.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.writeFile(localPath, rawBuffer);
+    console.log(`[saveInboundRawEmailToStorage] Local: ${relativePath} (${rawBuffer.length} bytes)`);
+    return relativePath;
+  } catch (error) {
+    console.error(`[saveInboundRawEmailToStorage] Failed:`, error);
+    return null;
+  }
+}
+
+export type OutboundRawMailParams = {
+  from: string;
+  to: string;
+  cc?: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  messageId?: string;
+  date: Date;
+};
+
+function buildOutboundMimeBuffer(params: OutboundRawMailParams): Buffer {
+  const nl = "\r\n";
+  const subject = (params.subject || "").replace(/\r?\n/g, " ");
+  const escapeHeader = (s: string) => s.replace(/\r?\n/g, " ");
+  const lines: string[] = [
+    `From: ${escapeHeader(params.from)}`,
+    `To: ${escapeHeader(params.to)}`,
+    ...(params.cc ? [`Cc: ${escapeHeader(params.cc)}`] : []),
+    `Subject: ${escapeHeader(subject)}`,
+    `Date: ${params.date.toUTCString()}`,
+    `MIME-Version: 1.0`,
+  ];
+  if (params.messageId) {
+    lines.push(`Message-ID: ${escapeHeader(params.messageId)}`);
+  }
+  const text = params.text ?? "";
+  const html = params.html ?? "";
+  if (html && text) {
+    const b = `----BOUND_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    lines.push(`Content-Type: multipart/alternative; boundary="${b}"`);
+    lines.push("");
+    lines.push(`--${b}`);
+    lines.push(`Content-Type: text/plain; charset=UTF-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push("");
+    lines.push(text);
+    lines.push(`--${b}`);
+    lines.push(`Content-Type: text/html; charset=UTF-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push("");
+    lines.push(html);
+    lines.push(`--${b}--`);
+  } else if (html) {
+    lines.push(`Content-Type: text/html; charset=UTF-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push("");
+    lines.push(html);
+  } else {
+    lines.push(`Content-Type: text/plain; charset=UTF-8`);
+    lines.push(`Content-Transfer-Encoding: 8bit`);
+    lines.push("");
+    lines.push(text);
+  }
+  return Buffer.from(lines.join(nl), "utf-8");
+}
+
+/**
+ * Save outbound sent message as .eml under Emails/outbound/<threadId>/
+ */
+export async function saveOutboundRawEmailToStorage(
+  threadId: string,
+  emailMessageId: string,
+  params: OutboundRawMailParams
+): Promise<string | null> {
+  const safeThread = threadId.replace(/[/\\:*?"<>|]/g, "_");
+  const safeMsg = emailMessageId.replace(/[/\\:*?"<>|]/g, "_");
+  const relativePath = `${EMAILS_STORAGE_ROOT}/outbound/${safeThread}/${safeMsg}.eml`;
+  const dirOnly = `${EMAILS_STORAGE_ROOT}/outbound/${safeThread}`;
+  const buf = buildOutboundMimeBuffer(params);
+
+  try {
+    await ensureDir(dirOnly);
+    if (USE_WEBDAV && webdavClient) {
+      const fullPath = getWebDAVPath(relativePath);
+      await webdavClient.putFileContents(fullPath, buf, { overwrite: true });
+      console.log(`[saveOutboundRawEmailToStorage] WebDAV: ${relativePath} (${buf.length} bytes)`);
+      return toWebdavRef(relativePath);
+    }
+    const localPath = path.join(path.resolve(env.FILE_ROOT_PATH), relativePath);
+    await fs.mkdir(path.dirname(localPath), { recursive: true });
+    await fs.writeFile(localPath, buf);
+    return relativePath;
+  } catch (error) {
+    console.error(`[saveOutboundRawEmailToStorage] Failed:`, error);
+    return null;
+  }
+}
+
 function sanitizeSubjectForFolderName(subject: string): string {
   const s = (subject || "Bez naslova")
     .replace(/[/\\:*?"<>|]/g, "_")
@@ -390,8 +524,9 @@ export async function createClaimFolder(claim: Claim & { customer?: { name: stri
 }
 
 /**
- * When company or MR code changes and claim already has a folder, rename it on the server
- * so the old folder with wrong name is not left behind. Returns new base key or null.
+ * When folder name would change (domestic↔international, company/customer name, or MR code),
+ * rename the existing folder on NAS to the new name so we never have duplicates and always
+ * one source of truth. Returns new base key or null if no change or rename failed.
  */
 export async function renameClaimFolderIfNeeded(
   claim: Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean; serverFolderPath?: string | null }

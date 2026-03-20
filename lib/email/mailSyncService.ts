@@ -10,6 +10,7 @@ import { isEmailConfigured } from "@/lib/config/envLoader";
 import {
   saveAttachmentForUnassignedThread,
   saveAttachmentForClaim,
+  saveInboundRawEmailToStorage,
 } from "@/lib/files/fileStorage";
 import {
   cleanSubject,
@@ -160,6 +161,28 @@ export async function syncNewEmails(): Promise<SyncResult> {
           date: fetchedMsg.headers.date,
         },
       });
+
+      if (fetchedMsg.rawSource && fetchedMsg.rawSource.length > 0) {
+        try {
+          const rawPath = await saveInboundRawEmailToStorage(
+            thread.id,
+            emailMessage.id,
+            fetchedMsg.rawSource
+          );
+          if (rawPath) {
+            await prisma.emailMessage.update({
+              where: { id: emailMessage.id },
+              data: {
+                rawSourcePath: rawPath,
+                bodyText: null,
+                bodyHtml: null,
+              },
+            });
+          }
+        } catch (rawErr) {
+          console.error(`[MailSync] Raw .eml save failed for message ${emailMessage.id}:`, rawErr);
+        }
+      }
 
       newMessagesCount++;
 

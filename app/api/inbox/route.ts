@@ -8,6 +8,7 @@ import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { ensureIdleStarted } from "@/lib/email/mailSyncScheduler";
 import { isThreadEffectivelyUnread } from "@/lib/inbox/effectiveUnread";
+import { hydrateEmailMessages } from "@/lib/email/hydrateRawEmail";
 
 export async function GET() {
   try {
@@ -30,6 +31,8 @@ export async function GET() {
             date: true,
             from: true,
             bodyText: true,
+            bodyHtml: true,
+            rawSourcePath: true,
             attachments: { select: { id: true } },
           },
           orderBy: {
@@ -42,11 +45,19 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
 
-    const threadsForResponse = threads.map(({ _count, ...t }) => ({
-      ...t,
-      threadStatus: t.threadStatus ?? "NEW_CLAIM",
-      messageCount: _count?.messages ?? 0,
-    }));
+    const threadsWithHydratedPreview = await Promise.all(
+      threads.map(async ({ _count, messages, ...t }) => {
+        const hydrated = messages?.length ? await hydrateEmailMessages(messages) : [];
+        return {
+          ...t,
+          messages: hydrated,
+          threadStatus: t.threadStatus ?? "NEW_CLAIM",
+          messageCount: _count?.messages ?? 0,
+        };
+      })
+    );
+
+    const threadsForResponse = threadsWithHydratedPreview;
 
     const latestMessageDate = (t: (typeof threadsForResponse)[0]) =>
       t.messages?.[0]?.date ? new Date(t.messages[0].date).getTime() : new Date(t.createdAt).getTime();

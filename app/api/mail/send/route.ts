@@ -10,11 +10,11 @@ import { sendEmail } from "@/lib/email/smtpClient";
 import { getEmailSignatureHtml, getEmailSignatureText } from "@/lib/email/emailSignature";
 import { sanitizeEmailHtml } from "@/lib/email/sanitizeEmailHtml";
 import { saveSentMailToNas } from "@/lib/files/fileStorage";
-import { requireMinimumRole, createPermissionError, ROLES } from "@/lib/auth/permissions";
+import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireMinimumRole(ROLES.ADMIN);
+    await requirePermission(PERMISSIONS.CLAIMS_UPDATE);
   } catch (error) {
     const permError = createPermissionError(error);
     if (permError.status !== 500) {

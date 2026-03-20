@@ -8,7 +8,6 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Inbox,
-  Mail,
   FileText,
   Home,
   Settings,
@@ -82,7 +81,6 @@ type NavigationItemWithRole = NavigationItem & {
 const warrantyNavigation: NavigationItemWithRole[] = [
   { name: "Dashboard", translationKey: "nav.dashboard", href: "/", icon: Home, minRole: "VIEWER" },
   { name: "Inbox", translationKey: "nav.inbox", href: "/inbox", icon: Inbox, showBadge: false, minRole: "VIEWER" },
-  { name: "Mail", translationKey: "nav.mail", href: "/mail", icon: Mail, minRole: "ADMIN" },
   { name: "Claims", translationKey: "nav.claims", href: "/claims", icon: FileText, minRole: "VIEWER" },
   { name: "Statistics", translationKey: "nav.statistics", href: "/statistics", icon: BarChart3, minRole: "ADMIN" },
   { name: "Settings", translationKey: "nav.settings", href: "/settings", icon: Settings, minRole: "ADMIN" },

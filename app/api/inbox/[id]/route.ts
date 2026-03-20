@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { hydrateEmailMessages } from "@/lib/email/hydrateRawEmail";
 
 export async function GET(
   request: NextRequest,
@@ -42,7 +43,8 @@ export async function GET(
       return NextResponse.json({ error: "Thread not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ thread });
+    const messagesHydrated = await hydrateEmailMessages(thread.messages);
+    return NextResponse.json({ thread: { ...thread, messages: messagesHydrated } });
   } catch (error) {
     console.error("Error fetching thread:", error);
     const permError = createPermissionError(error);

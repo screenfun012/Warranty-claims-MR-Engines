@@ -67,8 +67,6 @@ function PageTitle({ pathname }: { pathname: string | null }) {
         return;
       } else if (part === "inbox") {
         breadcrumbs.push({ label: t("nav.inbox"), href: "/inbox" });
-      } else if (part === "mail") {
-        breadcrumbs.push({ label: t("nav.mail"), href: "/mail" });
       } else if (part === "settings") {
         breadcrumbs.push({ label: t("nav.settings"), href: "/settings" });
       } else if (part === "admin" && parts[index + 1] === "users") {

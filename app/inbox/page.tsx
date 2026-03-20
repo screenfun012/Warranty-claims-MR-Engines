@@ -1,8 +1,8 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
@@ -10,7 +10,26 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { RefreshCw, Paperclip, FileText, Link as LinkIcon, Plus, Languages, Eye, File, Download, MoreVertical, Trash2, Search, Loader2 } from "lucide-react";
+import {
+  RefreshCw,
+  Paperclip,
+  FileText,
+  Link as LinkIcon,
+  Plus,
+  Languages,
+  Eye,
+  File,
+  Download,
+  MoreVertical,
+  Trash2,
+  Search,
+  Loader2,
+  Inbox,
+  Send,
+  Reply,
+  ReplyAll,
+  Forward,
+} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,9 +43,22 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@auth0/nextjs-auth0/client";
+import { SentMailArchive } from "@/components/inbox/sent-mail-archive";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TRANSLATION_LANGUAGES } from "@/lib/translation/languages";
+import {
+  OutlookMailList,
+  groupThreadsByOutlookBuckets,
+} from "@/components/inbox/outlook-mail-list";
 import { isThreadEffectivelyUnread } from "@/lib/inbox/effectiveUnread";
+import { EmailComposePanel, type ComposeMode } from "@/components/inbox/email-compose-panel";
+import {
+  buildReplyAllRecipients,
+  buildReplyTo,
+  ensureReplySubject,
+  buildQuotedReply,
+  formatMessageIdHeader,
+} from "@/lib/email/replyHelpers";
 
 const FileViewerModal = dynamic(
   () => import("@/components/file-viewer-modal").then((m) => ({ default: m.FileViewerModal })),
@@ -62,6 +94,7 @@ interface EmailThread {
   } | null;
   messages: Array<{
     id: string;
+    direction?: string;
     messageId?: string | null;
     date: string;
     from: string;
@@ -83,131 +116,6 @@ interface EmailThread {
   }>;
   createdAt: string;
   updatedAt: string;
-}
-
-function decodeEmailEntities(s: string) {
-  return s
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
-}
-
-function threadSnippet(body: string | null | undefined): string {
-  if (!body?.trim()) return "";
-  const oneLine = body.replace(/\r?\n/g, " ").replace(/\s+/g, " ").trim();
-  return oneLine.length > 140 ? `${oneLine.slice(0, 137)}…` : oneLine;
-}
-
-interface InboxOutlookListProps {
-  threads: EmailThread[];
-  emptyMessage: string;
-  emphasizeUnread: boolean;
-  onActivate: (thread: EmailThread) => void;
-  router: ReturnType<typeof useRouter>;
-  claimLabel: string;
-  unassignedLabel: string;
-}
-
-function InboxOutlookList({
-  threads,
-  emptyMessage,
-  emphasizeUnread,
-  onActivate,
-  router,
-  claimLabel,
-  unassignedLabel,
-}: InboxOutlookListProps) {
-  if (threads.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-border bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
-        {emptyMessage}
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden divide-y divide-border">
-      {threads.map((thread) => {
-        const latest = thread.messages?.[0];
-        const sender = thread.originalSender ? decodeEmailEntities(thread.originalSender) : "—";
-        const snippet = threadSnippet(latest?.bodyText);
-        const attCount = latest?.attachments?.length ?? 0;
-        const dateStr = latest
-          ? new Date(latest.date).toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })
-          : "";
-        const latestAt = thread.messages?.[0]?.date ?? thread.createdAt;
-        const rowUnread = isThreadEffectivelyUnread(thread.viewedAt, latestAt);
-        const showUnreadDot = emphasizeUnread && rowUnread;
-        const boldRow = emphasizeUnread && rowUnread;
-
-        return (
-          <button
-            key={thread.id}
-            type="button"
-            onClick={() => onActivate(thread)}
-            className={cn(
-              "w-full text-left flex gap-3 px-3 py-3 sm:px-4 sm:py-3.5 transition-colors",
-              "hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-            )}
-          >
-            <span className="flex w-2 shrink-0 justify-center pt-1.5" aria-hidden>
-              {showUnreadDot ? (
-                <span className="h-2 w-2 rounded-full bg-primary" />
-              ) : (
-                <span className="h-2 w-2" />
-              )}
-            </span>
-            <div className="min-w-0 flex-1 space-y-0.5">
-              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                <div className="min-w-0 flex-1 flex flex-wrap items-baseline gap-x-2 gap-y-0">
-                  <span
-                    className={cn(
-                      "truncate text-sm max-w-[min(100%,18rem)] sm:max-w-[14rem]",
-                      boldRow ? "font-semibold text-foreground" : "font-medium text-foreground/90"
-                    )}
-                  >
-                    {sender}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-sm min-w-0 flex-1 truncate",
-                      boldRow ? "font-semibold" : "font-normal text-foreground/80"
-                    )}
-                  >
-                    {thread.subjectOriginal || "—"}
-                  </span>
-                  {attCount > 0 && (
-                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  )}
-                </div>
-                <time className="shrink-0 text-xs tabular-nums text-muted-foreground">{dateStr}</time>
-              </div>
-              {snippet ? (
-                <p className="text-xs text-muted-foreground line-clamp-1 pr-2">{snippet}</p>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                {thread.claim ? (
-                  <Badge
-                    variant="secondary"
-                    className="text-xs font-normal cursor-pointer hover:bg-secondary/80"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      router.push(`/claims/${thread.claim!.id}?from=inbox`);
-                    }}
-                  >
-                    {thread.claim.claimCodeRaw || claimLabel}
-                  </Badge>
-                ) : (
-                  <span className="text-xs text-muted-foreground">{unassignedLabel}</span>
-                )}
-              </div>
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 interface Claim {
@@ -246,10 +154,26 @@ const checkForUpdates = async (lastCheck?: string | null): Promise<{ hasUpdates:
   };
 };
 
-export default function InboxPage() {
+function InboxPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const t = useTranslations();
+  const { user } = useUser();
+  const isSentView = searchParams.get("view") === "sent";
+  const showCompose = searchParams.get("compose") === "1";
+
+  const auth0User = user as { role?: string; roles?: string[] } | undefined;
+  const userRole = auth0User?.role || auth0User?.roles?.[0];
+  const canUseMailCompose = hasMinRole(userRole, "OPERATOR");
+
+  const [composeFromEmail, setComposeFromEmail] = useState("");
+  useEffect(() => {
+    fetch("/api/mail/config", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setComposeFromEmail(d.fromEmail ?? ""))
+      .catch(() => {});
+  }, []);
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
@@ -308,19 +232,20 @@ export default function InboxPage() {
     });
   }, [threads, searchQuery]);
 
-  const unreadThreads = useMemo(
-    () =>
-      filteredThreads.filter((t) =>
-        isThreadEffectivelyUnread(t.viewedAt, t.messages?.[0]?.date ?? t.createdAt)
-      ),
-    [filteredThreads]
+  const outlookBucketLabels = useMemo(
+    () => ({
+      today: t("inbox.groupToday"),
+      yesterday: t("inbox.groupYesterday"),
+      thisWeek: t("inbox.groupThisWeek"),
+      earlierThisMonth: t("inbox.groupEarlierThisMonth"),
+      older: t("inbox.groupOlder"),
+    }),
+    [t]
   );
-  const readThreads = useMemo(
-    () =>
-      filteredThreads.filter(
-        (t) => !isThreadEffectivelyUnread(t.viewedAt, t.messages?.[0]?.date ?? t.createdAt)
-      ),
-    [filteredThreads]
+
+  const outlookGroups = useMemo(
+    () => groupThreadsByOutlookBuckets(filteredThreads, outlookBucketLabels),
+    [filteredThreads, outlookBucketLabels]
   );
 
   // Check for updates sa React Query - ovo trigger-uje sync u pozadini
@@ -393,135 +318,258 @@ export default function InboxPage() {
     }
   };
 
+  const totalInList = outlookGroups.reduce((n, g) => n + g.threads.length, 0);
+
+  const handleThreadActivate = (thread: EmailThread) => {
+    const latestAt = thread.messages?.[0]?.date ?? thread.createdAt;
+    if (isThreadEffectivelyUnread(thread.viewedAt, latestAt)) {
+      fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" })
+        .then((res) => {
+          if (res.ok) {
+            queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) =>
+              old?.map((x) => (x.id === thread.id ? { ...x, viewedAt: new Date().toISOString() } : x)) || []
+            );
+            queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+            window.dispatchEvent(new Event("inbox-updated"));
+          }
+        })
+        .catch(console.error);
+    }
+    router.replace("/inbox", { scroll: false });
+    setSelectedThread(thread);
+  };
+
+  const clearSelectionAndRefresh = () => {
+    setSelectedThread(null);
+    refetchThreads();
+    queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+    window.dispatchEvent(new Event("inbox-updated"));
+  };
+
   if (loading) {
     return (
-      <div className="p-8">
-        <div className="flex items-center justify-between mb-6">
-          <Skeleton className="h-9 w-32" />
-          <Skeleton className="h-10 w-40" />
+      <div className="p-4 lg:p-6 space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <Skeleton className="h-9 w-48" />
+          <Skeleton className="h-10 w-36" />
         </div>
-        <Card className="p-4">
-          <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ))}
-          </div>
-        </Card>
+        <div className="flex gap-2 min-h-[480px] rounded-xl border border-border overflow-hidden">
+          <Skeleton className="hidden lg:block w-52 shrink-0" />
+          <Skeleton className="flex-1 max-w-md" />
+          <Skeleton className="hidden lg:block flex-1" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">{t("inbox.title")}</h1>
-          <Button 
-            onClick={handleSync} 
-            disabled={syncing} 
-            className="bg-primary hover:bg-primary/90 relative overflow-hidden"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? t("inbox.syncing") : t("inbox.syncEmails")}
-            {syncing && syncProgress > 0 && (
-              <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-foreground/20">
-                <div 
-                  className="h-full bg-primary-foreground/40 transition-all duration-300"
-                  style={{ width: `${syncProgress}%` }}
-                />
-              </div>
+    <div className="flex flex-col gap-4 p-4 lg:p-6 min-h-0 lg:min-h-[calc(100vh-5rem)]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{t("inbox.title")}</h1>
+        <Button
+          onClick={handleSync}
+          disabled={syncing}
+          className="bg-primary hover:bg-primary/90 relative overflow-hidden shrink-0"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
+          {syncing ? t("inbox.syncing") : t("inbox.syncEmails")}
+          {syncing && syncProgress > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-foreground/20">
+              <div
+                className="h-full bg-primary-foreground/40 transition-all duration-300"
+                style={{ width: `${syncProgress}%` }}
+              />
+            </div>
+          )}
+        </Button>
+      </div>
+
+      <div className="flex flex-1 min-h-0 flex-col lg:flex-row gap-0 rounded-xl border border-border bg-card/40 overflow-hidden shadow-sm">
+        <aside className="hidden lg:flex w-52 shrink-0 flex-col border-r border-border bg-muted/35">
+          <div className="px-3 py-2.5 border-b border-border">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {t("mail.title")}
+            </span>
+          </div>
+          <nav className="p-2 space-y-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedThread(null);
+                router.push("/inbox");
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors text-left",
+                !isSentView && !showCompose
+                  ? "bg-primary/15 font-medium text-foreground"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              )}
+            >
+              <Inbox className="h-4 w-4 shrink-0 text-primary" />
+              {t("inbox.outlookFolderInbox")}
+            </button>
+            {canUseMailCompose && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedThread(null);
+                  router.push("/inbox?compose=1");
+                }}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors text-left",
+                  showCompose
+                    ? "bg-primary/15 font-medium text-foreground"
+                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                )}
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                {t("inbox.newMail")}
+              </button>
             )}
-          </Button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedThread(null);
+                router.push("/inbox?view=sent");
+              }}
+              className={cn(
+                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors text-left",
+                isSentView
+                  ? "bg-primary/15 font-medium text-foreground"
+                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+              )}
+            >
+              <Send className="h-4 w-4 shrink-0" />
+              {t("inbox.sentArchive")}
+            </button>
+          </nav>
+        </aside>
+
+        <div
+          className={cn(
+            "flex flex-col min-h-0 w-full lg:w-[min(420px,38vw)] lg:max-w-md shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-background",
+            (selectedThread || showCompose) && !isSentView && "hidden lg:flex"
+          )}
+        >
+          {isSentView ? (
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <SentMailArchive />
+            </div>
+          ) : (
+            <>
+              <div className="shrink-0 border-b border-border px-3 py-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                  <Input
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder={t("inbox.searchPlaceholder")}
+                    className="pl-9 h-9 bg-muted/25"
+                  />
+                </div>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+                {totalInList === 0 ? (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
+                  </div>
+                ) : (
+                  <OutlookMailList
+                    groups={outlookGroups}
+                    selectedThreadId={selectedThread?.id ?? null}
+                    emphasizeUnread
+                    onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
+                    router={router}
+                    claimLabel={t("inbox.viewClaim")}
+                    unassignedLabel={t("inbox.unassigned")}
+                  />
+                )}
+              </div>
+            </>
+          )}
         </div>
 
-        <Card className="p-4 mb-6">
-          <Label>{t("common.search")}</Label>
-          <div className="relative mt-2">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder={t("inbox.searchPlaceholder")}
-              className="pl-9"
+        <div
+          className={cn(
+            "flex flex-1 min-h-0 min-w-0 flex-col bg-muted/10",
+            isSentView && "hidden",
+            !selectedThread && !showCompose && "hidden lg:flex"
+          )}
+        >
+          {selectedThread ? (
+            <ThreadDetail
+              key={selectedThread.id}
+              readingPane
+              thread={selectedThread}
+              onBack={clearSelectionAndRefresh}
+              onThreadUpdated={() => {
+                refetchThreads();
+                queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                window.dispatchEvent(new Event("inbox-updated"));
+              }}
             />
-          </div>
-        </Card>
-
-        {selectedThread ? (
-          <ThreadDetail 
-            key={selectedThread.id}
-            thread={selectedThread} 
-            onBack={() => {
-              setSelectedThread(null);
-              refetchThreads(); // Refresh threads to update unread count
-              queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-              // Trigger sidebar refresh
-              window.dispatchEvent(new Event('inbox-updated'));
-            }}
-            onThreadUpdated={() => {
-              refetchThreads(); // Refresh threads when thread is updated (linked to claim)
-              queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-              // Trigger sidebar refresh
-              window.dispatchEvent(new Event('inbox-updated'));
-            }}
-          />
-        ) : (
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                {t("inbox.unreadSection")} <span className="tabular-nums">({unreadThreads.length})</span>
-              </h2>
-              <InboxOutlookList
-                threads={unreadThreads}
-                emptyMessage={t("inbox.noUnread")}
-                emphasizeUnread
-                router={router}
-                claimLabel={t("inbox.viewClaim")}
-                unassignedLabel={t("inbox.unassigned")}
-                onActivate={(thread) => {
-                  fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" }).then((res) => {
-                    if (res.ok) {
-                      queryClient.setQueryData<EmailThread[]>(["inboxThreads"], (old) =>
-                        old?.map((t) => (t.id === thread.id ? { ...t, viewedAt: new Date().toISOString() } : t)) || []
-                      );
-                      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                      window.dispatchEvent(new Event("inbox-updated"));
-                    }
-                  }).catch(console.error);
-                  setSelectedThread(thread);
+          ) : showCompose && canUseMailCompose ? (
+            <div className="m-4 flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
+              <EmailComposePanel
+                mode="new"
+                fromEmail={composeFromEmail}
+                onCancel={() => router.push("/inbox")}
+                onSent={() => {
+                  router.push("/inbox");
+                  refetchThreads();
+                  queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                  window.dispatchEvent(new Event("inbox-updated"));
                 }}
               />
-            </section>
-            <section>
-              <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                {t("inbox.readSection")} <span className="tabular-nums">({readThreads.length})</span>
-              </h2>
-              <InboxOutlookList
-                threads={readThreads}
-                emptyMessage={t("inbox.noRead")}
-                emphasizeUnread={false}
-                router={router}
-                claimLabel={t("inbox.viewClaim")}
-                unassignedLabel={t("inbox.unassigned")}
-                onActivate={(thread) => setSelectedThread(thread)}
-              />
-            </section>
-          </div>
-        )}
+            </div>
+          ) : showCompose && !canUseMailCompose ? (
+            <div className="m-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
+              <p className="text-sm text-muted-foreground">{t("inbox.composeNoPermission")}</p>
+            </div>
+          ) : (
+            <div className="m-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
+              <p className="text-sm text-muted-foreground">{t("inbox.outlookSelectMessage")}</p>
+            </div>
+          )}
+        </div>
       </div>
+    </div>
   );
 }
 
-function ThreadDetail({ 
-  thread, 
-  onBack, 
-  onThreadUpdated 
-}: { 
-  thread: EmailThread; 
+export default function InboxPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="p-4 lg:p-6 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-10 w-36" />
+          </div>
+          <div className="flex gap-2 min-h-[480px] rounded-xl border border-border overflow-hidden">
+            <Skeleton className="hidden lg:block w-52 shrink-0" />
+            <Skeleton className="flex-1 max-w-md" />
+            <Skeleton className="hidden lg:block flex-1" />
+          </div>
+        </div>
+      }
+    >
+      <InboxPageContent />
+    </Suspense>
+  );
+}
+
+function ThreadDetail({
+  thread,
+  onBack,
+  onThreadUpdated,
+  readingPane = false,
+}: {
+  thread: EmailThread;
   onBack: () => void;
   onThreadUpdated: () => void;
+  /** Desktop: lista + čitanje u istom ekranu — sakrij „Nazad“ na velikom ekranu */
+  readingPane?: boolean;
 }) {
   const router = useRouter();
   const { user } = useUser();
@@ -566,8 +614,23 @@ function ThreadDetail({
   const [previewAttachment, setPreviewAttachment] = useState<{ id: string; fileName: string; mimeType: string } | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [composeMode, setComposeMode] = useState<ComposeMode | null>(null);
+  const [fromEmail, setFromEmail] = useState("");
   /** viewedAt from the list row when thread was opened — used to highlight new messages since last read */
   const viewedAtOnOpenRef = useRef<string | null>(thread.viewedAt ?? null);
+
+  const canCompose = hasMinRole(userRole, "OPERATOR");
+
+  useEffect(() => {
+    fetch("/api/mail/config", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setFromEmail(d.fromEmail ?? ""))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setComposeMode(null);
+  }, [thread.id]);
 
   const allAttachmentFiles = useMemo(() => {
     if (!fullThread?.messages?.length) return [];
@@ -593,6 +656,66 @@ function ThreadDetail({
     });
     return deduped.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [fullThread?.id, fullThread?.messages]);
+
+  const replyBaseMsg = useMemo(() => {
+    if (!sortedMessages.length) return null;
+    for (let i = sortedMessages.length - 1; i >= 0; i--) {
+      if (sortedMessages[i].direction === "INBOUND") return sortedMessages[i];
+    }
+    return sortedMessages[sortedMessages.length - 1];
+  }, [sortedMessages]);
+
+  const composePrefill = useMemo(() => {
+    if (!composeMode || !replyBaseMsg || !fullThread) return null;
+    const subj = fullThread.subjectOriginal || "";
+    const ourEmails = fromEmail ? [fromEmail] : [];
+    const when = new Date(replyBaseMsg.date);
+    const quoted = buildQuotedReply(
+      replyBaseMsg.from,
+      when,
+      replyBaseMsg.bodyText,
+      replyBaseMsg.bodyHtml
+    );
+    const inReply = formatMessageIdHeader(replyBaseMsg.messageId);
+
+    if (composeMode === "reply") {
+      return {
+        to: buildReplyTo(replyBaseMsg.from),
+        cc: "",
+        subject: ensureReplySubject(subj, "re"),
+        html: quoted.html,
+        inReplyTo: inReply,
+        references: inReply,
+      };
+    }
+    if (composeMode === "replyAll") {
+      const { to, cc } = buildReplyAllRecipients(
+        replyBaseMsg.from,
+        replyBaseMsg.to,
+        replyBaseMsg.cc,
+        ourEmails
+      );
+      return {
+        to,
+        cc,
+        subject: ensureReplySubject(subj, "re"),
+        html: quoted.html,
+        inReplyTo: inReply,
+        references: inReply,
+      };
+    }
+    if (composeMode === "forward") {
+      return {
+        to: "",
+        cc: "",
+        subject: ensureReplySubject(subj, "fw"),
+        html: quoted.html,
+        inReplyTo: undefined as string | undefined,
+        references: undefined as string | undefined,
+      };
+    }
+    return null;
+  }, [composeMode, replyBaseMsg, fullThread, fromEmail]);
 
   const fetchFullThread = useCallback(async () => {
     setLoading(true);
@@ -771,8 +894,8 @@ function ThreadDetail({
 
   if (loading || !fullThread) {
     return (
-      <div>
-        <Button onClick={onBack} variant="ghost" className="mb-4">
+      <div className={cn(readingPane && "flex min-h-0 flex-1 flex-col overflow-hidden")}>
+        <Button onClick={onBack} variant="ghost" className={cn("mb-4 shrink-0", readingPane && "lg:hidden")}>
           ← {t("inbox.backToList")}
         </Button>
         <div className="space-y-4">
@@ -801,11 +924,17 @@ function ThreadDetail({
   }
 
   return (
-    <div>
-      <Button onClick={onBack} variant="ghost" className="mb-4">
+    <div
+      className={cn(
+        readingPane && "flex min-h-0 flex-1 flex-col overflow-hidden",
+        readingPane && "lg:pl-2 lg:pr-4 lg:pt-2"
+      )}
+    >
+      <Button onClick={onBack} variant="ghost" size="sm" className={cn("mb-3 shrink-0 -ml-1", readingPane && "lg:hidden")}>
         ← {t("inbox.backToList")}
       </Button>
-      
+
+      <div className={cn(readingPane && "min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-4")}>
       <Card className="p-6 mb-4 border shadow-sm">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
           <h2 className="text-xl font-semibold leading-tight pr-2">{fullThread.subjectOriginal}</h2>
@@ -877,6 +1006,64 @@ function ThreadDetail({
         )}
 
       </Card>
+
+      {canCompose && replyBaseMsg && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-9"
+            onClick={() => setComposeMode("reply")}
+          >
+            <Reply className="h-4 w-4 mr-2 shrink-0" />
+            {t("inbox.reply")}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-9"
+            onClick={() => setComposeMode("replyAll")}
+          >
+            <ReplyAll className="h-4 w-4 mr-2 shrink-0" />
+            {t("inbox.replyAll")}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-9"
+            onClick={() => setComposeMode("forward")}
+          >
+            <Forward className="h-4 w-4 mr-2 shrink-0" />
+            {t("inbox.forward")}
+          </Button>
+        </div>
+      )}
+
+      {composeMode && composePrefill && fromEmail && (
+        <div className="mb-6">
+          <EmailComposePanel
+            key={`${composeMode}-${thread.id}`}
+            mode={composeMode}
+            threadId={thread.id}
+            fromEmail={fromEmail}
+            initialTo={composePrefill.to}
+            initialCc={composePrefill.cc}
+            initialSubject={composePrefill.subject}
+            initialHtml={composePrefill.html}
+            inReplyTo={composePrefill.inReplyTo}
+            references={composePrefill.references}
+            onCancel={() => setComposeMode(null)}
+            onSent={() => {
+              setComposeMode(null);
+              fetchFullThread();
+              onThreadUpdated();
+            }}
+          />
+        </div>
+      )}
 
       <div className="space-y-3">
         {sortedMessages.map((message, index) => {
@@ -1251,6 +1438,7 @@ function ThreadDetail({
           </Card>
           );
         })}
+      </div>
       </div>
 
       {/* Preview / file viewer (images, PDF, video, etc.) */}
