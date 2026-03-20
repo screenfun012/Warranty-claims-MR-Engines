@@ -29,6 +29,7 @@ import {
   Reply,
   ReplyAll,
   Forward,
+  Mail,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { SentMailArchive } from "@/components/inbox/sent-mail-archive";
+import {
+  InboxDesktopPanels,
+  InboxFolderToggleButton,
+  type InboxFolderPanelApi,
+} from "@/components/inbox/inbox-desktop-panels";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { TRANSLATION_LANGUAGES } from "@/lib/translation/languages";
 import {
@@ -188,9 +194,9 @@ function InboxPageContent() {
   } = useQuery({
     queryKey: ["inboxThreads"],
     queryFn: fetchThreads,
-    refetchInterval: 5000, // 5 sekundi - brza detekcija novih mailova (kao u mail aplikacijama)
+    refetchInterval: 12_000,
     refetchIntervalInBackground: false,
-    staleTime: 3 * 1000, // 3 sekunde - data je fresh 3 sekunde
+    staleTime: 8 * 1000,
   });
 
   // Get last updated time from threads
@@ -384,153 +390,242 @@ function InboxPageContent() {
         </Button>
       </div>
 
-      <div className="flex flex-1 min-h-0 flex-col lg:flex-row gap-0 rounded-xl border border-border bg-card/40 overflow-hidden shadow-sm">
-        <aside className="hidden lg:flex w-52 shrink-0 flex-col border-r border-border bg-muted/35">
-          <div className="px-3 py-2.5 border-b border-border">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("mail.title")}
-            </span>
-          </div>
-          <nav className="p-2 space-y-0.5">
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedThread(null);
-                router.push("/inbox");
-              }}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors text-left",
-                !isSentView && !showCompose
-                  ? "bg-primary/15 font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              )}
-            >
-              <Inbox className="h-4 w-4 shrink-0 text-primary" />
-              {t("inbox.outlookFolderInbox")}
-            </button>
-            {canUseMailCompose && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedThread(null);
-                  router.push("/inbox?compose=1");
-                }}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors text-left",
-                  showCompose
-                    ? "bg-primary/15 font-medium text-foreground"
-                    : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                )}
-              >
-                <Plus className="h-4 w-4 shrink-0" />
-                {t("inbox.newMail")}
-              </button>
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card/40 shadow-sm">
+        {/* Mobile / tablet: lista + detalj (bez folder kolone) */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:hidden">
+          <div
+            className={cn(
+              "flex min-h-0 w-full shrink-0 flex-col border-b border-border bg-background",
+              (selectedThread || showCompose) && !isSentView && "hidden"
             )}
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedThread(null);
-                router.push("/inbox?view=sent");
-              }}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors text-left",
-                isSentView
-                  ? "bg-primary/15 font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              )}
-            >
-              <Send className="h-4 w-4 shrink-0" />
-              {t("inbox.sentArchive")}
-            </button>
-          </nav>
-        </aside>
-
-        <div
-          className={cn(
-            "flex flex-col min-h-0 w-full lg:w-[min(420px,38vw)] lg:max-w-md shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-background",
-            (selectedThread || showCompose) && !isSentView && "hidden lg:flex"
-          )}
-        >
-          {isSentView ? (
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <SentMailArchive />
-            </div>
-          ) : (
-            <>
-              <div className="shrink-0 border-b border-border px-3 py-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder={t("inbox.searchPlaceholder")}
-                    className="pl-9 h-9 bg-muted/25"
-                  />
-                </div>
+          >
+            {isSentView ? (
+              <div className="flex min-h-0 flex-1 overflow-hidden">
+                <SentMailArchive />
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                {totalInList === 0 ? (
-                  <div className="p-8 text-center text-sm text-muted-foreground">
-                    {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
+            ) : (
+              <>
+                <div className="shrink-0 border-b border-border px-3 py-2">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder={t("inbox.searchPlaceholder")}
+                      className="h-9 bg-muted/25 pl-9"
+                    />
                   </div>
-                ) : (
-                  <OutlookMailList
-                    groups={outlookGroups}
-                    selectedThreadId={selectedThread?.id ?? null}
-                    emphasizeUnread
-                    onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
-                    router={router}
-                    claimLabel={t("inbox.viewClaim")}
-                    unassignedLabel={t("inbox.unassigned")}
-                  />
-                )}
-              </div>
-            </>
-          )}
-        </div>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  {totalInList === 0 ? (
+                    <div className="p-8 text-center text-sm text-muted-foreground">
+                      {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
+                    </div>
+                  ) : (
+                    <OutlookMailList
+                      groups={outlookGroups}
+                      selectedThreadId={selectedThread?.id ?? null}
+                      emphasizeUnread
+                      onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
+                      router={router}
+                      claimLabel={t("inbox.viewClaim")}
+                      unassignedLabel={t("inbox.unassigned")}
+                    />
+                  )}
+                </div>
+              </>
+            )}
+          </div>
 
-        <div
-          className={cn(
-            "flex flex-1 min-h-0 min-w-0 flex-col bg-muted/10",
-            isSentView && "hidden",
-            !selectedThread && !showCompose && "hidden lg:flex"
-          )}
-        >
-          {selectedThread ? (
-            <ThreadDetail
-              key={selectedThread.id}
-              readingPane
-              thread={selectedThread}
-              onBack={clearSelectionAndRefresh}
-              onThreadUpdated={() => {
-                refetchThreads();
-                queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                window.dispatchEvent(new Event("inbox-updated"));
-              }}
-            />
-          ) : showCompose && canUseMailCompose ? (
-            <div className="m-4 flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
-              <EmailComposePanel
-                mode="new"
-                fromEmail={composeFromEmail}
-                onCancel={() => router.push("/inbox")}
-                onSent={() => {
-                  router.push("/inbox");
+          <div
+            className={cn(
+              "flex min-h-0 min-w-0 flex-1 flex-col bg-muted/10",
+              isSentView && "hidden"
+            )}
+          >
+            {selectedThread ? (
+              <ThreadDetail
+                key={selectedThread.id}
+                readingPane
+                thread={selectedThread}
+                onBack={clearSelectionAndRefresh}
+                onThreadUpdated={() => {
                   refetchThreads();
                   queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
                   window.dispatchEvent(new Event("inbox-updated"));
                 }}
               />
-            </div>
-          ) : showCompose && !canUseMailCompose ? (
-            <div className="m-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
-              <p className="text-sm text-muted-foreground">{t("inbox.composeNoPermission")}</p>
-            </div>
-          ) : (
-            <div className="m-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
-              <p className="text-sm text-muted-foreground">{t("inbox.outlookSelectMessage")}</p>
-            </div>
-          )}
+            ) : showCompose && canUseMailCompose ? (
+              <div className="m-4 flex min-h-0 flex-1 flex-col overflow-hidden">
+                <EmailComposePanel
+                  mode="new"
+                  fromEmail={composeFromEmail}
+                  onCancel={() => router.push("/inbox")}
+                  onSent={() => {
+                    router.push("/inbox");
+                    refetchThreads();
+                    queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                    window.dispatchEvent(new Event("inbox-updated"));
+                  }}
+                />
+              </div>
+            ) : showCompose && !canUseMailCompose ? (
+              <div className="m-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
+                <p className="text-sm text-muted-foreground">{t("inbox.composeNoPermission")}</p>
+              </div>
+            ) : (
+              <div className="m-4 flex flex-1 items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 px-6 py-16 text-center">
+                <p className="text-sm text-muted-foreground">{t("inbox.outlookSelectMessage")}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop: 3 resizable kolone, nezavisni scroll po panelu */}
+        <div className="hidden min-h-0 flex-1 overflow-hidden lg:flex">
+          <InboxDesktopPanels
+            folder={(api: InboxFolderPanelApi) => (
+              <>
+                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-2">
+                  <span className="truncate pl-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("mail.title")}
+                  </span>
+                  <InboxFolderToggleButton api={api} label={t("inbox.folderCollapseToggle")} />
+                </div>
+                <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain p-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedThread(null);
+                      router.push("/inbox");
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                      !isSentView && !showCompose
+                        ? "bg-primary/15 font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    )}
+                  >
+                    <Inbox className="h-4 w-4 shrink-0 text-primary" />
+                    {t("inbox.outlookFolderInbox")}
+                  </button>
+                  {canUseMailCompose && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedThread(null);
+                        router.push("/inbox?compose=1");
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                        showCompose
+                          ? "bg-primary/15 font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      )}
+                    >
+                      <Plus className="h-4 w-4 shrink-0" />
+                      {t("inbox.newMail")}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedThread(null);
+                      router.push("/inbox?view=sent");
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                      isSentView
+                        ? "bg-primary/15 font-medium text-foreground"
+                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    )}
+                  >
+                    <Send className="h-4 w-4 shrink-0" />
+                    {t("inbox.sentArchive")}
+                  </button>
+                </nav>
+              </>
+            )}
+            list={
+              isSentView ? (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <SentMailArchive />
+                </div>
+              ) : (
+                <>
+                  <div className="shrink-0 border-b border-border px-3 py-2">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        placeholder={t("inbox.searchPlaceholder")}
+                        className="h-9 bg-muted/25 pl-9"
+                      />
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    {totalInList === 0 ? (
+                      <div className="p-8 text-center text-sm text-muted-foreground">
+                        {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
+                      </div>
+                    ) : (
+                      <OutlookMailList
+                        groups={outlookGroups}
+                        selectedThreadId={selectedThread?.id ?? null}
+                        emphasizeUnread
+                        onActivate={(thread) => handleThreadActivate(thread as EmailThread)}
+                        router={router}
+                        claimLabel={t("inbox.viewClaim")}
+                        unassignedLabel={t("inbox.unassigned")}
+                      />
+                    )}
+                  </div>
+                </>
+              )
+            }
+            detail={
+              isSentView ? (
+                <div className="flex min-h-0 flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                  {t("inbox.sentSelectHint")}
+                </div>
+              ) : selectedThread ? (
+                <ThreadDetail
+                  key={selectedThread.id}
+                  readingPane
+                  thread={selectedThread}
+                  onBack={clearSelectionAndRefresh}
+                  onThreadUpdated={() => {
+                    refetchThreads();
+                    queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                    window.dispatchEvent(new Event("inbox-updated"));
+                  }}
+                />
+              ) : showCompose && canUseMailCompose ? (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4">
+                  <EmailComposePanel
+                    mode="new"
+                    fromEmail={composeFromEmail}
+                    onCancel={() => router.push("/inbox")}
+                    onSent={() => {
+                      router.push("/inbox");
+                      refetchThreads();
+                      queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
+                      window.dispatchEvent(new Event("inbox-updated"));
+                    }}
+                  />
+                </div>
+              ) : showCompose && !canUseMailCompose ? (
+                <div className="flex flex-1 items-center justify-center p-6 text-center">
+                  <p className="text-sm text-muted-foreground">{t("inbox.composeNoPermission")}</p>
+                </div>
+              ) : (
+                <div className="flex flex-1 items-center justify-center p-6 text-center">
+                  <p className="text-sm text-muted-foreground">{t("inbox.outlookSelectMessage")}</p>
+                </div>
+              )
+            }
+          />
         </div>
       </div>
     </div>
@@ -720,28 +815,22 @@ function ThreadDetail({
   const fetchFullThread = useCallback(async () => {
     setLoading(true);
     try {
-      // Mark thread as viewed when opened
-      try {
-        const res = await fetch(`/api/inbox/${thread.id}/mark-viewed`, {
-          method: "POST",
-        });
-        if (res.ok) {
-          // Trigger sidebar refresh
-          window.dispatchEvent(new Event('inbox-updated'));
-        }
-      } catch (error) {
-        console.error("Error marking thread as viewed:", error);
+      const [threadRes, viewedRes] = await Promise.all([
+        fetch(`/api/inbox/${thread.id}`),
+        fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" }),
+      ]);
+
+      if (viewedRes.ok) {
+        window.dispatchEvent(new Event("inbox-updated"));
       }
 
-      const res = await fetch(`/api/inbox/${thread.id}`);
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Thread API error:", res.status, text);
-        throw new Error(`API error: ${res.status}`);
+      if (!threadRes.ok) {
+        const text = await threadRes.text();
+        console.error("Thread API error:", threadRes.status, text);
+        throw new Error(`API error: ${threadRes.status}`);
       }
-      const data = await res.json();
+      const data = await threadRes.json();
       setFullThread(data.thread);
-      
     } catch (error) {
       console.error("Error fetching thread:", error);
     } finally {
@@ -934,14 +1023,15 @@ function ThreadDetail({
         ← {t("inbox.backToList")}
       </Button>
 
-      <div className={cn(readingPane && "min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-4")}>
-      <Card className="p-6 mb-4 border shadow-sm">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between mb-4">
-          <h2 className="text-xl font-semibold leading-tight pr-2">{fullThread.subjectOriginal}</h2>
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden pr-1">
+        <div className="shrink-0 space-y-3 pb-3">
+      <Card className="border p-4 shadow-sm">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <h2 className="pr-2 text-xl font-semibold leading-tight">{fullThread.subjectOriginal}</h2>
           {fullThread.claim && (
             <Badge 
               variant="secondary"
-              className="cursor-pointer"
+              className="cursor-pointer shrink-0"
               onClick={() => router.push(`/claims/${fullThread.claim!.id}?from=inbox`)}
             >
               {fullThread.claim.claimCodeRaw || "View Claim"}
@@ -949,15 +1039,15 @@ function ThreadDetail({
           )}
         </div>
 
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2">
           {!fullThread.claimId && canCreate && (
             <>
-              <Button onClick={() => setShowCreateClaim(true)} className="flex-1 sm:flex-none min-w-0">
-                <Plus className="h-4 w-4 mr-2 shrink-0" />
+              <Button onClick={() => setShowCreateClaim(true)} className="h-10 min-h-10 flex-1 sm:flex-none min-w-0">
+                <Plus className="mr-2 h-4 w-4 shrink-0" />
                 <span className="truncate">{t("inbox.createClaim")}</span>
               </Button>
-              <Button variant="outline" onClick={() => setShowLinkClaim(true)} className="flex-1 sm:flex-none min-w-0">
-                <LinkIcon className="h-4 w-4 mr-2 shrink-0" />
+              <Button variant="outline" onClick={() => setShowLinkClaim(true)} className="h-10 min-h-10 flex-1 sm:flex-none min-w-0">
+                <LinkIcon className="mr-2 h-4 w-4 shrink-0" />
                 <span className="truncate">{t("inbox.linkToClaim")}</span>
               </Button>
             </>
@@ -965,12 +1055,45 @@ function ThreadDetail({
           {canDelete && (
             <Button 
               variant="destructive" 
+              className="h-10 min-h-10"
               onClick={() => setShowDeleteDialog(true)}
               disabled={isDeleting}
             >
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="mr-2 h-4 w-4" />
               {isDeleting ? t("common.loading") : t("inbox.deleteThread")}
             </Button>
+          )}
+          {canCompose && replyBaseMsg && (
+            <>
+              <div className="hidden h-8 w-px shrink-0 bg-border sm:block" aria-hidden />
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 min-h-10"
+                onClick={() => setComposeMode("reply")}
+              >
+                <Reply className="mr-2 h-4 w-4 shrink-0" />
+                {t("inbox.reply")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 min-h-10"
+                onClick={() => setComposeMode("replyAll")}
+              >
+                <ReplyAll className="mr-2 h-4 w-4 shrink-0" />
+                {t("inbox.replyAll")}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 min-h-10"
+                onClick={() => setComposeMode("forward")}
+              >
+                <Forward className="mr-2 h-4 w-4 shrink-0" />
+                {t("inbox.forward")}
+              </Button>
+            </>
           )}
         </div>
 
@@ -1007,43 +1130,8 @@ function ThreadDetail({
 
       </Card>
 
-      {canCompose && replyBaseMsg && (
-        <div className="mb-4 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="min-h-9"
-            onClick={() => setComposeMode("reply")}
-          >
-            <Reply className="h-4 w-4 mr-2 shrink-0" />
-            {t("inbox.reply")}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="min-h-9"
-            onClick={() => setComposeMode("replyAll")}
-          >
-            <ReplyAll className="h-4 w-4 mr-2 shrink-0" />
-            {t("inbox.replyAll")}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="min-h-9"
-            onClick={() => setComposeMode("forward")}
-          >
-            <Forward className="h-4 w-4 mr-2 shrink-0" />
-            {t("inbox.forward")}
-          </Button>
-        </div>
-      )}
-
       {composeMode && composePrefill && fromEmail && (
-        <div className="mb-6">
+        <div className="max-h-[min(70vh,560px)] min-h-0 overflow-y-auto rounded-lg border border-border bg-muted/20 p-2">
           <EmailComposePanel
             key={`${composeMode}-${thread.id}`}
             mode={composeMode}
@@ -1064,7 +1152,9 @@ function ThreadDetail({
           />
         </div>
       )}
+        </div>
 
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-4">
       <div className="space-y-3">
         {sortedMessages.map((message, index) => {
           const sentAt = new Date(message.date).toLocaleString(undefined, {
@@ -1079,7 +1169,7 @@ function ThreadDetail({
             <Card
               key={message.id}
               className={cn(
-                "overflow-hidden border shadow-sm",
+                "overflow-hidden border-l-2 border-l-primary/30 shadow-sm",
                 messageIsNew && "ring-1 ring-primary/35 bg-primary/[0.04]"
               )}
             >
@@ -1090,7 +1180,10 @@ function ThreadDetail({
                 )}
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <div className="font-semibold text-foreground min-w-0 break-words">{message.from}</div>
+                  <div className="flex min-w-0 items-start gap-2 gap-y-1">
+                    <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary/70" aria-hidden />
+                    <span className="font-semibold text-foreground break-words">{message.from}</span>
+                  </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {messageIsNew ? (
                       <Badge variant="default" className="text-[10px] px-1.5 py-0 h-5 font-semibold">
@@ -1438,6 +1531,7 @@ function ThreadDetail({
           </Card>
           );
         })}
+      </div>
       </div>
       </div>
 

@@ -28,24 +28,24 @@ function needsHydrate(m: MessageWithRawFields): boolean {
 
 /** Fill bodyText/bodyHtml from .eml on NAS when DB has no body but rawSourcePath exists */
 export async function hydrateEmailMessages<T extends MessageWithRawFields>(messages: T[]): Promise<T[]> {
-  const results: T[] = [];
-  for (const m of messages) {
-    if (!needsHydrate(m)) {
-      results.push(m);
-      continue;
-    }
-    try {
-      const buf = await readAttachmentFile(m.rawSourcePath!);
-      const { text, html } = await parseEmlBuffer(buf);
-      results.push({
-        ...m,
-        bodyText: text ?? null,
-        bodyHtml: html ?? null,
-      } as T);
-    } catch (e) {
-      console.error(`[hydrateEmailMessages] Failed message ${m.id}:`, e);
-      results.push(m);
-    }
-  }
-  return results;
+  const hydrated = await Promise.all(
+    messages.map(async (m) => {
+      if (!needsHydrate(m)) {
+        return m;
+      }
+      try {
+        const buf = await readAttachmentFile(m.rawSourcePath!);
+        const { text, html } = await parseEmlBuffer(buf);
+        return {
+          ...m,
+          bodyText: text ?? null,
+          bodyHtml: html ?? null,
+        } as T;
+      } catch (e) {
+        console.error(`[hydrateEmailMessages] Failed message ${m.id}:`, e);
+        return m;
+      }
+    })
+  );
+  return hydrated;
 }

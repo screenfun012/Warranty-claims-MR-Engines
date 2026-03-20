@@ -21,6 +21,7 @@ import {
   extractOriginalSenderFromForward,
 } from "./emailThreadingUtils";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
+import { normalizeMessageId } from "@/lib/email/replyHelpers";
 
 export interface SyncResult {
   newMessages: number;
@@ -108,7 +109,12 @@ export async function syncNewEmails(): Promise<SyncResult> {
   let highestUid: string | null = null;
   const skipReasons = { error: 0 };
 
-  // Svi mailovi iz inboxa se prikazuju – korisnik odlučuje šta da briše. Ne preskačemo outbound, duplicate ni deleted.
+  const deletedRows = await prisma.deletedEmailMessage.findMany({ select: { messageId: true } });
+  const deletedMessageIdSet = new Set(
+    deletedRows
+      .map((r) => normalizeMessageId(r.messageId))
+      .filter((x): x is string => !!x)
+  );
 
   for (const fetchedMsg of fetchedMessages) {
     try {
@@ -126,6 +132,12 @@ export async function syncNewEmails(): Promise<SyncResult> {
       const isRelevant = isClaimEmail(fetchedMsg.headers.to, fetchedMsg.headers.cc, claimsEmail);
       if (!isRelevant) {
         console.log(`[MailSync] Skipping irrelevant: ${fetchedMsg.headers.subject}`);
+        continue;
+      }
+
+      const normalizedMid = normalizeMessageId(fetchedMsg.headers.messageId);
+      if (normalizedMid && deletedMessageIdSet.has(normalizedMid)) {
+        console.log(`[MailSync] Skipping message previously deleted by user: ${normalizedMid}`);
         continue;
       }
 

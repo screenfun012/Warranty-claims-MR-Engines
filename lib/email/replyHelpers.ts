@@ -64,6 +64,15 @@ export function buildReplyAllRecipients(
   };
 }
 
+/**
+ * Normalized Message-ID for DB/sync dedup (no angle brackets, trimmed).
+ * Use when storing DeletedEmailMessage or comparing with IMAP headers.
+ */
+export function normalizeMessageId(messageId: string | null | undefined): string | null {
+  if (!messageId?.trim()) return null;
+  return messageId.replace(/^<|>$/g, "").trim();
+}
+
 export function formatMessageIdHeader(id: string | null | undefined): string | undefined {
   if (!id?.trim()) return undefined;
   const s = id.trim();

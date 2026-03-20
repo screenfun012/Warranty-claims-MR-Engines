@@ -134,6 +134,8 @@
     "composeMissingToSubject": "Unesite primaoca i naslov.",
     "composeMissingBody": "Unesite tekst poruke.",
     "composeNoPermission": "Nemate dozvolu za slanje emaila.",
+    "folderCollapseToggle": "Sklopi ili proširi kolonu foldera",
+    "sentSelectHint": "Izaberite poslatu poruku sa liste.",
     "noUnread": "Nema nepročitanih poruka",
     "noRead": "Nema pročitanih poruka",
     "backToList": "Nazad na listu",

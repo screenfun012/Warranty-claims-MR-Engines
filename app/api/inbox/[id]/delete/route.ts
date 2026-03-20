@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
+import { normalizeMessageId } from "@/lib/email/replyHelpers";
 
 export async function DELETE(
   request: NextRequest,
@@ -84,21 +85,22 @@ export async function DELETE(
     // CRITICAL: Track deleted messageIds BEFORE deletion to prevent sync from recreating them
     // This ensures that once a mail is deleted, it won't come back during sync
     for (const message of thread.messages) {
-      if (message.messageId) {
+      const normalizedMid = normalizeMessageId(message.messageId);
+      if (normalizedMid) {
         try {
           await prisma.deletedEmailMessage.upsert({
-            where: { messageId: message.messageId },
+            where: { messageId: normalizedMid },
             update: { 
               threadId: id,
               deletedAt: new Date(),
             },
             create: {
-              messageId: message.messageId,
+              messageId: normalizedMid,
               threadId: id,
               deletedAt: new Date(),
             },
           });
-          console.log(`[Delete] Tracked deleted messageId: ${message.messageId}`);
+          console.log(`[Delete] Tracked deleted messageId: ${normalizedMid}`);
         } catch (error) {
           console.error(`[Delete] Error tracking deleted messageId ${message.messageId}:`, error);
           // Continue even if tracking fails - don't block deletion
