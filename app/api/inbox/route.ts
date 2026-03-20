@@ -8,15 +8,15 @@ import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { ensureIdleStarted } from "@/lib/email/mailSyncScheduler";
 import { isThreadEffectivelyUnread } from "@/lib/inbox/effectiveUnread";
-import { hydrateEmailMessages } from "@/lib/email/hydrateRawEmail";
 
 export async function GET() {
   try {
-    ensureIdleStarted();
+    queueMicrotask(() => ensureIdleStarted());
     // VIEWER+ can read inbox
     await requirePermission(PERMISSIONS.INBOX_READ);
     
     const prisma = await getPrisma();
+    // List: last message fields from DB only — no per-row .eml parse (that was very slow).
     const threads = await prisma.emailThread.findMany({
       include: {
         claim: {
@@ -45,19 +45,12 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
     });
 
-    const threadsWithHydratedPreview = await Promise.all(
-      threads.map(async ({ _count, messages, ...t }) => {
-        const hydrated = messages?.length ? await hydrateEmailMessages(messages) : [];
-        return {
-          ...t,
-          messages: hydrated,
-          threadStatus: t.threadStatus ?? "NEW_CLAIM",
-          messageCount: _count?.messages ?? 0,
-        };
-      })
-    );
-
-    const threadsForResponse = threadsWithHydratedPreview;
+    const threadsForResponse = threads.map(({ _count, messages, ...t }) => ({
+      ...t,
+      messages: messages ?? [],
+      threadStatus: t.threadStatus ?? "NEW_CLAIM",
+      messageCount: _count?.messages ?? 0,
+    }));
 
     const latestMessageDate = (t: (typeof threadsForResponse)[0]) =>
       t.messages?.[0]?.date ? new Date(t.messages[0].date).getTime() : new Date(t.createdAt).getTime();

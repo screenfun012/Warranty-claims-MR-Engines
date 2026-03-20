@@ -18,13 +18,16 @@ type Props = {
   list: ReactNode;
   detail: ReactNode;
   className?: string;
+  /** Optional: control folder panel size from parent (e.g. icon-only rail) */
+  folderPanelRef?: RefObject<PanelImperativeHandle | null>;
 };
 
 /**
  * Desktop-only: 3 resizable columns with independent vertical scroll inside each panel.
  */
-export function InboxDesktopPanels({ folder, list, detail, className }: Props) {
-  const folderPanelRef = usePanelRef();
+export function InboxDesktopPanels({ folder, list, detail, className, folderPanelRef: folderPanelRefProp }: Props) {
+  const internalFolderRef = usePanelRef();
+  const folderPanelRef = folderPanelRefProp ?? internalFolderRef;
 
   const toggleFolder = () => {
     const p = folderPanelRef.current;
@@ -51,7 +54,7 @@ export function InboxDesktopPanels({ folder, list, detail, className }: Props) {
         collapsedSize="3%"
         className="flex min-h-0 min-w-0"
       >
-        <div className="flex h-full min-h-0 w-full flex-col overflow-hidden bg-muted/35">
+        <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-muted/35">
           {folder(api)}
         </div>
       </Panel>

@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { usePanelRef } from "react-resizable-panels";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
@@ -30,6 +31,8 @@ import {
   ReplyAll,
   Forward,
   Mail,
+  ChevronRight,
+  PanelLeftClose,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -185,6 +188,44 @@ function InboxPageContent() {
   const [selectedThread, setSelectedThread] = useState<EmailThread | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const folderPanelRef = usePanelRef();
+  const [folderIconsOnly, setFolderIconsOnly] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("inbox-folder-icons-only") === "1") {
+        setFolderIconsOnly(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("inbox-folder-icons-only", folderIconsOnly ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }, [folderIconsOnly]);
+
+  /** Resize folder panel when switching full labels vs icon rail */
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      const p = folderPanelRef.current;
+      if (!p) return;
+      try {
+        if (folderIconsOnly) {
+          p.resize("3.5rem");
+        } else {
+          p.resize("15%");
+        }
+      } catch {
+        /* ignore */
+      }
+    }, 50);
+    return () => clearTimeout(id);
+  }, [folderIconsOnly]);
 
   // Fetch threads sa React Query
   const { 
@@ -194,9 +235,9 @@ function InboxPageContent() {
   } = useQuery({
     queryKey: ["inboxThreads"],
     queryFn: fetchThreads,
-    refetchInterval: 12_000,
+    refetchInterval: 20_000,
     refetchIntervalInBackground: false,
-    staleTime: 8 * 1000,
+    staleTime: 30 * 1000,
   });
 
   // Get last updated time from threads
@@ -484,67 +525,136 @@ function InboxPageContent() {
         {/* Desktop: 3 resizable kolone, nezavisni scroll po panelu */}
         <div className="hidden min-h-0 flex-1 overflow-hidden lg:flex">
           <InboxDesktopPanels
+            folderPanelRef={folderPanelRef}
             folder={(api: InboxFolderPanelApi) => (
-              <>
-                <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-2 py-2">
-                  <span className="truncate pl-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    {t("mail.title")}
-                  </span>
-                  <InboxFolderToggleButton api={api} label={t("inbox.folderCollapseToggle")} />
+              <div className="flex h-full min-h-0 flex-col overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between gap-1 border-b border-border px-1 py-1.5">
+                  {!folderIconsOnly ? (
+                    <span className="truncate pl-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t("mail.title")}
+                    </span>
+                  ) : (
+                    <span className="sr-only">{t("mail.title")}</span>
+                  )}
+                  <div className="ml-auto flex items-center gap-0.5">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 shrink-0"
+                      title={folderIconsOnly ? t("inbox.folderShowLabels") : t("inbox.folderIconsOnly")}
+                      onClick={() => setFolderIconsOnly((v) => !v)}
+                    >
+                      {folderIconsOnly ? (
+                        <ChevronRight className="h-4 w-4" />
+                      ) : (
+                        <PanelLeftClose className="h-4 w-4" />
+                      )}
+                    </Button>
+                    {!folderIconsOnly ? (
+                      <InboxFolderToggleButton api={api} label={t("inbox.folderCollapseToggle")} />
+                    ) : null}
+                  </div>
                 </div>
-                <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain p-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedThread(null);
-                      router.push("/inbox");
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                      !isSentView && !showCompose
-                        ? "bg-primary/15 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-                    )}
-                  >
-                    <Inbox className="h-4 w-4 shrink-0 text-primary" />
-                    {t("inbox.outlookFolderInbox")}
-                  </button>
-                  {canUseMailCompose && (
+                {folderIconsOnly ? (
+                  <div className="flex min-h-0 flex-1 flex-col items-stretch gap-2 overflow-y-auto overflow-x-hidden overscroll-contain px-1 py-2">
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={!isSentView && !showCompose ? "secondary" : "ghost"}
+                      className="h-10 w-full shrink-0"
+                      title={t("inbox.outlookFolderInbox")}
+                      onClick={() => {
+                        setSelectedThread(null);
+                        router.push("/inbox");
+                      }}
+                    >
+                      <Inbox className="h-4 w-4 text-primary" />
+                    </Button>
+                    {canUseMailCompose ? (
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant={showCompose ? "secondary" : "ghost"}
+                        className="h-10 w-full shrink-0"
+                        title={t("inbox.newMail")}
+                        onClick={() => {
+                          setSelectedThread(null);
+                          router.push("/inbox?compose=1");
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant={isSentView ? "secondary" : "ghost"}
+                      className="h-10 w-full shrink-0"
+                      title={t("inbox.sentArchive")}
+                      onClick={() => {
+                        setSelectedThread(null);
+                        router.push("/inbox?view=sent");
+                      }}
+                    >
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden overscroll-contain p-2">
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedThread(null);
-                        router.push("/inbox?compose=1");
+                        router.push("/inbox");
                       }}
                       className={cn(
                         "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                        showCompose
+                        !isSentView && !showCompose
                           ? "bg-primary/15 font-medium text-foreground"
                           : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       )}
                     >
-                      <Plus className="h-4 w-4 shrink-0" />
-                      {t("inbox.newMail")}
+                      <Inbox className="h-4 w-4 shrink-0 text-primary" />
+                      {t("inbox.outlookFolderInbox")}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedThread(null);
-                      router.push("/inbox?view=sent");
-                    }}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                      isSentView
-                        ? "bg-primary/15 font-medium text-foreground"
-                        : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                    {canUseMailCompose && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedThread(null);
+                          router.push("/inbox?compose=1");
+                        }}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                          showCompose
+                            ? "bg-primary/15 font-medium text-foreground"
+                            : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                        )}
+                      >
+                        <Plus className="h-4 w-4 shrink-0" />
+                        {t("inbox.newMail")}
+                      </button>
                     )}
-                  >
-                    <Send className="h-4 w-4 shrink-0" />
-                    {t("inbox.sentArchive")}
-                  </button>
-                </nav>
-              </>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedThread(null);
+                        router.push("/inbox?view=sent");
+                      }}
+                      className={cn(
+                        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                        isSentView
+                          ? "bg-primary/15 font-medium text-foreground"
+                          : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      )}
+                    >
+                      <Send className="h-4 w-4 shrink-0" />
+                      {t("inbox.sentArchive")}
+                    </button>
+                  </nav>
+                )}
+              </div>
             )}
             list={
               isSentView ? (

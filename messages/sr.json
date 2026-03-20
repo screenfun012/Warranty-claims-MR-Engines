@@ -135,6 +135,8 @@
     "composeMissingBody": "Unesite tekst poruke.",
     "composeNoPermission": "Nemate dozvolu za slanje emaila.",
     "folderCollapseToggle": "Sklopi ili proširi kolonu foldera",
+    "folderIconsOnly": "Kompaktno: samo ikone (skroluje se)",
+    "folderShowLabels": "Prikaži puna imena foldera",
     "sentSelectHint": "Izaberite poslatu poruku sa liste.",
     "noUnread": "Nema nepročitanih poruka",
     "noRead": "Nema pročitanih poruka",

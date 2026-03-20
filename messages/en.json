@@ -135,6 +135,8 @@
     "composeMissingBody": "Enter message body.",
     "composeNoPermission": "You don’t have permission to compose mail.",
     "folderCollapseToggle": "Collapse or expand folder column",
+    "folderIconsOnly": "Compact: icons only (scrollable)",
+    "folderShowLabels": "Show full folder names",
     "sentSelectHint": "Select a sent message from the list.",
     "noUnread": "No unread messages",
     "noRead": "No read messages",
