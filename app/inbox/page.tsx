@@ -242,7 +242,7 @@ function InboxPageContent() {
   // Fetch threads sa paginacijom (prva stranica brza; "Učitaj još" za starije)
   const {
     data: inboxPages,
-    isLoading: loading,
+    isPending: inboxInitialPending,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -260,8 +260,9 @@ function InboxPageContent() {
     [inboxPages]
   );
 
+  /** invalidate (ne reset) — reset briše keš i isLoading=true → ceo ekran skeleton i petlja pri otvaranju poruke */
   const refetchThreads = useCallback(() => {
-    void queryClient.resetQueries({
+    void queryClient.invalidateQueries({
       queryKey: ["inboxThreads"],
       exact: false,
     });
@@ -319,7 +320,7 @@ function InboxPageContent() {
     queryFn: () => checkForUpdates(lastCheckTime),
     enabled:
       !!lastCheckTime &&
-      !loading &&
+      !inboxInitialPending &&
       typeof document !== "undefined" &&
       !document.hidden,
     refetchInterval: 60_000,
@@ -327,13 +328,11 @@ function InboxPageContent() {
     staleTime: 30 * 1000,
   });
 
-  // Refetch kada se detektuju update-i
+  // Refetch kada se detektuju update-i (ne šalji inbox-updated — slušalac bi duplirao refetch)
   useEffect(() => {
     if (updateCheck?.hasUpdates) {
       refetchThreads();
-      // Trigger sidebar refresh
       queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-      window.dispatchEvent(new Event('inbox-updated'));
     }
   }, [updateCheck?.hasUpdates, refetchThreads, queryClient]);
 
@@ -424,7 +423,7 @@ function InboxPageContent() {
     window.dispatchEvent(new Event("inbox-updated"));
   };
 
-  if (loading) {
+  if (inboxInitialPending) {
     return (
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 lg:gap-4 lg:p-6">
         <div className="flex shrink-0 items-center justify-between gap-4">
@@ -546,7 +545,6 @@ function InboxPageContent() {
                 onThreadUpdated={() => {
                   refetchThreads();
                   queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                  window.dispatchEvent(new Event("inbox-updated"));
                 }}
               />
             ) : showCompose && canUseMailCompose ? (
@@ -781,7 +779,6 @@ function InboxPageContent() {
                     onThreadUpdated={() => {
                       refetchThreads();
                       queryClient.invalidateQueries({ queryKey: ["unreadCount"] });
-                      window.dispatchEvent(new Event("inbox-updated"));
                     }}
                   />
                 </div>
@@ -999,14 +996,8 @@ function ThreadDetail({
   const fetchFullThread = useCallback(async () => {
     setLoading(true);
     try {
-      const [threadRes, viewedRes] = await Promise.all([
-        fetch(`/api/inbox/${thread.id}`),
-        fetch(`/api/inbox/${thread.id}/mark-viewed`, { method: "POST" }),
-      ]);
-
-      if (viewedRes.ok) {
-        window.dispatchEvent(new Event("inbox-updated"));
-      }
+      // Samo GET — mark-viewed već radi handleThreadActivate za nepročitane; dupli POST je okidao inbox-updated + reset liste
+      const threadRes = await fetch(`/api/inbox/${thread.id}`);
 
       if (!threadRes.ok) {
         const text = await threadRes.text();
