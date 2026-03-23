@@ -132,6 +132,16 @@ All configuration is done via environment variables (12-factor style). See `.env
 - `MAIL_SYNC_INTERVAL_SECONDS`: Interval for scheduled sync (default: 300)
 - `MAIL_SYNC_MAX_MESSAGES_PER_RUN`: Maximum messages to process per sync (default: 50)
 
+### Vercel Cron (production mail sync)
+Na Vercelu serverless ne drži stalnu IMAP IDLE sesiju — koristi se **`vercel.json`** cron koji svakih **5 minuta** (UTC) zove `GET /api/cron/mail-sync`.
+
+1. U **Vercel → Project → Settings → Environment Variables** dodaj:
+   - **`CRON_SECRET`** — nasumičan jak string (npr. `openssl rand -hex 32`).
+2. Deploy; u **Deployments → Cron Jobs** proveri da je raspored aktivan.
+3. Vercel automatski šalje `Authorization: Bearer <CRON_SECRET>` — ruta bez tog headera vraća 401.
+
+Raspored menjaš u **`vercel.json`** (`schedule`, cron sintaksa UTC). Na Hobby planu važe [ograničenja za Cron](https://vercel.com/docs/cron-jobs); ako cron nije dostupan, koristi ručni sync u adminu ili Pro plan.
+
 ## Project Structure
 
 ```
