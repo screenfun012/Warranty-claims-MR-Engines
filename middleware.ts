@@ -14,8 +14,11 @@ export async function middleware(request: NextRequest) {
   if (pathname === "/pending-approval") return NextResponse.next();
   if (pathname === "/api/auth/check-approval") return NextResponse.next();
   if (pathname === "/api/internal/start-mail-sync") return NextResponse.next();
-  // Vercel Cron — autentifikacija Bearer CRON_SECRET unutar rute
+  // Javni health check (bez auth) — za proveru APP_URL u GitHub Actions
+  if (pathname === "/api/health") return NextResponse.next();
+  // Vercel Cron / GitHub Actions — Bearer CRON_SECRET unutar rute
   if (pathname.startsWith("/api/cron/")) return NextResponse.next();
+  if (pathname.startsWith("/api/scheduled/")) return NextResponse.next();
   // /api/files/* — auth done inside route so fetch() with credentials works reliably for img/video
   if (pathname.startsWith("/api/files/")) return NextResponse.next();
   if (pathname === "/login") return NextResponse.redirect(new URL("/auth/login", request.url));

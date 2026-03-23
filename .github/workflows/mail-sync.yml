@@ -27,13 +27,30 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          set -e
-          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+          set -euo pipefail
+          if [ -z "${APP_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
             echo "::error::Missing APP_URL or CRON_SECRET in repository Secrets"
             exit 1
           fi
-          URL="${APP_URL%/}/api/cron/mail-sync"
-          echo "GET $URL"
+          # ukloni CRLF / razmake sa ivica (čest uzrok "404")
+          BASE="$(printf '%s' "$APP_URL" | tr -d '\r' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | sed 's:/*$::')"
+          HEALTH="${BASE}/api/health"
+          SYNC="${BASE}/api/cron/mail-sync"
+
+          echo "BASE=$BASE"
+          echo "Checking health: GET $HEALTH"
+          H_CODE=$(curl -sS -o /tmp/health.body -w "%{http_code}" --connect-timeout 30 --max-time 30 "$HEALTH" || echo "000")
+          if [ "$H_CODE" != "200" ]; then
+            echo "::error::GET /api/health returned HTTP $H_CODE (expected 200). APP_URL is wrong or not Production."
+            echo "Body:"
+            cat /tmp/health.body 2>/dev/null || true
+            echo ""
+            echo "Fix: Vercel → Project → Settings → Domains → kopiraj Production URL (https, bez / na kraju) u GitHub secret APP_URL."
+            exit 1
+          fi
+          echo "Health OK."
+
+          echo "GET $SYNC"
           curl -sS -f --connect-timeout 30 --max-time 120 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
-            "$URL"
+            "$SYNC"
