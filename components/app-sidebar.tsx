@@ -345,7 +345,7 @@ export function AppSidebar() {
     const handleLinkClick = () => { if (isMobile) setOpenMobile(false); };
     const menuButton = (
       <SidebarMenuButton asChild isActive={isActive} className={cn("transition-all duration-200 hover:bg-sidebar-accent/80", isCollapsed && !isMobile && "justify-center")}>
-        <Link href={item.href} onClick={handleLinkClick} className={cn("flex items-center group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit", isCollapsed && !isMobile ? "justify-center" : "gap-3")} style={{ textDecoration: "none", color: "inherit" }}>
+        <Link href={item.href} prefetch onClick={handleLinkClick} className={cn("flex items-center group/item no-underline hover:no-underline visited:no-underline active:no-underline text-inherit", isCollapsed && !isMobile ? "justify-center" : "gap-3")} style={{ textDecoration: "none", color: "inherit" }}>
           <item.icon className={cn("h-5 w-5 shrink-0", isActive && "scale-110")} />
           <span className={cn(isCollapsed && !isMobile && "hidden")}>{t(item.translationKey)}</span>
           {showBadge && !isCollapsed && <Badge variant="destructive" className="ml-auto h-5 min-w-5 px-1.5 text-xs">{unreadCount > 99 ? "99+" : unreadCount}</Badge>}

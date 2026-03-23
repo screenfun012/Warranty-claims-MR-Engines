@@ -203,34 +203,40 @@ function InboxPageContent() {
   const folderPanelRef = usePanelRef();
   const [folderIconsOnly, setFolderIconsOnly] = useState(false);
 
-  const applyFolderPanelSize = useCallback((icons: boolean) => {
+  const applyFolderPanelSize = useCallback((iconsOnly: boolean) => {
     const p = folderPanelRef.current;
     if (!p) return;
     try {
-      if (icons) p.resize("3.5rem");
-      else p.resize("15%");
+      if (iconsOnly) p.resize("3.25rem");
+      else p.resize("18%");
     } catch {
       /* ignore */
     }
   }, []);
 
-  /** One-time: read saved mode + resize before paint fights react-resizable-panels default. */
+  /**
+   * Podrazumevano: ikonica + tekst (prošireno). Samo ikonice nakon klika.
+   * Novi ključ `inbox-mail-folder-expanded`: "1" = prošireno, "0" = samo ikonice.
+   */
   useLayoutEffect(() => {
-    let icons = false;
+    let iconsOnly = false;
     try {
-      icons = localStorage.getItem("inbox-folder-icons-only") === "1";
+      const v = localStorage.getItem("inbox-mail-folder-expanded");
+      if (v === "0") iconsOnly = true;
+      else if (v === "1") iconsOnly = false;
+      else iconsOnly = false;
     } catch {
       /* ignore */
     }
-    setFolderIconsOnly(icons);
-    queueMicrotask(() => applyFolderPanelSize(icons));
+    setFolderIconsOnly(iconsOnly);
+    queueMicrotask(() => applyFolderPanelSize(iconsOnly));
   }, [applyFolderPanelSize]);
 
   const toggleFolderIconsOnly = useCallback(() => {
     setFolderIconsOnly((prev) => {
       const next = !prev;
       try {
-        localStorage.setItem("inbox-folder-icons-only", next ? "1" : "0");
+        localStorage.setItem("inbox-mail-folder-expanded", next ? "0" : "1");
       } catch {
         /* ignore */
       }
@@ -252,7 +258,9 @@ function InboxPageContent() {
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) =>
       lastPage.hasMore && lastPage.nextCursor ? lastPage.nextCursor : undefined,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 
   const threads = useMemo(

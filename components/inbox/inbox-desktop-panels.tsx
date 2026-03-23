@@ -47,11 +47,11 @@ export function InboxDesktopPanels({ folder, list, detail, className, folderPane
       <Panel
         id="folders"
         panelRef={folderPanelRef}
-        defaultSize="14%"
-        minSize="6%"
-        maxSize="32%"
+        defaultSize="18%"
+        minSize="8%"
+        maxSize="36%"
         collapsible
-        collapsedSize="3%"
+        collapsedSize="3.25rem"
         className="flex min-h-0 min-w-0 overflow-hidden"
       >
         <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-muted/35">
