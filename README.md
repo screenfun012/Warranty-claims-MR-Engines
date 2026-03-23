@@ -148,6 +148,8 @@ Podrazumevano: **svakih 15 minuta** (UTC). Menja se `cron` u workflow fajlu; **w
 
 **Napomena:** Privatni repoi imaju [mesečni limit minuta](https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions) za Actions — po potrebi povećaj interval (npr. `*/30 * * * *`).
 
+**Turso / produkcija:** `npx prisma migrate deploy` ne radi sa `libsql://` (Prisma očekuje `file:`). Za primenu migracija na udaljeni Turso: `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` iz Vercela, pa `npm run migrate:turso` (skripta `scripts/turso-apply-pending-migrations.ts` — preskače SQL ako objekat već postoji, korisno kad je `_prisma_migrations` prazan).
+
 **404 na `/api/cron/mail-sync`:** skoro uvek je **pogrešan `APP_URL`** (drugi projekat, Preview URL, razmak/novi red u secretu). Proveri u browseru **`https://<tvoj-domen>/api/health`** — mora vratiti JSON `ok: true`. Ako i to bude 404, u Vercelu otvori **Deployments → Production → Visit** i taj URL stavi u `APP_URL`. Isti handler radi i na **`/api/scheduled/mail-sync`** (Bearer `CRON_SECRET`).
 
 ## Project Structure

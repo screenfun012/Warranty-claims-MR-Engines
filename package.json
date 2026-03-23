@@ -11,7 +11,8 @@
     "migrate:email-threads": "npx tsx scripts/migrate-email-threads.ts",
     "migrate:email-threads:execute": "npx tsx scripts/migrate-email-threads.ts --execute",
     "ping": "npx tsx scripts/ping-api.ts http://localhost:3000",
-    "ping:prod": "npx tsx scripts/ping-api.ts"
+    "ping:prod": "npx tsx scripts/ping-api.ts",
+    "migrate:turso": "npx tsx scripts/turso-apply-pending-migrations.ts"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.14.0",
