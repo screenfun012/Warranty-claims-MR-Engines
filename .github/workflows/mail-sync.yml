@@ -1,0 +1,39 @@
+# Automatski IMAP sync na produkciju (bez Vercel Cron — Hobby limit).
+#
+# GitHub → Settings → Secrets and variables → Actions (repository secrets):
+#   APP_URL     = https://warranty-claims-mr-engines.vercel.app  (bez / na kraju)
+#   CRON_SECRET = isto kao CRON_SECRET na Vercel env
+#
+# Ručni test: Actions → Mail sync → Run workflow
+
+name: Mail sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # UTC svakih 15 min; za ređe: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: mail-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call production mail-sync API
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -e
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::Missing APP_URL or CRON_SECRET in repository Secrets"
+            exit 1
+          fi
+          URL="${APP_URL%/}/api/cron/mail-sync"
+          echo "GET $URL"
+          curl -sS -f --connect-timeout 30 --max-time 120 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "$URL"

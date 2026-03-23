@@ -132,24 +132,28 @@ All configuration is done via environment variables (12-factor style). See `.env
 - `MAIL_SYNC_INTERVAL_SECONDS`: Interval for scheduled sync (default: 300)
 - `MAIL_SYNC_MAX_MESSAGES_PER_RUN`: Maximum messages to process per sync (default: 50)
 
-### Vercel Cron (production mail sync)
-Na Vercelu serverless ne drži stalnu IMAP IDLE sesiju — koristi se **`vercel.json`** cron koji zove `GET /api/cron/mail-sync`.
+### Automatski mail sync (GitHub Actions)
+Vercel **Hobby** ne dozvoljava česte **Vercel Cron** jobove; zato se periodični IMAP sync pokreće iz **GitHub Actions** (`.github/workflows/mail-sync.yml`) — `curl` na `GET /api/cron/mail-sync` sa `Authorization: Bearer <CRON_SECRET>`.
 
-**Hobby (besplatan) plan:** Cron sme **najviše jednom dnevno** — više od toga **failuje deploy** („Hobby accounts are limited to daily cron jobs”). U repou je zato `schedule` postavljen na **jednom dnevno u 07:00 UTC** (`0 7 * * *`). Vreme menjaš u `vercel.json` (uvek UTC).
+**Vercel:** u **Environment Variables** ostavi **`CRON_SECRET`** (isti kao u GitHub Secrets).
 
-**Pro plan:** Možeš češći raspored (npr. svakih 5 min: `*/5 * * * *`).
+**GitHub:** repo → **Settings → Secrets and variables → Actions** (repository secrets):
 
-1. U **Vercel → Project → Settings → Environment Variables** dodaj:
-   - **`CRON_SECRET`** — nasumičan jak string (npr. `openssl rand -hex 32`).
-2. Deploy; u **Deployments → Cron Jobs** proveri da je raspored aktivan.
-3. Vercel automatski šalje `Authorization: Bearer <CRON_SECRET>` — ruta bez tog headera vraća 401.
+| Secret | Primer |
+|--------|--------|
+| `APP_URL` | `https://warranty-claims-mr-engines.vercel.app` (bez `/` na kraju) |
+| `CRON_SECRET` | ista vrednost kao na Vercelu |
 
-Između cron pokreta korisnici i dalje mogu **ručni sync** u adminu ili osloniti se na **polling/check-updates** u aplikaciji za svežiju listu.
+Podrazumevano: **svakih 15 minuta** (UTC). Menja se `cron` u workflow fajlu; **workflow_dispatch** omogućava ručni pokret u **Actions** tabu.
+
+**Napomena:** Privatni repoi imaju [mesečni limit minuta](https://docs.github.com/en/billing/managing-billing-for-github-actions/about-billing-for-github-actions) za Actions — po potrebi povećaj interval (npr. `*/30 * * * *`).
 
 ## Project Structure
 
 ```
 mr-engines-warranty/
+├── .github/
+│   └── workflows/         # GitHub Actions (npr. periodični mail sync)
 ├── app/                    # Next.js App Router pages and API routes
 │   ├── api/               # API routes
 │   │   ├── admin/         # Admin endpoints (mail sync)
