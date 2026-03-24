@@ -20,7 +20,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Call production mail-sync API
         env:
@@ -53,7 +53,7 @@ jobs:
           echo ""
           echo "GET $SYNC"
           # Bez curl -f — uvek ispiši telo i kod (curl -f daje samo exit 22)
-          S_CODE=$(curl -sS -o /tmp/sync.body -w "%{http_code}" --connect-timeout 30 --max-time 120 \
+          S_CODE=$(curl -sS -o /tmp/sync.body -w "%{http_code}" --connect-timeout 30 --max-time 330 \
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "$SYNC" || echo "000")
 
@@ -76,6 +76,9 @@ jobs:
               ;;
             404)
               echo "Hint: Pogrešan APP_URL ili stari deploy bez rute. Otvori SYNC URL u browseru posle redeploya."
+              ;;
+            504)
+              echo "Hint: FUNCTION_INVOCATION_TIMEOUT — sync predugačak. Na Vercelu Pro maxDuration za /api/cron/mail-sync je 300s; smanji MAIL_SYNC_MAX_MESSAGES_PER_RUN ili proveri IMAP/WebDAV."
               ;;
             000)
               echo "Hint: Mreža / timeout — proveri da li je sajt dostupan."

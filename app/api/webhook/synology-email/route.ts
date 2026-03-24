@@ -12,7 +12,7 @@ import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 import { env } from "@/lib/config/env";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {

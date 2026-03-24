@@ -7,8 +7,8 @@ import { NextResponse } from "next/server";
 import { syncNewEmails } from "@/lib/email/mailSyncService";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 
-// Vercel serverless function config - increase timeout for large emails with many attachments
-export const maxDuration = 60; // 60 seconds (Pro plan limit)
+// Vercel Pro: do 300s — isto kao cron mail-sync (veliki IMAP batch + attachment-i)
+export const maxDuration = 300;
 export const runtime = 'nodejs';
 
 export async function POST() {

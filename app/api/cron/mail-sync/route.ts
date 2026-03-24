@@ -11,7 +11,8 @@
 import { handleMailSyncCronGet } from "@/lib/email/mailSyncCronRoute";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/** Vercel Pro: do 300s; potrebno za IMAP + velike attachment-e (ranije 504 @ 60s). */
+export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {

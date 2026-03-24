@@ -12,8 +12,7 @@ import { env } from "@/lib/config/env";
 import { isEmailConfigured } from "@/lib/config/envLoader";
 import { countEffectivelyUnreadThreads } from "@/lib/inbox/effectiveUnread";
 
-// Vercel serverless function config - increase timeout for large emails with many attachments
-export const maxDuration = 60; // 60 seconds (Pro plan limit)
+export const maxDuration = 300;
 export const runtime = 'nodejs';
 
 // Track last sync time to avoid too frequent syncs

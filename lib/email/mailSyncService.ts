@@ -6,7 +6,7 @@
 import { getPrisma } from "@/lib/db/prisma";
 import { fetchNewMessagesSince, type FetchedMessage } from "./imapClient";
 import { env } from "@/lib/config/env";
-import { isEmailConfigured } from "@/lib/config/envLoader";
+import { getEmailConfig, isEmailConfigured } from "@/lib/config/envLoader";
 import {
   saveAttachmentForUnassignedThread,
   saveAttachmentForClaim,
@@ -116,17 +116,15 @@ export async function syncNewEmails(): Promise<SyncResult> {
       .filter((x): x is string => !!x)
   );
 
+  const emailConfig = getEmailConfig();
+  const claimsEmail = (emailConfig.imapUserEmail || emailConfig.smtpUserEmail || "").toLowerCase();
+
   for (const fetchedMsg of fetchedMessages) {
     try {
       const uidNum = parseInt(fetchedMsg.uid, 10);
       if (!highestUid || uidNum > parseInt(highestUid, 10)) {
         highestUid = fetchedMsg.uid;
       }
-
-      // Get claims email
-      const { getEmailConfig } = await import("@/lib/config/envLoader");
-      const emailConfig = getEmailConfig();
-      const claimsEmail = (emailConfig.imapUserEmail || emailConfig.smtpUserEmail || "").toLowerCase();
 
       // Check relevance
       const isRelevant = isClaimEmail(fetchedMsg.headers.to, fetchedMsg.headers.cc, claimsEmail);
@@ -200,8 +198,7 @@ export async function syncNewEmails(): Promise<SyncResult> {
 
       // Process attachments - OPTIMIZED: parallel processing and batch operations
       const attachmentCount = fetchedMsg.attachments.length;
-      console.log(`[Sync] Processing ${attachmentCount} attachments for message UID ${fetchedMsg.uid}...`);
-      
+
       if (attachmentCount === 0) {
         console.warn(`[Sync] Warning: Message UID ${fetchedMsg.uid} has no attachments, but email might have attachments in body`);
       } else {
@@ -214,10 +211,8 @@ export async function syncNewEmails(): Promise<SyncResult> {
         }
 
         // OPTIMIZATION 2: Process all attachments in parallel
-        const attachmentPromises = fetchedMsg.attachments.map(async (attachment, index) => {
+        const attachmentPromises = fetchedMsg.attachments.map(async (attachment) => {
           try {
-            console.log(`[Sync] Saving attachment ${index + 1}/${attachmentCount}: ${attachment.filename} (${attachment.buffer.length} bytes, ${attachment.mimeType})`);
-            
             let filePath: string;
 
             if (claim) {
