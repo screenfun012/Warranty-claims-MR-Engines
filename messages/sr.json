@@ -561,6 +561,16 @@
   "admin": {
     "title": "Admin Panel",
     "subtitle": "Upravljanje sistemom i korisnicima",
+    "recovery": {
+      "title": "Oporavak firme kupca iz putanje servera",
+      "description": "Kada je u bazi prazna firma/ime a postoji sačuvana putanja foldera, možemo ponovo izvesti naziv iz imena foldera (npr. FIRMA - MR1234-25). Prvo uradi pregled, pa primeni.",
+      "preview": "Pregled (dry run)",
+      "apply": "Primeni u bazu",
+      "running": "Obrada...",
+      "resultPreviewDetailed": "Pregled: {wouldFix} za popravku, {skipped} bez promene.",
+      "resultAppliedDetailed": "Ažurirano {fixed} reklamacija. Preskočeno: {skipped}.",
+      "error": "Greška pri oporavku"
+    },
     "sections": "Admin sekcije",
     "users": {
       "title": "Upravljanje korisnicima",

@@ -121,6 +121,8 @@ export default function AdminDashboardPage() {
   const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([]);
   const [loadingActivity, setLoadingActivity] = useState(true);
   const [selectedActivity, setSelectedActivity] = useState<ActivityLogEntry | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
 
   const auth0User = user as Auth0User | undefined;
   const userRoles = auth0User?.['https://mr-engines-warranty/roles'] || auth0User?.app_metadata?.roles || [];
@@ -226,6 +228,43 @@ export default function AdminDashboardPage() {
     setLoadingActivity(true);
     fetchStats();
     fetchActivityLog();
+  };
+
+  const runRecovery = async (dryRun: boolean) => {
+    setRecoveryBusy(true);
+    setRecoveryMessage(null);
+    try {
+      const res = await fetch("/api/admin/recover-customers-from-paths", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dryRun }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRecoveryMessage(data.error || t("admin.recovery.error"));
+        return;
+      }
+      if (dryRun) {
+        setRecoveryMessage(
+          t("admin.recovery.resultPreviewDetailed", {
+            wouldFix: data.fixedOrWouldFix ?? 0,
+            skipped: data.skipped ?? 0,
+          })
+        );
+      } else {
+        setRecoveryMessage(
+          t("admin.recovery.resultAppliedDetailed", {
+            fixed: data.fixedOrWouldFix ?? 0,
+            skipped: data.skipped ?? 0,
+          })
+        );
+        fetchStats();
+      }
+    } catch {
+      setRecoveryMessage(t("admin.recovery.error"));
+    } finally {
+      setRecoveryBusy(false);
+    }
   };
 
   if (isLoading || loading) {
@@ -383,6 +422,33 @@ export default function AdminDashboardPage() {
           </Card>
         </div>
       )}
+
+      <Card className="p-6 border-amber-500/20 bg-amber-500/5">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+          <div className="space-y-2 max-w-3xl">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-amber-600" />
+              {t("admin.recovery.title")}
+            </h2>
+            <p className="text-sm text-muted-foreground">{t("admin.recovery.description")}</p>
+            {recoveryMessage && (
+              <p className="text-sm text-foreground whitespace-pre-wrap">{recoveryMessage}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            <Button
+              variant="outline"
+              disabled={recoveryBusy}
+              onClick={() => runRecovery(true)}
+            >
+              {recoveryBusy ? t("admin.recovery.running") : t("admin.recovery.preview")}
+            </Button>
+            <Button disabled={recoveryBusy} onClick={() => runRecovery(false)}>
+              {recoveryBusy ? t("admin.recovery.running") : t("admin.recovery.apply")}
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Middle Section - Activity Log & Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

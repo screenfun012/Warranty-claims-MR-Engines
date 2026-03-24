@@ -563,6 +563,16 @@
   "admin": {
     "title": "Admin Panel",
     "subtitle": "System and user management",
+    "recovery": {
+      "title": "Recover customer company from server folder path",
+      "description": "If company/name is empty in the database but a server folder path exists, we can derive the label from the folder name (e.g. COMPANY - MR1234-25). Run preview first, then apply.",
+      "preview": "Preview (dry run)",
+      "apply": "Apply to database",
+      "running": "Running...",
+      "resultPreviewDetailed": "Preview: {wouldFix} to fix, {skipped} unchanged.",
+      "resultAppliedDetailed": "Updated {fixed} claims. Skipped: {skipped}.",
+      "error": "Recovery failed"
+    },
     "sections": "Admin Sections",
     "users": {
       "title": "User Management",
