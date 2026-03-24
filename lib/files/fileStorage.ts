@@ -637,6 +637,188 @@ export async function renameClaimFolderIfNeeded(
   }
 }
 
+const PENDING_CLAIMS_ROOT = "_pending_claims";
+
+function normalizeFolderPathToBaseKey(folderPath: string): string {
+  if (path.isAbsolute(folderPath) || folderPath.includes(path.sep)) {
+    return path.basename(folderPath);
+  }
+  return folderPath;
+}
+
+/** Izvuci relativnu putanju ispod `_pending_claims/<claimId>/` u WebDAV filename. */
+function relativePathInsidePendingClaim(webdavFilename: string, claimId: string): string | null {
+  const norm = webdavFilename.replace(/\\/g, "/");
+  const needle = `${PENDING_CLAIMS_ROOT}/${claimId}/`;
+  const idx = norm.indexOf(needle);
+  if (idx === -1) return null;
+  const rest = norm.slice(idx + needle.length);
+  return rest || null;
+}
+
+async function rewriteAttachmentPathsAfterPendingMerge(
+  claimId: string,
+  targetBaseKey: string
+): Promise<number> {
+  const prisma = await getPrisma();
+  const pendingPrefix = `${PENDING_CLAIMS_ROOT}/${claimId}`;
+  const attachments = await prisma.attachment.findMany({ where: { claimId } });
+  let updated = 0;
+  const webdavOld = `webdav:${pendingPrefix}/`;
+  const localOld = `${pendingPrefix}/`;
+
+  for (const att of attachments) {
+    const fp = att.filePath;
+    let next: string | null = null;
+    if (fp.startsWith(webdavOld)) {
+      next = `webdav:${targetBaseKey}/` + fp.slice(webdavOld.length);
+    } else if (fp.startsWith(localOld)) {
+      next = `${targetBaseKey}/` + fp.slice(localOld.length);
+    }
+    if (next && next !== fp) {
+      await prisma.attachment.update({ where: { id: att.id }, data: { filePath: next } });
+      updated++;
+    }
+  }
+  if (updated > 0) {
+    console.log(`[mergePendingClaimFolder] Updated ${updated} attachment path(s) in DB for claim ${claimId}`);
+  }
+  return updated;
+}
+
+async function deleteWebdavFolderRecursive(relPath: string): Promise<void> {
+  if (!webdavClient) return;
+  const davRoot = getWebDAVPath(relPath);
+  try {
+    if (!(await webdavClient.exists(davRoot))) return;
+  } catch {
+    return;
+  }
+  const contents = await webdavClient.getDirectoryContents(davRoot, { deep: true });
+  const items = Array.isArray(contents) ? contents : (contents as { data?: unknown[] }).data ?? [];
+  const sorted = [...items].sort(
+    (a, b) =>
+      ((b as { filename?: string }).filename?.length || 0) -
+      ((a as { filename?: string }).filename?.length || 0)
+  );
+  for (const raw of sorted) {
+    const item = raw as { filename?: string };
+    if (!item.filename) continue;
+    try {
+      await webdavClient.deleteFile(item.filename);
+    } catch (e) {
+      console.warn(`[deleteWebdavFolderRecursive] ${item.filename}`, e);
+    }
+  }
+  try {
+    await webdavClient.deleteFile(davRoot);
+  } catch (e) {
+    console.warn(`[deleteWebdavFolderRecursive] root ${relPath}`, e);
+  }
+}
+
+/**
+ * Posle kreiranja pravog foldera reklamacije, prebaci fajlove iz `_pending_claims/<claimId>`
+ * u `<targetBaseKey>/` i ažurira `Attachment.filePath` u bazi.
+ */
+export async function mergePendingClaimFolderIntoClaimFolder(
+  claimId: string,
+  folderPathFromCreate: string
+): Promise<{ filesMoved: number; pathsUpdated: number }> {
+  const targetBaseKey = normalizeFolderPathToBaseKey(folderPathFromCreate);
+  const pendingRel = `${PENDING_CLAIMS_ROOT}/${claimId}`.replace(/\/+/g, "/");
+  const rootPath = path.resolve(env.FILE_ROOT_PATH);
+
+  let filesMoved = 0;
+
+  if (USE_WEBDAV && webdavClient) {
+    const pendingDav = getWebDAVPath(pendingRel);
+    try {
+      if (!(await webdavClient.exists(pendingDav))) {
+        const pathsUpdated = await rewriteAttachmentPathsAfterPendingMerge(claimId, targetBaseKey);
+        return { filesMoved: 0, pathsUpdated };
+      }
+    } catch {
+      const pathsUpdated = await rewriteAttachmentPathsAfterPendingMerge(claimId, targetBaseKey);
+      return { filesMoved: 0, pathsUpdated };
+    }
+
+    const contents = await webdavClient.getDirectoryContents(pendingDav, { deep: true });
+    const items = Array.isArray(contents) ? contents : (contents as { data?: unknown[] }).data ?? [];
+
+    for (const raw of items) {
+      const item = raw as { type?: string; filename?: string };
+      if (item.type === "directory") continue;
+      const srcFilename = item.filename;
+      if (!srcFilename) continue;
+
+      const rel = relativePathInsidePendingClaim(srcFilename, claimId);
+      if (!rel) continue;
+
+      const destRel = `${targetBaseKey}/${rel}`.replace(/\/+/g, "/");
+      const destDav = getWebDAVPath(destRel);
+
+      try {
+        const buf = await webdavClient.getFileContents(srcFilename, { format: "binary" });
+        const data = Buffer.isBuffer(buf) ? buf : Buffer.from(buf as ArrayBuffer);
+        const destDir = destRel.includes("/") ? destRel.slice(0, destRel.lastIndexOf("/")) : "";
+        if (destDir) {
+          await webdavClient.createDirectory(getWebDAVPath(destDir), { recursive: true });
+        }
+        await webdavClient.putFileContents(destDav, data, { overwrite: true, contentLength: data.length });
+        await webdavClient.deleteFile(srcFilename);
+        filesMoved++;
+      } catch (err) {
+        console.error(`[mergePendingClaimFolder] WebDAV copy ${rel}:`, err);
+      }
+    }
+
+    await deleteWebdavFolderRecursive(pendingRel);
+    if (filesMoved > 0) {
+      console.log(`[mergePendingClaimFolder] claim ${claimId}: moved ${filesMoved} file(s) → ${targetBaseKey} (WebDAV)`);
+    }
+    const pathsUpdated = await rewriteAttachmentPathsAfterPendingMerge(claimId, targetBaseKey);
+    return { filesMoved, pathsUpdated };
+  }
+
+  const srcRoot = path.join(rootPath, pendingRel);
+  try {
+    await fs.access(srcRoot);
+  } catch {
+    const pathsUpdated = await rewriteAttachmentPathsAfterPendingMerge(claimId, targetBaseKey);
+    return { filesMoved: 0, pathsUpdated };
+  }
+
+  async function walk(relDir: string): Promise<void> {
+    const dir = relDir ? path.join(srcRoot, relDir) : srcRoot;
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const ent of entries) {
+      const sub = relDir ? `${relDir}/${ent.name}` : ent.name;
+      const full = path.join(srcRoot, sub);
+      if (ent.isDirectory()) {
+        await walk(sub);
+      } else {
+        const destFull = path.join(rootPath, targetBaseKey, sub);
+        await fs.mkdir(path.dirname(destFull), { recursive: true });
+        await fs.copyFile(full, destFull);
+        await fs.unlink(full);
+        filesMoved++;
+      }
+    }
+  }
+  await walk("");
+  try {
+    await fs.rm(srcRoot, { recursive: true, force: true });
+  } catch (e) {
+    console.warn(`[mergePendingClaimFolder] rm pending local ${claimId}:`, e);
+  }
+  if (filesMoved > 0) {
+    console.log(`[mergePendingClaimFolder] claim ${claimId}: moved ${filesMoved} file(s) → ${targetBaseKey} (local)`);
+  }
+  const pathsUpdated = await rewriteAttachmentPathsAfterPendingMerge(claimId, targetBaseKey);
+  return { filesMoved, pathsUpdated };
+}
+
 export async function saveAttachmentForClaim(params: {
   claim?: Claim;
   claimId?: string;

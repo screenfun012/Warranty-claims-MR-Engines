@@ -10,7 +10,12 @@ import { parseClaimCode } from "@/lib/domain/claimCode";
 import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/auth/permissions";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 import { logActivityFromRequest } from "@/lib/activity-log";
-import { createClaimFolder, claimHasProperFolderMetadata, renameClaimFolderIfNeeded } from "@/lib/files/fileStorage";
+import {
+  createClaimFolder,
+  claimHasProperFolderMetadata,
+  mergePendingClaimFolderIntoClaimFolder,
+  renameClaimFolderIfNeeded,
+} from "@/lib/files/fileStorage";
 import { hydrateEmailMessages } from "@/lib/email/hydrateRawEmail";
 
 export async function GET(
@@ -549,6 +554,12 @@ export async function PATCH(
           });
           (claim as { serverFolderPath?: string | null }).serverFolderPath = folderPath;
           console.log(`[PATCH /api/claims/${id}] Created Synology folder (Firma - MR Code): ${folderPath}`);
+          const merged = await mergePendingClaimFolderIntoClaimFolder(id, folderPath);
+          if (merged.filesMoved > 0 || merged.pathsUpdated > 0) {
+            console.log(
+              `[PATCH /api/claims/${id}] Pending merge: ${merged.filesMoved} file(s), ${merged.pathsUpdated} DB path(s)`
+            );
+          }
         }
       }
     }
