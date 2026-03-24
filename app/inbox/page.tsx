@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { usePanelRef } from "react-resizable-panels";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
@@ -139,13 +139,30 @@ type InboxPagePayload = {
   nextCursor: string | null;
 };
 
+const INBOX_FETCH_TIMEOUT_MS = 55_000;
+
 const fetchInboxPage = async (cursor: string | null, q: string): Promise<InboxPagePayload> => {
   const params = new URLSearchParams();
   params.set("take", String(INBOX_PAGE_SIZE));
   if (cursor) params.set("cursor", cursor);
   const trimmed = q.trim();
   if (trimmed) params.set("q", trimmed);
-  const res = await fetch(`/api/inbox?${params.toString()}`);
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), INBOX_FETCH_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`/api/inbox?${params.toString()}`, {
+      credentials: "include",
+      signal: ac.signal,
+    });
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("Inbox request timed out — server or database is slow.");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     const text = await res.text();
     console.error("API error:", res.status, text);
@@ -249,6 +266,9 @@ function InboxPageContent() {
   const {
     data: inboxPages,
     isPending: inboxInitialPending,
+    isError: inboxQueryError,
+    error: inboxFetchError,
+    refetch: refetchInboxQuery,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -262,6 +282,8 @@ function InboxPageContent() {
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
+
+  const listLoading = inboxInitialPending && !inboxPages;
 
   const threads = useMemo(
     () => inboxPages?.pages.flatMap((p) => p.threads) ?? [],
@@ -431,17 +453,21 @@ function InboxPageContent() {
     window.dispatchEvent(new Event("inbox-updated"));
   };
 
-  if (inboxInitialPending) {
+  if (inboxQueryError) {
+    const msg =
+      inboxFetchError instanceof Error ? inboxFetchError.message : String(inboxFetchError ?? "Unknown error");
     return (
       <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 lg:gap-4 lg:p-6">
-        <div className="flex shrink-0 items-center justify-between gap-4">
-          <Skeleton className="h-9 w-48" />
-          <Skeleton className="h-10 w-36" />
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{t("inbox.title")}</h1>
+          <Button type="button" variant="outline" onClick={() => void refetchInboxQuery()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            {t("common.retry")}
+          </Button>
         </div>
-        <div className="flex min-h-0 flex-1 gap-2 overflow-hidden rounded-xl border border-border">
-          <Skeleton className="hidden w-52 shrink-0 lg:block" />
-          <Skeleton className="max-w-md flex-1" />
-          <Skeleton className="hidden flex-1 lg:block" />
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
+          <p className="font-medium text-destructive">{t("inbox.loadFailed")}</p>
+          <p className="mt-2 text-muted-foreground">{msg}</p>
         </div>
       </div>
     );
@@ -496,7 +522,20 @@ function InboxPageContent() {
                   </div>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
-                  {totalInList === 0 ? (
+                  {listLoading ? (
+                    <div className="space-y-2 p-3">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <div key={i} className="flex gap-3 rounded-lg border border-border bg-card/50 p-3">
+                          <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <Skeleton className="h-4 w-[85%] max-w-full" />
+                            <Skeleton className="h-3 w-[55%] max-w-48" />
+                            <Skeleton className="h-3 w-full" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : totalInList === 0 ? (
                     <div className="p-8 text-center text-sm text-muted-foreground">
                       {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
                     </div>
@@ -731,7 +770,20 @@ function InboxPageContent() {
                     </div>
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]">
-                    {totalInList === 0 ? (
+                    {listLoading ? (
+                      <div className="space-y-2 p-3">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                          <div key={i} className="flex gap-3 rounded-lg border border-border bg-card/50 p-3">
+                            <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+                            <div className="min-w-0 flex-1 space-y-2">
+                              <Skeleton className="h-4 w-[85%] max-w-full" />
+                              <Skeleton className="h-3 w-[55%] max-w-48" />
+                              <Skeleton className="h-3 w-full" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : totalInList === 0 ? (
                       <div className="p-8 text-center text-sm text-muted-foreground">
                         {searchQuery.trim() ? t("inbox.noThreadsMatchingSearch") : t("inbox.noThreads")}
                       </div>
@@ -822,25 +874,7 @@ function InboxPageContent() {
 }
 
 export default function InboxPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex h-full min-h-0 flex-col gap-3 overflow-hidden p-4 lg:gap-4 lg:p-6">
-          <div className="flex shrink-0 items-center justify-between gap-4">
-            <Skeleton className="h-9 w-48" />
-            <Skeleton className="h-10 w-36" />
-          </div>
-          <div className="flex min-h-0 flex-1 gap-2 overflow-hidden rounded-xl border border-border">
-            <Skeleton className="hidden w-52 shrink-0 lg:block" />
-            <Skeleton className="max-w-md flex-1" />
-            <Skeleton className="hidden flex-1 lg:block" />
-          </div>
-        </div>
-      }
-    >
-      <InboxPageContent />
-    </Suspense>
-  );
+  return <InboxPageContent />;
 }
 
 function ThreadDetail({
