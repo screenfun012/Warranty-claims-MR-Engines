@@ -12,18 +12,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Plus } from "lucide-react";
+import { SEED_PREDEFINED_COMPANY_NAMES } from "@/lib/config/predefinedSeeds";
 
-// Fallback list of companies (used if API fails)
-const FALLBACK_COMPANY_LIST = [
-  "APPROVED GREEN",
-  "VITOBELLO",
-  "AUTO STANIĆ",
-  "SELMAN",
-  "TVH",
-  "CRD",
-  "RETTIFICHE 3G",
-  "BOLS MOTOREN",
-];
+const FALLBACK_COMPANY_LIST = [...SEED_PREDEFINED_COMPANY_NAMES];
 
 export default function NewClaimPage() {
   const t = useTranslations();
@@ -44,7 +35,10 @@ export default function NewClaimPage() {
         const res = await fetch("/api/admin/companies");
         if (res.ok) {
           const data = await res.json();
-          const companyNames = (data.companies || []).map((c: { name: string }) => c.name);
+          let companyNames = (data.companies || []).map((c: { name: string }) => c.name);
+          if (companyNames.length === 0) {
+            companyNames = [...FALLBACK_COMPANY_LIST];
+          }
           setCompanies(companyNames);
         } else {
           setCompanies(FALLBACK_COMPANY_LIST);

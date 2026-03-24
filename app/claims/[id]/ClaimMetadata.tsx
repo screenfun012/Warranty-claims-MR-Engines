@@ -17,6 +17,10 @@ import {
 import { useUser } from "@auth0/nextjs-auth0/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { MultiSelect } from "@/components/ui/multi-select";
+import {
+  SEED_PREDEFINED_COMPANY_NAMES,
+  SEED_PREDEFINED_WORKER_NAMES,
+} from "@/lib/config/predefinedSeeds";
 
 interface Department {
   id: string;
@@ -24,34 +28,9 @@ interface Department {
   isSystem: boolean;
 }
 
-// Fallback lists (used if API fails)
-const FALLBACK_WORKER_LIST = [
-  "IVICA STANISAVLJEVIĆ",
-  "IVAN STANISAVLJEVIĆ",
-  "EMRUŠ DULJAJ",
-  "ELMEDIN DULJAJ",
-  "PETAR PETROVIĆ",
-  "DRAGAN MILOSAVLJEVIĆ",
-  "MARKO ŽIVANOVIĆ",
-  "DEJAN MILOVANOVIĆ",
-  "MILOŠ ĆEBIĆ",
-  "BOJAN TANASKOVIĆ",
-  "DEJAN SIMIĆ",
-  "NIKOLA MIRKOVIĆ",
-  "STEFAN NOVAKOVIĆ",
-  "NEBOJŠA NIKOLIĆ",
-];
-
-const FALLBACK_COMPANY_LIST = [
-  "APPROVED GREEN",
-  "VITOBELLO",
-  "AUTO STANIĆ",
-  "SELMAN",
-  "TVH",
-  "CRD",
-  "RETTIFICHE 3G",
-  "BOLS MOTOREN",
-];
+// Fallback lists (API error ili prazan odgovor 200 + [])
+const FALLBACK_WORKER_LIST = [...SEED_PREDEFINED_WORKER_NAMES];
+const FALLBACK_COMPANY_LIST = [...SEED_PREDEFINED_COMPANY_NAMES];
 
 interface ClaimMetadataProps {
   claim: {
@@ -178,7 +157,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         const res = await fetch("/api/admin/workers");
         if (res.ok) {
           const data = await res.json();
-          const workerNames = (data.workers || []).map((w: { name: string }) => w.name);
+          let workerNames = (data.workers || []).map((w: { name: string }) => w.name);
+          if (workerNames.length === 0) {
+            workerNames = [...FALLBACK_WORKER_LIST];
+          }
           // Add current claim's worker if not in list
           if (claim.assignedWorkerName && !workerNames.includes(claim.assignedWorkerName)) {
             workerNames.push(claim.assignedWorkerName);
@@ -208,7 +190,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
         const res = await fetch("/api/admin/companies");
         if (res.ok) {
           const data = await res.json();
-          const companyNames = (data.companies || []).map((c: { name: string }) => c.name);
+          let companyNames = (data.companies || []).map((c: { name: string }) => c.name);
+          if (companyNames.length === 0) {
+            companyNames = [...FALLBACK_COMPANY_LIST];
+          }
           // Add current claim's company if not in list
           if (claim.customer?.company && !companyNames.includes(claim.customer.company)) {
             companyNames.push(claim.customer.company);

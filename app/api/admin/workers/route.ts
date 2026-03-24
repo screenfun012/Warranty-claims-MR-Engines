@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requireMinimumRole } from "@/lib/auth/permissions";
 import { ROLES } from "@/lib/auth/roles";
+import { SEED_PREDEFINED_WORKER_NAMES } from "@/lib/config/predefinedSeeds";
 
 export async function GET() {
   try {
@@ -19,25 +20,23 @@ export async function GET() {
       workers = await prisma.predefinedWorker.findMany({
         orderBy: { name: "asc" },
       });
+      if (workers.length === 0) {
+        await prisma.predefinedWorker.createMany({
+          data: SEED_PREDEFINED_WORKER_NAMES.map((name) => ({ name })),
+        });
+        workers = await prisma.predefinedWorker.findMany({
+          orderBy: { name: "asc" },
+        });
+        if (workers.length > 0) {
+          console.warn("[GET /api/admin/workers] Table was empty; re-seeded default workers.");
+        }
+      }
     } catch (error) {
       console.warn("[GET /api/admin/workers] PredefinedWorker table might not exist:", error);
-      // Return hardcoded list as fallback
-      workers = [
-        { id: "1", name: "IVICA STANISAVLJEVIĆ" },
-        { id: "2", name: "IVAN STANISAVLJEVIĆ" },
-        { id: "3", name: "EMRUŠ DULJAJ" },
-        { id: "4", name: "ELMEDIN DULJAJ" },
-        { id: "5", name: "PETAR PETROVIĆ" },
-        { id: "6", name: "DRAGAN MILOSAVLJEVIĆ" },
-        { id: "7", name: "MARKO ŽIVANOVIĆ" },
-        { id: "8", name: "DEJAN MILOVANOVIĆ" },
-        { id: "9", name: "MILOŠ ĆEBIĆ" },
-        { id: "10", name: "BOJAN TANASKOVIĆ" },
-        { id: "11", name: "DEJAN SIMIĆ" },
-        { id: "12", name: "NIKOLA MIRKOVIĆ" },
-        { id: "13", name: "STEFAN NOVAKOVIĆ" },
-        { id: "14", name: "NEBOJŠA NIKOLIĆ" },
-      ];
+      workers = SEED_PREDEFINED_WORKER_NAMES.map((name, i) => ({
+        id: `fallback-${i}`,
+        name,
+      }));
     }
 
     return NextResponse.json({ workers });

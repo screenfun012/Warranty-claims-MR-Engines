@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requireMinimumRole } from "@/lib/auth/permissions";
 import { ROLES } from "@/lib/auth/roles";
+import { SEED_PREDEFINED_COMPANY_NAMES } from "@/lib/config/predefinedSeeds";
 
 export async function GET() {
   try {
@@ -19,19 +20,25 @@ export async function GET() {
       companies = await prisma.predefinedCompany.findMany({
         orderBy: { name: "asc" },
       });
+      // Tabela postoji ali je prazna → ponovo ubaci seed (INSERT OR IGNORE ponašanje)
+      if (companies.length === 0) {
+        await prisma.predefinedCompany.createMany({
+          data: SEED_PREDEFINED_COMPANY_NAMES.map((name) => ({ name })),
+        });
+        companies = await prisma.predefinedCompany.findMany({
+          orderBy: { name: "asc" },
+        });
+        if (companies.length > 0) {
+          console.warn("[GET /api/admin/companies] Table was empty; re-seeded default companies.");
+        }
+      }
     } catch (error) {
       console.warn("[GET /api/admin/companies] PredefinedCompany table might not exist:", error);
       // Return hardcoded list as fallback
-      companies = [
-        { id: "1", name: "APPROVED GREEN" },
-        { id: "2", name: "VITOBELLO" },
-        { id: "3", name: "AUTO STANIĆ" },
-        { id: "4", name: "SELMAN" },
-        { id: "5", name: "TVH" },
-        { id: "6", name: "CRD" },
-        { id: "7", name: "RETTIFICHE 3G" },
-        { id: "8", name: "BOLS MOTOREN" },
-      ];
+      companies = SEED_PREDEFINED_COMPANY_NAMES.map((name, i) => ({
+        id: `fallback-${i}`,
+        name,
+      }));
     }
 
     return NextResponse.json({ companies });
