@@ -92,9 +92,70 @@ async function getClaimBaseKey(claim: ClaimForFolder): Promise<string> {
   return `${sanitizedCompanyName} - ${sanitizedClaimCode}`;
 }
 
+/** "Unknown - MR…" / "Domestic - MR…" — nastaju kad nema imena/firme; ne želimo nove takve foldere. */
+function isPlaceholderFolderKey(claim: ClaimForFolder, baseKey: string): boolean {
+  const sanitizedCode = claim.claimCodeRaw?.trim()
+    ? sanitizeClaimCodeForPath(claim.claimCodeRaw.trim())
+    : claim.id;
+  return baseKey === `Unknown - ${sanitizedCode}` || baseKey === `Domestic - ${sanitizedCode}`;
+}
+
+/**
+ * Da li ima smisla praviti "pravi" folder: uvek MR broj + bar ime ili firma (domaće ili strano).
+ * Ranije je domaće tržište uvek vraćalo true pa su nastajali "Domestic - …" folderi bez podataka.
+ */
+export async function claimHasProperFolderMetadata(
+  claim: Claim & {
+    customer?: { name: string | null; company?: string | null } | null;
+    isDomesticMarket?: boolean;
+  }
+): Promise<boolean> {
+  if (!claim.claimCodeRaw?.trim()) {
+    return false;
+  }
+
+  let customerName: string | null = null;
+  let companyName: string | null = null;
+  if (claim.customer) {
+    customerName = claim.customer.name ?? null;
+    companyName = claim.customer.company ?? null;
+  } else if (claim.customerId) {
+    try {
+      const prismaClient = await getPrisma();
+      const customer = await prismaClient.customer.findUnique({
+        where: { id: claim.customerId },
+        select: { name: true, company: true },
+      });
+      customerName = customer?.name ?? null;
+      companyName = customer?.company ?? null;
+    } catch {
+      return false;
+    }
+  }
+
+  if (claim.isDomesticMarket) {
+    const namePart = [customerName?.trim(), companyName?.trim()].filter(Boolean);
+    return namePart.length > 0;
+  }
+
+  const companyOrName = companyName?.trim() || customerName?.trim() || null;
+  return !!(companyOrName?.trim());
+}
+
+/** Pravi ključ za NAS ili privremeni `_pending_claims/<id>` dok korisnik ne popuni metapodatke. */
+async function resolveStorageBaseKey(claim: ClaimForFolder): Promise<string> {
+  if (await claimHasProperFolderMetadata(claim)) {
+    return await getClaimBaseKey(claim);
+  }
+  console.warn(
+    `[resolveStorageBaseKey] Claim ${claim.id}: metadata incomplete — using _pending_claims/${claim.id}`
+  );
+  return `_pending_claims/${claim.id}`;
+}
+
 export async function getClaimBasePath(claim: Claim & { customer?: { name: string | null } | null }): Promise<string> {
   const rootPath = path.resolve(env.FILE_ROOT_PATH);
-  const baseKey = await getClaimBaseKey(claim);
+  const baseKey = await resolveStorageBaseKey(claim);
   return path.join(rootPath, baseKey);
 }
 
@@ -493,7 +554,15 @@ function getWebDAVPath(relativePath: string): string {
 }
 
 export async function createClaimFolder(claim: Claim & { customer?: { name: string | null; company?: string | null } | null }): Promise<string | null> {
+  if (!(await claimHasProperFolderMetadata(claim))) {
+    console.warn(`[createClaimFolder] Skipped: insufficient metadata for claim ${claim.id}`);
+    return null;
+  }
   const baseKey = await getClaimBaseKey(claim);
+  if (isPlaceholderFolderKey(claim, baseKey)) {
+    console.warn(`[createClaimFolder] Skipped: would create placeholder folder for claim ${claim.id}`);
+    return null;
+  }
   console.log(`[createClaimFolder] Creating folder for claim ${claim.id}: ${baseKey}`);
 
   if (USE_WEBDAV && webdavClient) {
@@ -534,6 +603,10 @@ export async function renameClaimFolderIfNeeded(
   const oldStored = claim.serverFolderPath?.trim();
   if (!oldStored) return null;
   const newBaseKey = await getClaimBaseKey(claim);
+  if (isPlaceholderFolderKey(claim, newBaseKey)) {
+    console.warn(`[renameClaimFolder] Skip: target would be placeholder for claim ${claim.id}`);
+    return null;
+  }
   const oldBaseKey = path.isAbsolute(oldStored) || oldStored.includes(path.sep)
     ? path.basename(oldStored)
     : oldStored;
@@ -564,31 +637,6 @@ export async function renameClaimFolderIfNeeded(
   }
 }
 
-/** Returns true if folder can be created: (Kompanija kupca + MR broj) OR domaće tržište */
-export async function claimHasProperFolderMetadata(
-  claim: Claim & { customer?: { name: string | null; company?: string | null } | null; isDomesticMarket?: boolean }
-): Promise<boolean> {
-  if (claim.isDomesticMarket) return true;
-  let companyName: string | null = null;
-  if (claim.customer) {
-    companyName = claim.customer.company || claim.customer.name;
-  } else if (claim.customerId) {
-    try {
-      const prismaClient = await getPrisma();
-      const customer = await prismaClient.customer.findUnique({
-        where: { id: claim.customerId },
-        select: { name: true, company: true },
-      });
-      companyName = customer?.company || customer?.name || null;
-    } catch {
-      return false;
-    }
-  }
-  const hasCompany = !!(companyName?.trim());
-  const hasClaimCode = !!(claim.claimCodeRaw?.trim());
-  return hasCompany && hasClaimCode;
-}
-
 export async function saveAttachmentForClaim(params: {
   claim?: Claim;
   claimId?: string;
@@ -602,7 +650,10 @@ export async function saveAttachmentForClaim(params: {
     claim = params.claim;
   } else if (params.claimId) {
     const prismaClient = await getPrisma();
-    claim = await prismaClient.claim.findUnique({ where: { id: params.claimId } });
+    claim = await prismaClient.claim.findUnique({
+      where: { id: params.claimId },
+      include: { customer: true },
+    });
     if (!claim) throw new Error(`Claim not found: ${params.claimId}`);
   } else {
     throw new Error("Either claim or claimId must be provided");
@@ -614,7 +665,7 @@ export async function saveAttachmentForClaim(params: {
   const subfolder = params.subfolder || "03_attachments";
 
   if (USE_WEBDAV && webdavClient) {
-    const baseKey = await getClaimBaseKey(claim);
+    const baseKey = await resolveStorageBaseKey(claim);
     const relativePath = `${baseKey}/${subfolder}/${sanitizedFileName}`;
     const webdavPath = getWebDAVPath(relativePath);
     await ensureDir(`${baseKey}/${subfolder}`);
@@ -897,7 +948,7 @@ export async function deleteUnassignedThreadFolder(threadId: string): Promise<vo
 }
 
 export async function deleteClaimFolder(claim: Claim & { customer?: { name: string | null } | null }): Promise<void> {
-  const baseKey = await getClaimBaseKey(claim);
+  const baseKey = await resolveStorageBaseKey(claim);
 
   if (USE_WEBDAV && webdavClient) {
     try {
