@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db/prisma";
 import { requirePermission, PERMISSIONS } from "@/lib/auth/permissions";
+import { enrichClaimsForListView } from "@/lib/claims/enrichClaimsList";
 
 export async function GET(request: NextRequest) {
   try {
@@ -148,13 +149,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    claims = (await enrichClaimsForListView(prisma, claims)) as typeof claims;
+
     // Get total count
     const totalCount = await prisma.claim.count({ where });
 
-    return NextResponse.json({
-      claims,
-      totalCount,
-    });
+    return NextResponse.json(
+      {
+        claims,
+        totalCount,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+        },
+      }
+    );
   } catch (error) {
     console.error("Error fetching statistics:", error);
     return NextResponse.json(

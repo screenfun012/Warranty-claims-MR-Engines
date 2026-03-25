@@ -11,6 +11,7 @@ import { requirePermission, createPermissionError, PERMISSIONS } from "@/lib/aut
 import { createClaimFolder, moveAttachmentFromUnassignedToClaim, deleteUnassignedThreadFolder } from "@/lib/files/fileStorage";
 import { triggerEvent, CHANNELS, EVENTS } from "@/lib/realtime/pusher";
 import { logActivityFromRequest } from "@/lib/activity-log";
+import { enrichClaimsForListView } from "@/lib/claims/enrichClaimsList";
 
 export async function GET(request: NextRequest) {
   try {
@@ -181,6 +182,8 @@ export async function GET(request: NextRequest) {
       ]);
     }
 
+    claims = (await enrichClaimsForListView(prisma, claims)) as typeof claims;
+
     // If claimAcceptanceStatus is not returned by Prisma, fetch in one batch
     const missingStatus = claims.filter((c) => (c as any).claimAcceptanceStatus === undefined);
     if (missingStatus.length > 0) {
@@ -201,17 +204,24 @@ export async function GET(request: NextRequest) {
     // Calculate pagination info
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({ 
-      claims,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNext: page < totalPages,
-        hasPrev: page > 1,
+    return NextResponse.json(
+      {
+        claims,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      },
+      {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+        },
       }
-    });
+    );
   } catch (error) {
     console.error("Error fetching claims:", error);
     const permError = createPermissionError(error);
