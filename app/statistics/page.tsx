@@ -34,6 +34,7 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
 import * as XLSX from "xlsx";
+import { workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
 
 interface Claim {
   id: string;
@@ -185,8 +186,8 @@ export default function StatisticsPage() {
           ? b.faultDepartments.map((d) => d.name).join(", ")
           : b.faultDepartment?.name || "";
       } else if (sortField === "assignedTo") {
-        aVal = a.assignedWorkerName || "";
-        bVal = b.assignedWorkerName || "";
+        aVal = workerWhoBuiltMotorLabel(a);
+        bVal = workerWhoBuiltMotorLabel(b);
       }
       
       if (aVal === null || aVal === undefined) return 1;
@@ -270,7 +271,7 @@ export default function StatisticsPage() {
         claim.workerFault || "",
         claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "",
         claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
-        claim.assignedWorkerName || "",
+        workerWhoBuiltMotorLabel(claim),
         claim.reason || "",
         claim.isDomesticMarket ? t("common.yes") : t("common.no"),
         new Date(claim.createdAt).toLocaleDateString(),
@@ -573,7 +574,7 @@ export default function StatisticsPage() {
                 : claim.faultDepartment?.name || "-",
               dateEngineDone: claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "-",
               claimArrivalDate: claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "-",
-              assignedTo: claim.assignedWorkerName || "-",
+              assignedTo: workerWhoBuiltMotorLabel(claim) || "-",
               market: claim.isDomesticMarket ? (
                 <Badge variant="secondary">{t("statistics.domestic")}</Badge>
               ) : (

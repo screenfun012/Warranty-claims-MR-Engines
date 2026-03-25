@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { customerPrimaryLabel } from "@/lib/domain/customerDisplay";
+import { workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
@@ -845,7 +846,11 @@ export default function ClaimsPage() {
               </span>
             ),
             engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
-            assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,
+            assignedTo: (
+              <span className="text-muted-foreground">
+                {workerWhoBuiltMotorLabel(claim) || "-"}
+              </span>
+            ),
             claimArrival: (
               <span className="text-muted-foreground text-xs">
                 {(() => {

@@ -21,6 +21,7 @@ import {
   SEED_PREDEFINED_COMPANY_NAMES,
   SEED_PREDEFINED_WORKER_NAMES,
 } from "@/lib/config/predefinedSeeds";
+import { workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
 
 interface Department {
   id: string;
@@ -120,7 +121,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [claimArrivalDate, setClaimArrivalDate] = useState<Date | undefined>(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
   const [reason, setReason] = useState(claim.reason || "");
 
-  const assignedWorkerName = claim.assignedWorkerName ?? "";
+  /** Tekst ili (legacy) assignedTo.fullName — isto kao lista reklamacija */
+  const assignedWorkerDisplay = workerWhoBuiltMotorLabel(claim);
   const isDomesticMarket = !!claim.isDomesticMarket;
 
   // Departments state
@@ -163,24 +165,26 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           if (workerNames.length === 0) {
             workerNames = [...FALLBACK_WORKER_LIST];
           }
-          // Add current claim's worker if not in list
-          if (claim.assignedWorkerName && !workerNames.includes(claim.assignedWorkerName)) {
-            workerNames.push(claim.assignedWorkerName);
+          const currentWorkerLabel = workerWhoBuiltMotorLabel(claim);
+          if (currentWorkerLabel && !workerNames.includes(currentWorkerLabel)) {
+            workerNames.push(currentWorkerLabel);
           }
           setWorkers(workerNames);
         } else {
           // Fallback to hardcoded list
           const fallback = [...FALLBACK_WORKER_LIST];
-          if (claim.assignedWorkerName && !fallback.includes(claim.assignedWorkerName)) {
-            fallback.push(claim.assignedWorkerName);
+          const cur = workerWhoBuiltMotorLabel(claim);
+          if (cur && !fallback.includes(cur)) {
+            fallback.push(cur);
           }
           setWorkers(fallback);
         }
       } catch (error) {
         console.error("Error loading workers:", error);
         const fallback = [...FALLBACK_WORKER_LIST];
-        if (claim.assignedWorkerName && !fallback.includes(claim.assignedWorkerName)) {
-          fallback.push(claim.assignedWorkerName);
+        const cur = workerWhoBuiltMotorLabel(claim);
+        if (cur && !fallback.includes(cur)) {
+          fallback.push(cur);
         }
         setWorkers(fallback);
       } finally {
@@ -684,12 +688,18 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
             {t("claims.metadata.assignedWorker")}
           </Label>
           <Select
-            value={assignedWorkerName || "__empty__"}
+            value={assignedWorkerDisplay || "__empty__"}
             onValueChange={(value) => {
               if (value === "__add_new__") {
                 setShowAddWorker(true);
               } else if (value === "__clear__") {
-                handleFieldBlur("assignedWorkerName", "");
+                setEditingField(null);
+                if (!isReadOnly) {
+                  const updates: Record<string, unknown> = { assignedWorkerName: null };
+                  if (claim.assignedTo?.id) updates.assignedToId = null;
+                  if (claim.status === "NEW") updates.status = "IN_ANALYSIS";
+                  onUpdate(updates);
+                }
               } else {
                 handleFieldBlur("assignedWorkerName", value);
               }
@@ -700,7 +710,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               <SelectValue placeholder={t("claims.metadata.selectWorker")} />
             </SelectTrigger>
             <SelectContent>
-              {assignedWorkerName && (
+              {assignedWorkerDisplay && (
                 <SelectItem value="__clear__" className="text-destructive font-medium">
                   <X className="h-4 w-4 inline mr-2" />
                   {t("common.clear")}
