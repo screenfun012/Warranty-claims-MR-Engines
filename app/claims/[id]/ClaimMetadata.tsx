@@ -340,6 +340,49 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     setCustomerName(claim.customer?.name || "");
   }, [claim.customer?.name, claim.customer?.id, editingField]);
 
+  // Ostala polja: lokalni useState se inicijalizuje pre nego što React Query učita pun claim — moraju da prate claim.*
+  useEffect(() => {
+    if (editingField === "customerNumber") return;
+    setCustomerNumber(claim.customerNumber ?? "");
+  }, [claim.customerNumber, claim.id, editingField]);
+
+  useEffect(() => {
+    if (editingField === "claimCodeRaw") return;
+    setClaimCode(claim.claimCodeRaw || "");
+  }, [claim.claimCodeRaw, claim.id, editingField]);
+
+  useEffect(() => {
+    if (editingField === "engineType") return;
+    setEngineType(claim.engineType || "");
+  }, [claim.engineType, claim.id, editingField]);
+
+  useEffect(() => {
+    if (editingField === "mrEngineCode") return;
+    setEngineCode(claim.mrEngineCode || "");
+  }, [claim.mrEngineCode, claim.id, editingField]);
+
+  useEffect(() => {
+    if (editingField === "workerFault") return;
+    setWorkerFault(claim.workerFault || "");
+  }, [claim.workerFault, claim.id, editingField]);
+
+  useEffect(() => {
+    if (editingField === "reason") return;
+    setReason(claim.reason || "");
+  }, [claim.reason, claim.id, editingField]);
+
+  useEffect(() => {
+    setYearEngineDone(claim.yearEngineDone != null ? String(claim.yearEngineDone) : "");
+  }, [claim.yearEngineDone, claim.id]);
+
+  useEffect(() => {
+    setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
+  }, [claim.dateEngineDone, claim.id]);
+
+  useEffect(() => {
+    setClaimArrivalDate(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
+  }, [claim.claimArrivalDate, claim.id]);
+
   const handleFieldBlur = (field: string, value: string | number | boolean | null) => {
     setEditingField(null);
     if (isReadOnly) return;

@@ -333,6 +333,7 @@ export default function ClaimDetailPage() {
       // Only track patchable fields; UI-only fields just update cache
       let hasPatchable = false;
       for (const [k, v] of Object.entries(updates)) {
+        if (v === undefined) continue;
         if (!SKIP_PATCH_FIELDS.has(k)) {
           pendingRef.current[k] = v;
           hasPatchable = true;
@@ -344,6 +345,7 @@ export default function ClaimDetailPage() {
       if (current) {
         const nextClaim = { ...current } as Record<string, unknown>;
         for (const [k, v] of Object.entries(updates)) {
+          if (v === undefined) continue;
           nextClaim[k] = v;
         }
         queryClient.setQueryData(["claim", claimId], nextClaim as unknown as Claim);
