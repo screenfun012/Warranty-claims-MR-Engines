@@ -108,6 +108,15 @@ export async function GET(request: NextRequest) {
           fullName: true,
         },
       },
+      workOrder: {
+        select: {
+          id: true,
+          assemblyDate: true,
+          worker: {
+            select: { id: true, fullName: true },
+          },
+        },
+      },
     };
 
     // Fetch claims with all necessary relations - try with faultDepartments, fallback without

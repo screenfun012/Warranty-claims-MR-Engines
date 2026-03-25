@@ -34,12 +34,18 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { MultiSelect } from "@/components/ui/multi-select";
 import * as XLSX from "xlsx";
-import { workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
+import {
+  customerNumberForList,
+  engineAssemblyDateForList,
+  workerWhoBuiltMotorLabel,
+} from "@/lib/domain/claimDisplay";
 
 interface Claim {
   id: string;
   claimCodeRaw: string | null;
   customerNumber: string | null;
+  customerReference?: string | null;
+  invoiceNumber?: string | null;
   status: string;
   createdAt: string;
   customer: {
@@ -68,6 +74,11 @@ interface Claim {
   claimArrivalDate: string | null;
   reason: string | null;
   isDomesticMarket: boolean;
+  workOrder?: {
+    id: string;
+    assemblyDate: string | null;
+    worker: { id: string; fullName: string | null } | null;
+  } | null;
 }
 
 interface Filters {
@@ -188,6 +199,14 @@ export default function StatisticsPage() {
       } else if (sortField === "assignedTo") {
         aVal = workerWhoBuiltMotorLabel(a);
         bVal = workerWhoBuiltMotorLabel(b);
+      } else if (sortField === "customerNumber") {
+        aVal = customerNumberForList(a);
+        bVal = customerNumberForList(b);
+      } else if (sortField === "dateEngineDone") {
+        const ad = a.dateEngineDone || a.workOrder?.assemblyDate;
+        const bd = b.dateEngineDone || b.workOrder?.assemblyDate;
+        aVal = ad ? new Date(ad as string).getTime() : 0;
+        bVal = bd ? new Date(bd as string).getTime() : 0;
       }
       
       if (aVal === null || aVal === undefined) return 1;
@@ -259,9 +278,10 @@ export default function StatisticsPage() {
         claim.faultDepartments && claim.faultDepartments.length > 0
           ? claim.faultDepartments.map((d) => d.name).join(", ")
           : claim.faultDepartment?.name || "";
+      const engineDateLabel = engineAssemblyDateForList(claim);
       return [
         claim.claimCodeRaw || "",
-        claim.customerNumber || "",
+        customerNumberForList(claim),
         t(`claims.status.${claim.status}` as never) || claim.status,
         claim.customer?.name || "",
         claim.customer?.company || "",
@@ -269,7 +289,7 @@ export default function StatisticsPage() {
         claim.mrEngineCode || "",
         faultDeptStr,
         claim.workerFault || "",
-        claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "",
+        engineDateLabel === "–" ? "" : engineDateLabel,
         claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
         workerWhoBuiltMotorLabel(claim),
         claim.reason || "",
@@ -562,7 +582,7 @@ export default function StatisticsPage() {
                 <span className="font-medium">{claim.claimCodeRaw || "-"}</span>
               ),
               customerNumber: (
-                <span className="font-medium">{claim.customerNumber || "-"}</span>
+                <span className="font-medium">{customerNumberForList(claim) || "-"}</span>
               ),
               status: <Badge variant="outline">{t(`claims.status.${claim.status}` as any) || claim.status}</Badge>,
               customer: claim.customer?.name || "-",
@@ -572,7 +592,7 @@ export default function StatisticsPage() {
               faultDept: claim.faultDepartments && claim.faultDepartments.length > 0
                 ? claim.faultDepartments.map((d) => d.name).join(", ")
                 : claim.faultDepartment?.name || "-",
-              dateEngineDone: claim.dateEngineDone ? new Date(claim.dateEngineDone).toLocaleDateString() : "-",
+              dateEngineDone: engineAssemblyDateForList(claim),
               claimArrivalDate: claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "-",
               assignedTo: workerWhoBuiltMotorLabel(claim) || "-",
               market: claim.isDomesticMarket ? (

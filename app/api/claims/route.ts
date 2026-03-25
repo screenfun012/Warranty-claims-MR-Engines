@@ -122,6 +122,26 @@ export async function GET(request: NextRequest) {
     // For search queries with Serbian characters, we need to fetch all and filter in memory
     // Then apply pagination manually
     const needsMemoryFilter = !!claimCode;
+
+    const claimListInclude = {
+      customer: true,
+      assignedTo: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+        },
+      },
+      workOrder: {
+        select: {
+          id: true,
+          assemblyDate: true,
+          worker: {
+            select: { id: true, fullName: true },
+          },
+        },
+      },
+    };
     
     let claims;
     let total;
@@ -130,16 +150,7 @@ export async function GET(request: NextRequest) {
       // Fetch all matching claims for memory filtering
       let allClaims = await prisma.claim.findMany({
         where,
-        include: {
-          customer: true,
-          assignedTo: {
-            select: {
-              id: true,
-              fullName: true,
-              email: true,
-            },
-          },
-        },
+        include: claimListInclude,
         orderBy: {
           createdAt: "desc",
         },
@@ -159,16 +170,7 @@ export async function GET(request: NextRequest) {
       [claims, total] = await Promise.all([
         prisma.claim.findMany({
           where,
-          include: {
-            customer: true,
-            assignedTo: {
-              select: {
-                id: true,
-                fullName: true,
-                email: true,
-              },
-            },
-          },
+          include: claimListInclude,
           orderBy: {
             createdAt: "desc",
           },

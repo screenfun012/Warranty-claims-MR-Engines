@@ -13,7 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { customerPrimaryLabel } from "@/lib/domain/customerDisplay";
-import { formatClaimTableDate, workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
+import {
+  customerNumberForList,
+  engineAssemblyDateForList,
+  formatClaimTableDate,
+  workerWhoBuiltMotorLabel,
+} from "@/lib/domain/claimDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
@@ -38,6 +43,9 @@ interface Claim {
   id: string;
   claimCodeRaw: string | null;
   customerNumber: string | null;
+  customerReference?: string | null;
+  invoiceNumber?: string | null;
+  yearEngineDone?: number | null;
   claimPrefix: string | null;
   status: string;
   claimAcceptanceStatus?: string | null;
@@ -59,6 +67,11 @@ interface Claim {
   claimArrivalDate: string | null;
   createdAt: string;
   isDomesticMarket?: boolean;
+  workOrder?: {
+    id: string;
+    assemblyDate: string | null;
+    worker: { id: string; fullName: string | null } | null;
+  } | null;
 }
 
 interface PaginationInfo {
@@ -845,7 +858,7 @@ export default function ClaimsPage() {
             ),
             customerNumber: (
               <span className="text-muted-foreground text-sm tabular-nums">
-                {claim.customerNumber?.trim() || "–"}
+                {customerNumberForList(claim) || "–"}
               </span>
             ),
             status: <StatusBadge status={getDisplayStatus(claim)} label={getStatusLabel(getDisplayStatus(claim))} />,
@@ -862,7 +875,7 @@ export default function ClaimsPage() {
             ),
             dateEngineDone: (
               <span className="text-muted-foreground text-xs whitespace-nowrap">
-                {formatClaimTableDate(claim.dateEngineDone)}
+                {engineAssemblyDateForList(claim)}
               </span>
             ),
             claimArrival: (
