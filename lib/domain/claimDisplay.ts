@@ -10,3 +10,15 @@ export function workerWhoBuiltMotorLabel(claim: {
   if (text) return text;
   return (claim.assignedTo?.fullName ?? "").trim();
 }
+
+/** Datum u listama (lokalni kalendar, ne UTC komponente). */
+export function formatClaimTableDate(iso: string | null | undefined): string {
+  if (!iso) return "–";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "–";
+  return d.toLocaleDateString("sr-Latn", {
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+  });
+}

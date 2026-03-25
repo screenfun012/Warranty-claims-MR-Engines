@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
 import { customerPrimaryLabel } from "@/lib/domain/customerDisplay";
-import { workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
+import { formatClaimTableDate, workerWhoBuiltMotorLabel } from "@/lib/domain/claimDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
@@ -54,6 +54,7 @@ interface Claim {
   } | null;
   assignedWorkerName: string | null; // Worker who built the engine
   workerFault: string | null; // Worker at fault
+  dateEngineDone: string | null;
   claimArrivalDate: string | null;
   createdAt: string;
   isDomesticMarket?: boolean;
@@ -830,6 +831,7 @@ export default function ClaimsPage() {
             { key: "customer", label: t("claims.customer") },
             { key: "engineType", label: t("claims.engineType") },
             { key: "assignedTo", label: t("claims.metadata.assignedWorker") },
+            { key: "dateEngineDone", label: t("claims.dateEngineDone") },
             { key: "claimArrival", label: t("claims.claimArrivalDate") },
             ...(isSuperAdmin ? [{ key: "actions", label: t("common.actions") }] : []),
           ]}
@@ -851,13 +853,14 @@ export default function ClaimsPage() {
                 {workerWhoBuiltMotorLabel(claim) || "-"}
               </span>
             ),
+            dateEngineDone: (
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
+                {formatClaimTableDate(claim.dateEngineDone)}
+              </span>
+            ),
             claimArrival: (
-              <span className="text-muted-foreground text-xs">
-                {(() => {
-                  const raw = claim.claimArrivalDate || claim.createdAt;
-                  const d = new Date(raw);
-                  return `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()}`;
-                })()}
+              <span className="text-muted-foreground text-xs whitespace-nowrap">
+                {formatClaimTableDate(claim.claimArrivalDate || claim.createdAt)}
               </span>
             ),
             ...(isSuperAdmin ? {
