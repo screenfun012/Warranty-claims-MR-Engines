@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, CheckCircle2, Loader2, XCircle, Circle, Search, FileText, Check, ChevronDownIcon, X, AlertCircle, Trash2, Lock, Unlock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { normalizeSerbianLatin } from "@/lib/utils/search";
+import { customerPrimaryLabel } from "@/lib/domain/customerDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusSpinner } from "@/components/ui/status-spinner";
 import { useUser } from "@auth0/nextjs-auth0/client";
@@ -54,6 +55,7 @@ interface Claim {
   workerFault: string | null; // Worker at fault
   claimArrivalDate: string | null;
   createdAt: string;
+  isDomesticMarket?: boolean;
 }
 
 interface PaginationInfo {
@@ -824,7 +826,7 @@ export default function ClaimsPage() {
           headers={[
             { key: "claimCode", label: t("claims.mrNumber") },
             { key: "status", label: t("common.status") },
-            { key: "customer", label: t("claims.metadata.customerCompany") },
+            { key: "customer", label: t("claims.customer") },
             { key: "engineType", label: t("claims.engineType") },
             { key: "assignedTo", label: t("claims.metadata.assignedWorker") },
             { key: "claimArrival", label: t("claims.claimArrivalDate") },
@@ -837,7 +839,11 @@ export default function ClaimsPage() {
               </span>
             ),
             status: <StatusBadge status={getDisplayStatus(claim)} label={getStatusLabel(getDisplayStatus(claim))} />,
-            customer: <span className="transition-colors group-hover:text-primary">{claim.customer?.company || "-"}</span>,
+            customer: (
+              <span className="transition-colors group-hover:text-primary">
+                {customerPrimaryLabel(claim)}
+              </span>
+            ),
             engineType: <span className="text-muted-foreground">{claim.engineType || "-"}</span>,
             assignedTo: <span className="text-muted-foreground">{claim.assignedWorkerName || "-"}</span>,
             claimArrival: (
