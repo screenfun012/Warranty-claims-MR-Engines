@@ -109,7 +109,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [customerName, setCustomerName] = useState(claim.customer?.name || "");
   const [engineType, setEngineType] = useState(claim.engineType || "");
   const [engineCode, setEngineCode] = useState(claim.mrEngineCode || "");
-  const [assignedWorkerName, setAssignedWorkerName] = useState(claim.assignedWorkerName || "");
+  // assignedWorkerName i isDomesticMarket dolaze direktno iz claim (server/optimistički cache) — lokalni state je pravio nesinhron prikaz i "ne čuva se"
   const [faultDepartmentId, setFaultDepartmentId] = useState(claim.faultDepartment?.id || "");
   const [faultDepartmentIds, setFaultDepartmentIds] = useState<string[]>(
     claim.faultDepartments?.map((d) => d.id) || (claim.faultDepartment?.id ? [claim.faultDepartment.id] : [])
@@ -119,8 +119,10 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   const [dateEngineDone, setDateEngineDone] = useState<Date | undefined>(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
   const [claimArrivalDate, setClaimArrivalDate] = useState<Date | undefined>(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
   const [reason, setReason] = useState(claim.reason || "");
-  const [isDomesticMarket, setIsDomesticMarket] = useState(claim.isDomesticMarket || false);
-  
+
+  const assignedWorkerName = claim.assignedWorkerName ?? "";
+  const isDomesticMarket = !!claim.isDomesticMarket;
+
   // Departments state
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loadingDepartments, setLoadingDepartments] = useState(true);
@@ -219,7 +221,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       }
     };
     loadData();
-  }, [claim.assignedWorkerName, claim.customer?.company]);
+  }, [claim.id]);
 
   // Add new department
   const handleAddDepartment = async () => {
@@ -301,7 +303,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     }
   };
 
-  // Sync local state only when claim.id changes (new claim loaded). Never overwrite form on every claim change – that caused reverts.
+  // Sinhronizuj formu samo pri promeni reklamacije (drugi id)
   useEffect(() => {
     if (prevClaimIdRef.current !== claim.id) {
       prevClaimIdRef.current = claim.id;
@@ -310,7 +312,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setCustomerName(claim.customer?.name || "");
       setEngineType(claim.engineType || "");
       setEngineCode(claim.mrEngineCode || "");
-      setAssignedWorkerName(claim.assignedWorkerName || "");
       setFaultDepartmentId(claim.faultDepartment?.id || "");
       if (claim.faultDepartments && claim.faultDepartments.length > 0) {
         setFaultDepartmentIds(claim.faultDepartments.map((d) => d.id));
@@ -324,11 +325,16 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
       setClaimArrivalDate(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
       setReason(claim.reason || "");
-      setIsDomesticMarket(claim.isDomesticMarket || false);
       setEditingField(null);
       setNotificationSent(!!claim.processingEmailSentAt);
     }
-  }, [claim.id, claim.claimCodeRaw, claim.customerNumber, claim.customer?.name, claim.engineType, claim.mrEngineCode, claim.assignedWorkerName, claim.faultDepartment?.id, claim.faultDepartments, claim.workerFault, claim.yearEngineDone, claim.dateEngineDone, claim.claimArrivalDate, claim.reason, claim.isDomesticMarket, claim.processingEmailSentAt]);
+  }, [claim.id]);
+
+  // Ime kupca: osveži iz servera kad se customer promeni (npr. posle čuvanja), ali ne tokom kucanja
+  useEffect(() => {
+    if (editingField === "customerName") return;
+    setCustomerName(claim.customer?.name || "");
+  }, [claim.customer?.name, claim.customer?.id, editingField]);
 
   const handleFieldBlur = (field: string, value: string | number | boolean | null) => {
     setEditingField(null);
@@ -478,7 +484,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
 
   // Handle isDomesticMarket change
   const handleIsDomesticMarketChange = (checked: boolean) => {
-    setIsDomesticMarket(checked);
     const updates: Record<string, unknown> = { isDomesticMarket: checked };
     if (claim.status === "NEW") {
       updates.status = "IN_ANALYSIS";
@@ -527,11 +532,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           />
         </div>
 
-        {/* Customer Name - Optional */}
+        {/* Domaće tržište: primarno ime kupca; strano: firma obavezna */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             {t("claims.metadata.customerName")}
+            {isDomesticMarket && <span className="text-red-500">*</span>}
           </Label>
           <Input
             value={customerName}
@@ -544,11 +550,11 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           />
         </div>
 
-        {/* Customer Company - Required */}
         <div>
           <Label className="text-sm font-medium flex items-center gap-2 mb-2">
             <Building2 className="h-4 w-4 text-muted-foreground" />
-            {t("claims.metadata.customerCompany")} <span className="text-red-500">*</span>
+            {t("claims.metadata.customerCompany")}
+            {!isDomesticMarket && <span className="text-red-500">*</span>}
           </Label>
           <Select
             value={claim.customer?.company || "__empty__"}
@@ -683,10 +689,8 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
               if (value === "__add_new__") {
                 setShowAddWorker(true);
               } else if (value === "__clear__") {
-                setAssignedWorkerName("");
                 handleFieldBlur("assignedWorkerName", "");
               } else {
-                setAssignedWorkerName(value);
                 handleFieldBlur("assignedWorkerName", value);
               }
             }}
@@ -737,7 +741,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                           const trimmed = newWorker.trim();
                           if (!workers.includes(trimmed)) {
                             setWorkers([...workers, trimmed]);
-                            setAssignedWorkerName(trimmed);
                             handleFieldBlur('assignedWorkerName', trimmed);
                             setNewWorker("");
                             setShowAddWorker(false);
@@ -758,7 +761,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                         const trimmed = newWorker.trim();
                         if (trimmed && !workers.includes(trimmed)) {
                           setWorkers([...workers, trimmed]);
-                          setAssignedWorkerName(trimmed);
                           handleFieldBlur('assignedWorkerName', trimmed);
                           setNewWorker("");
                           setShowAddWorker(false);
