@@ -37,6 +37,7 @@ function hasMinRole(userRole: string | undefined, minRole: string): boolean {
 interface Claim {
   id: string;
   claimCodeRaw: string | null;
+  customerNumber: string | null;
   claimPrefix: string | null;
   status: string;
   claimAcceptanceStatus?: string | null;
@@ -827,6 +828,7 @@ export default function ClaimsPage() {
         <ResponsiveTable
           headers={[
             { key: "claimCode", label: t("claims.mrNumber") },
+            { key: "customerNumber", label: t("claims.customerNumber") },
             { key: "status", label: t("common.status") },
             { key: "customer", label: t("claims.customer") },
             { key: "engineType", label: t("claims.engineType") },
@@ -839,6 +841,11 @@ export default function ClaimsPage() {
             claimCode: (
               <span className="font-medium transition-colors group-hover:text-primary">
                 {claim.claimCodeRaw || <span className="text-muted-foreground italic">Unassigned</span>}
+              </span>
+            ),
+            customerNumber: (
+              <span className="text-muted-foreground text-sm tabular-nums">
+                {claim.customerNumber?.trim() || "–"}
               </span>
             ),
             status: <StatusBadge status={getDisplayStatus(claim)} label={getStatusLabel(getDisplayStatus(claim))} />,
