@@ -268,9 +268,10 @@ export default function StatisticsPage() {
       t("claims.dateEngineDone"),
       t("claims.claimArrivalDate"),
       t("claims.metadata.assignedWorker"),
-      t("claims.metadata.reason"),
       t("claims.metadata.domesticMarket"),
       t("claims.createdAt"),
+      // Isto polje kao u tooltip-u na kraju reda u tabeli statistike
+      t("statistics.exportClaimReason"),
     ];
 
     const rows = sortedClaims.map((claim) => {
@@ -292,15 +293,17 @@ export default function StatisticsPage() {
         engineDateLabel === "–" ? "" : engineDateLabel,
         claim.claimArrivalDate ? new Date(claim.claimArrivalDate).toLocaleDateString() : "",
         workerWhoBuiltMotorLabel(claim),
-        claim.reason || "",
         claim.isDomesticMarket ? t("common.yes") : t("common.no"),
         new Date(claim.createdAt).toLocaleDateString(),
+        claim.reason?.trim() || "",
       ];
     });
 
     const aoa = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = headers.map(() => ({ wch: 18 }));
+    ws["!cols"] = headers.map((_, i) =>
+      i === headers.length - 1 ? { wch: 48 } : { wch: 18 },
+    );
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Statistika");
     const dateStr = new Date().toISOString().split("T")[0];

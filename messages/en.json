@@ -558,7 +558,8 @@
     "selectCompanies": "Select companies...",
     "filterByYear": "Filter by year",
     "filterByEngineType": "Filter by engine type",
-    "market": "Market"
+    "market": "Market",
+    "exportClaimReason": "Claim reason"
   },
   "admin": {
     "title": "Admin Panel",

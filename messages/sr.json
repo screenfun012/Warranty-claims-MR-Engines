@@ -556,7 +556,8 @@
     "selectCompanies": "Izaberi kompanije...",
     "filterByYear": "Filtriraj po godini",
     "filterByEngineType": "Filtriraj po tipu motora",
-    "market": "Tržište"
+    "market": "Tržište",
+    "exportClaimReason": "Razlog reklamacije"
   },
   "admin": {
     "title": "Admin Panel",
