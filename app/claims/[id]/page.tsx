@@ -169,7 +169,8 @@ export default function ClaimDetailPage() {
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<Record<string, unknown>>({});
-  const PATCH_DEBOUNCE_MS = 400;
+  const flushToServerRef = useRef<(silent?: boolean) => Promise<boolean>>(async () => true);
+  const PATCH_DEBOUNCE_MS = 250;
 
   const getStatusLabel = (status: string) => t(`claims.status.${status}` as any) || status;
 
@@ -272,7 +273,9 @@ export default function ClaimDetailPage() {
           // Re-add to pending so next attempt includes them
           Object.assign(pendingRef.current, snapshot);
           const errorText = await res.text();
-          if (!silent) alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
+          // Uvek osveži detalj sa servera — optimistic UI je pogrešan dok PATCH ne uspe
+          void queryClient.invalidateQueries({ queryKey: ["claim", claimId] });
+          alert(`Greška pri čuvanju: ${res.status} ${errorText}`);
           return false;
         }
 
@@ -298,14 +301,15 @@ export default function ClaimDetailPage() {
             },
           );
         }
+
         return true;
       } catch (error) {
         Object.assign(pendingRef.current, snapshot);
         console.error("Error saving claim:", error);
-        if (!silent)
-          alert(
-            `Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown"}`,
-          );
+        void queryClient.invalidateQueries({ queryKey: ["claim", claimId] });
+        alert(
+          `Greška pri čuvanju: ${error instanceof Error ? error.message : "Unknown"}`,
+        );
         return false;
       } finally {
         if (!silent) setIsSaving(false);
@@ -314,9 +318,14 @@ export default function ClaimDetailPage() {
     [claimId, queryClient],
   );
 
+  flushToServerRef.current = flushToServer;
+
   // ── Update claim (called by Metadata, Overview, etc.) ────────────
   const updateClaim = useCallback(
-    (updates: Partial<Claim> | Claim) => {
+    (
+      updates: Partial<Claim> | Claim,
+      opts?: { flushImmediately?: boolean },
+    ) => {
       const updateKeys = Object.keys(updates);
 
       // Full claim replacement (from server / child components that push entire claim)
@@ -351,35 +360,27 @@ export default function ClaimDetailPage() {
         queryClient.setQueryData(["claim", claimId], nextClaim as unknown as Claim);
       }
 
-      // Only start debounce if there are actual server-bound fields
       if (hasPatchable) {
-        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = setTimeout(() => flushToServer(), PATCH_DEBOUNCE_MS);
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
+          debounceTimerRef.current = null;
+        }
+        if (opts?.flushImmediately) {
+          queueMicrotask(() => {
+            void flushToServer(true);
+          });
+        } else {
+          debounceTimerRef.current = setTimeout(() => flushToServer(), PATCH_DEBOUNCE_MS);
+        }
       }
     },
     [claim, claimId, queryClient, flushToServer],
   );
 
-  // ── Flush on unmount (fire-and-forget) ────────────────────────────
+  // Pri napuštanju stranice: isti flush kao dugme (vraća pending ako PATCH padne — ne gubi se u ćorsokaku)
   useEffect(() => {
-    const id = claimId;
     return () => {
-      if (debounceTimerRef.current) {
-        clearTimeout(debounceTimerRef.current);
-        debounceTimerRef.current = null;
-      }
-      const snapshot = { ...pendingRef.current };
-      const patchBody: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(snapshot)) {
-        if (!SKIP_PATCH_FIELDS.has(k)) patchBody[k] = v;
-      }
-      if (Object.keys(patchBody).length === 0) return;
-      pendingRef.current = {};
-      fetch(`/api/claims/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patchBody),
-      }).catch((err) => console.error("[flush on unmount]", err));
+      void flushToServerRef.current(true);
     };
   }, [claimId]);
 
@@ -439,25 +440,33 @@ export default function ClaimDetailPage() {
             <Button
               variant="default"
               size="sm"
-              onClick={() => {
+              disabled={isSaving}
+              onClick={async () => {
+                const ok = await flushToServer(false);
+                if (!ok) {
+                  window.dispatchEvent(
+                    new CustomEvent("claim-save-failed", { detail: { claimId } }),
+                  );
+                  return;
+                }
+                void queryClient.invalidateQueries({ queryKey: ["claims"], exact: false });
                 router.push("/claims");
-                flushToServer(true).then((ok) => {
-                  if (!ok) {
-                    window.dispatchEvent(
-                      new CustomEvent("claim-save-failed", { detail: { claimId } }),
-                    );
-                  }
-                });
               }}
               className="h-8 text-xs sm:text-sm"
             >
-              {t("claims.saveAndBackToList")}
+              {isSaving ? t("common.loading") : t("claims.saveAndBackToList")}
             </Button>
           )}
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push("/claims")}
+            disabled={isSaving}
+            onClick={async () => {
+              const ok = await flushToServer(false);
+              if (!ok) return;
+              void queryClient.invalidateQueries({ queryKey: ["claims"], exact: false });
+              router.push("/claims");
+            }}
             className="h-8 text-xs sm:text-sm"
           >
             <span className="hidden sm:inline">← </span>

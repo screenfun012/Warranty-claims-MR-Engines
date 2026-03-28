@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -69,7 +69,10 @@ interface ClaimMetadataProps {
     }[];
     claimAcceptanceStatus?: string | null;
   };
-  onUpdate: (updates: Record<string, unknown>) => void;
+  onUpdate: (
+    updates: Record<string, unknown>,
+    opts?: { flushImmediately?: boolean },
+  ) => void;
   isReadOnly?: boolean;
 }
 
@@ -85,6 +88,13 @@ function hasMinRole(userRole: string | undefined, minRole: string): boolean {
   const userLevel = ROLE_LEVELS[userRole || "VIEWER"] ?? 0;
   const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
   return userLevel >= requiredLevel;
+}
+
+/** Jedan izvor istine: vrednost iz React Query (optimistički + server), ne dupli lokalni useState — izbegava „vidi se u polju ali nije u bazi“. */
+function dateFromClaimField(iso: string | null | undefined): Date | undefined {
+  if (iso == null || iso === "") return undefined;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
 export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMetadataProps) {
@@ -117,8 +127,14 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
   );
   const [workerFault, setWorkerFault] = useState(claim.workerFault || "");
   const [yearEngineDone, setYearEngineDone] = useState(claim.yearEngineDone?.toString() || "");
-  const [dateEngineDone, setDateEngineDone] = useState<Date | undefined>(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
-  const [claimArrivalDate, setClaimArrivalDate] = useState<Date | undefined>(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
+  const dateEngineDone = useMemo(
+    () => dateFromClaimField(claim.dateEngineDone),
+    [claim.dateEngineDone],
+  );
+  const claimArrivalDate = useMemo(
+    () => dateFromClaimField(claim.claimArrivalDate),
+    [claim.claimArrivalDate],
+  );
   const [reason, setReason] = useState(claim.reason || "");
 
   /** Tekst ili (legacy) assignedTo.fullName — isto kao lista reklamacija */
@@ -326,8 +342,6 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
       }
       setWorkerFault(claim.workerFault || "");
       setYearEngineDone(claim.yearEngineDone?.toString() || "");
-      setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
-      setClaimArrivalDate(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
       setReason(claim.reason || "");
       setEditingField(null);
       setNotificationSent(!!claim.processingEmailSentAt);
@@ -371,17 +385,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     setReason(claim.reason || "");
   }, [claim.reason, claim.id, editingField]);
 
-  useEffect(() => {
-    setYearEngineDone(claim.yearEngineDone != null ? String(claim.yearEngineDone) : "");
-  }, [claim.yearEngineDone, claim.id]);
-
-  useEffect(() => {
-    setDateEngineDone(claim.dateEngineDone ? new Date(claim.dateEngineDone) : undefined);
-  }, [claim.dateEngineDone, claim.id]);
-
-  useEffect(() => {
-    setClaimArrivalDate(claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : undefined);
-  }, [claim.claimArrivalDate, claim.id]);
+  // Datumi (datum izrade / prijem): samo iz claim.* (React Query), bez duplog useState — polje uvek odražava keš koji i PATCH menja.
 
   const handleFieldBlur = (field: string, value: string | number | boolean | null) => {
     setEditingField(null);
@@ -526,7 +530,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     if (claim.status === "NEW") {
       updates.status = "IN_ANALYSIS";
     }
-    onUpdate(updates);
+    onUpdate(updates, { flushImmediately: true });
   };
 
   // Handle isDomesticMarket change
@@ -535,7 +539,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
     if (claim.status === "NEW") {
       updates.status = "IN_ANALYSIS";
     }
-    onUpdate(updates);
+    onUpdate(updates, { flushImmediately: true });
   };
 
   return (
@@ -741,7 +745,7 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
                   const updates: Record<string, unknown> = { assignedWorkerName: null };
                   if (claim.assignedTo?.id) updates.assignedToId = null;
                   if (claim.status === "NEW") updates.status = "IN_ANALYSIS";
-                  onUpdate(updates);
+                  onUpdate(updates, { flushImmediately: true });
                 }
               } else {
                 handleFieldBlur("assignedWorkerName", value);
@@ -909,14 +913,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           <DatePicker
             date={dateEngineDone}
             onSelect={(date) => {
-              setDateEngineDone(date);
-              // Auto-update when date is selected
               const isoDate = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T12:00:00.000Z` : null;
               const updates: Record<string, unknown> = { dateEngineDone: isoDate };
               if (claim.status === "NEW") {
                 updates.status = "IN_ANALYSIS";
               }
-              onUpdate(updates);
+              onUpdate(updates, { flushImmediately: true });
             }}
             placeholder={t("common.select") + " " + t("common.date")}
             disabled={isReadOnly}
@@ -932,13 +934,12 @@ export function ClaimMetadata({ claim, onUpdate, isReadOnly = false }: ClaimMeta
           <DatePicker
             date={claimArrivalDate}
             onSelect={(date) => {
-              setClaimArrivalDate(date);
               const isoDate = date ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}T12:00:00.000Z` : null;
               const updates: Record<string, unknown> = { claimArrivalDate: isoDate };
               if (claim.status === "NEW") {
                 updates.status = "IN_ANALYSIS";
               }
-              onUpdate(updates);
+              onUpdate(updates, { flushImmediately: true });
             }}
             placeholder={t("common.select") + " " + t("common.date")}
             disabled={isReadOnly}
