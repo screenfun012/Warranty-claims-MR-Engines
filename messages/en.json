@@ -559,7 +559,9 @@
     "filterByYear": "Filter by year",
     "filterByEngineType": "Filter by engine type",
     "market": "Market",
-    "exportClaimReason": "Claim reason"
+    "exportClaimReason": "Claim reason",
+    "workerFilter": "Worker (who built the engine)",
+    "selectWorkers": "Select workers..."
   },
   "admin": {
     "title": "Admin Panel",

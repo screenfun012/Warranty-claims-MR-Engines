@@ -557,7 +557,9 @@
     "filterByYear": "Filtriraj po godini",
     "filterByEngineType": "Filtriraj po tipu motora",
     "market": "Tržište",
-    "exportClaimReason": "Razlog reklamacije"
+    "exportClaimReason": "Razlog reklamacije",
+    "workerFilter": "Radnik (ko je radio motor)",
+    "selectWorkers": "Izaberi radnike..."
   },
   "admin": {
     "title": "Admin Panel",

@@ -39,6 +39,7 @@ import {
   engineAssemblyDateForList,
   workerWhoBuiltMotorLabel,
 } from "@/lib/domain/claimDisplay";
+import { TABLE_PAGE_SIZE_OPTIONS, usePersistentTablePageSize } from "@/lib/hooks/usePersistentTablePageSize";
 
 interface Claim {
   id: string;
@@ -86,6 +87,8 @@ interface Filters {
   customerNames: string[];
   customerCompanies: string[];
   faultDepartmentId: string[];
+  /** Imena radnika (PredefinedWorker) — prazno = svi */
+  workerNames: string[];
   yearEngineDone: string;
   isDomesticMarket: string;
   engineType: string;
@@ -101,6 +104,7 @@ export default function StatisticsPage() {
     customerNames: [],
     customerCompanies: [],
     faultDepartmentId: [],
+    workerNames: [],
     yearEngineDone: "",
     isDomesticMarket: "",
     engineType: "",
@@ -111,7 +115,7 @@ export default function StatisticsPage() {
   const [sortField, setSortField] = useState<string>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = usePersistentTablePageSize();
 
   // Fetch departments for filter
   const { data: departmentsData } = useQuery({
@@ -152,6 +156,23 @@ export default function StatisticsPage() {
     return Array.from(companies).sort().map(company => ({ value: company, label: company }));
   }, [customersData]);
 
+  const { data: workersData } = useQuery({
+    queryKey: ["predefined-workers-statistics"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/workers");
+      if (!res.ok) return { workers: [] as { id: string; name: string }[] };
+      return res.json();
+    },
+  });
+
+  const workerOptions = useMemo(() => {
+    const workers = workersData?.workers || [];
+    return workers.map((w: { name: string }) => ({
+      value: w.name,
+      label: w.name,
+    }));
+  }, [workersData]);
+
   // Fetch statistics with filters
   const { data: statisticsData, isLoading } = useQuery({
     queryKey: ["statistics", filters],
@@ -162,6 +183,7 @@ export default function StatisticsPage() {
       filters.customerNames.forEach(n => params.append("customerName", n));
       filters.customerCompanies.forEach(c => params.append("customerCompany", c));
       filters.faultDepartmentId.forEach(d => params.append("faultDepartmentId", d));
+      filters.workerNames.forEach((w) => params.append("workerName", w));
       if (filters.yearEngineDone) params.append("yearEngineDone", filters.yearEngineDone);
       if (filters.isDomesticMarket !== "") params.append("isDomesticMarket", filters.isDomesticMarket);
       if (filters.engineType) params.append("engineType", filters.engineType);
@@ -317,6 +339,7 @@ export default function StatisticsPage() {
       customerNames: [],
       customerCompanies: [],
       faultDepartmentId: [],
+      workerNames: [],
       yearEngineDone: "",
       isDomesticMarket: "",
       engineType: "",
@@ -331,6 +354,7 @@ export default function StatisticsPage() {
       filters.customerNames.length > 0 ||
       filters.customerCompanies.length > 0 ||
       filters.faultDepartmentId.length > 0 ||
+      filters.workerNames.length > 0 ||
       filters.yearEngineDone !== "" ||
       filters.isDomesticMarket !== "" ||
       filters.engineType !== "" ||
@@ -475,6 +499,19 @@ export default function StatisticsPage() {
                     }));
                   }}
                   placeholder={t("statistics.allDepartments")}
+                />
+              </div>
+
+              {/* Radnik koji je radio motor — više izbora; prazno = svi */}
+              <div>
+                <Label>{t("statistics.workerFilter")}</Label>
+                <MultiSelect
+                  options={workerOptions}
+                  selected={filters.workerNames}
+                  onChange={(selected) =>
+                    setFilters((prev) => ({ ...prev, workerNames: selected }))
+                  }
+                  placeholder={t("statistics.selectWorkers")}
                 />
               </div>
 
@@ -666,10 +703,11 @@ export default function StatisticsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="25">25</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                    <SelectItem value="100">100</SelectItem>
+                    {TABLE_PAGE_SIZE_OPTIONS.map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
