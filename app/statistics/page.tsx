@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,7 +17,6 @@ import {
   Download, 
   Filter, 
   X,
-  CalendarIcon,
   Info,
   ChevronLeft,
   ChevronRight,
@@ -40,6 +40,25 @@ import {
   workerWhoBuiltMotorLabel,
 } from "@/lib/domain/claimDisplay";
 import { TABLE_PAGE_SIZE_OPTIONS, usePersistentTablePageSize } from "@/lib/hooks/usePersistentTablePageSize";
+
+function StatisticsFilterSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 *:space-y-2">
+        {children}
+      </div>
+    </div>
+  );
+}
 
 interface Claim {
   id: string;
@@ -423,19 +442,50 @@ export default function StatisticsPage() {
 
       {/* Filters */}
       {showFilters && (
-        <Card className="p-6">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{t("statistics.filters")}</h2>
+        <Card className="overflow-hidden">
+          <div className="border-b bg-muted/30 px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold leading-tight">{t("statistics.filters")}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{t("statistics.filterHint")}</p>
+              </div>
               {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <Button variant="outline" size="sm" onClick={clearFilters} className="w-full shrink-0 sm:w-auto">
                   {t("statistics.clearFilters")}
                 </Button>
               )}
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Status Filter */}
+          </div>
+          <div className="space-y-8 p-4 sm:p-6">
+            {/* 1. Datumi prvo — tipičan analitički tok */}
+            <StatisticsFilterSection title={t("statistics.filterSections.timeRange")}>
+              <div>
+                <Label>{t("statistics.dateFrom")}</Label>
+                <DatePicker
+                  date={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
+                  onSelect={(date) => setFilters(prev => ({ 
+                    ...prev, 
+                    dateFrom: date ? format(date, "yyyy-MM-dd") : "" 
+                  }))}
+                  placeholder={t("statistics.selectStartDate")}
+                />
+              </div>
+              <div>
+                <Label>{t("statistics.dateTo")}</Label>
+                <DatePicker
+                  date={filters.dateTo ? new Date(filters.dateTo) : undefined}
+                  onSelect={(date) => setFilters(prev => ({ 
+                    ...prev, 
+                    dateTo: date ? format(date, "yyyy-MM-dd") : "" 
+                  }))}
+                  placeholder={t("statistics.selectEndDate")}
+                />
+              </div>
+            </StatisticsFilterSection>
+
+            <Separator />
+
+            <StatisticsFilterSection title={t("statistics.filterSections.statusAndMarket")}>
               <div>
                 <Label>{t("common.status")}</Label>
                 <Select
@@ -460,8 +510,27 @@ export default function StatisticsPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>{t("statistics.market")}</Label>
+                <Select
+                  value={filters.isDomesticMarket || "all"}
+                  onValueChange={(value) => setFilters(prev => ({ ...prev, isDomesticMarket: value === "all" ? "" : value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t("statistics.allMarkets")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{t("statistics.allMarkets")}</SelectItem>
+                    <SelectItem value="true">{t("statistics.domestic")}</SelectItem>
+                    <SelectItem value="false">{t("statistics.international")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </StatisticsFilterSection>
 
-              {/* Customer Name - Multi-select */}
+            <Separator />
+
+            <StatisticsFilterSection title={t("statistics.filterSections.customer")}>
               <div>
                 <Label>{t("statistics.customerName")}</Label>
                 <MultiSelect
@@ -471,8 +540,6 @@ export default function StatisticsPage() {
                   placeholder={t("statistics.selectCustomers")}
                 />
               </div>
-
-              {/* Customer Company - Multi-select */}
               <div>
                 <Label>{t("statistics.customerCompany")}</Label>
                 <MultiSelect
@@ -482,8 +549,30 @@ export default function StatisticsPage() {
                   placeholder={t("statistics.selectCompanies")}
                 />
               </div>
+            </StatisticsFilterSection>
 
-              {/* Fault Department - Multi-select */}
+            <Separator />
+
+            <StatisticsFilterSection title={t("statistics.filterSections.engineAndTeam")}>
+              <div>
+                <Label>{t("claims.engineType")}</Label>
+                <Input
+                  value={filters.engineType}
+                  onChange={(e) => setFilters(prev => ({ ...prev, engineType: e.target.value }))}
+                  placeholder={t("statistics.filterByEngineType")}
+                />
+              </div>
+              <div>
+                <Label>{t("claims.metadata.yearEngineDone")}</Label>
+                <Input
+                  type="number"
+                  value={filters.yearEngineDone}
+                  onChange={(e) => setFilters(prev => ({ ...prev, yearEngineDone: e.target.value }))}
+                  placeholder={t("statistics.filterByYear")}
+                  min="1900"
+                  max="2100"
+                />
+              </div>
               <div>
                 <Label>{t("claims.metadata.faultDepartment")}</Label>
                 <MultiSelect
@@ -501,8 +590,6 @@ export default function StatisticsPage() {
                   placeholder={t("statistics.allDepartments")}
                 />
               </div>
-
-              {/* Radnik koji je radio motor — više izbora; prazno = svi */}
               <div>
                 <Label>{t("statistics.workerFilter")}</Label>
                 <MultiSelect
@@ -514,74 +601,7 @@ export default function StatisticsPage() {
                   placeholder={t("statistics.selectWorkers")}
                 />
               </div>
-
-              {/* Year Engine Done */}
-              <div>
-                <Label>{t("claims.metadata.yearEngineDone")}</Label>
-                <Input
-                  type="number"
-                  value={filters.yearEngineDone}
-                  onChange={(e) => setFilters(prev => ({ ...prev, yearEngineDone: e.target.value }))}
-                  placeholder={t("statistics.filterByYear")}
-                  min="1900"
-                  max="2100"
-                />
-              </div>
-
-              {/* Engine Type */}
-              <div>
-                <Label>{t("claims.engineType")}</Label>
-                <Input
-                  value={filters.engineType}
-                  onChange={(e) => setFilters(prev => ({ ...prev, engineType: e.target.value }))}
-                  placeholder={t("statistics.filterByEngineType")}
-                />
-              </div>
-
-              {/* Domestic Market */}
-              <div>
-                <Label>{t("statistics.market")}</Label>
-                <Select
-                  value={filters.isDomesticMarket || "all"}
-                  onValueChange={(value) => setFilters(prev => ({ ...prev, isDomesticMarket: value === "all" ? "" : value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t("statistics.allMarkets")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("statistics.allMarkets")}</SelectItem>
-                    <SelectItem value="true">{t("statistics.domestic")}</SelectItem>
-                    <SelectItem value="false">{t("statistics.international")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date From */}
-              <div>
-                <Label>{t("statistics.dateFrom")}</Label>
-                <DatePicker
-                  date={filters.dateFrom ? new Date(filters.dateFrom) : undefined}
-                  onSelect={(date) => setFilters(prev => ({ 
-                    ...prev, 
-                    dateFrom: date ? format(date, "yyyy-MM-dd") : "" 
-                  }))}
-                  placeholder={t("statistics.selectStartDate")}
-                />
-              </div>
-
-              {/* Date To */}
-              <div>
-                <Label>{t("statistics.dateTo")}</Label>
-                <DatePicker
-                  date={filters.dateTo ? new Date(filters.dateTo) : undefined}
-                  onSelect={(date) => setFilters(prev => ({ 
-                    ...prev, 
-                    dateTo: date ? format(date, "yyyy-MM-dd") : "" 
-                  }))}
-                  placeholder={t("statistics.selectEndDate")}
-                />
-              </div>
-            </div>
+            </StatisticsFilterSection>
           </div>
         </Card>
       )}

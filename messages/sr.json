@@ -529,6 +529,7 @@
     "title": "Statistika",
     "subtitle": "Statistika i analiza metapodataka reklamacija",
     "filters": "Filteri",
+    "filterHint": "Podesite uslove po grupama; gde nije izabrano ništa, podrazumevano su svi podaci.",
     "showFilters": "Prikaži filtere",
     "hideFilters": "Sakrij filtere",
     "clearFilters": "Obriši filtere",
@@ -559,7 +560,13 @@
     "market": "Tržište",
     "exportClaimReason": "Razlog reklamacije",
     "workerFilter": "Radnik (ko je radio motor)",
-    "selectWorkers": "Izaberi radnike..."
+    "selectWorkers": "Izaberi radnike...",
+    "filterSections": {
+      "timeRange": "Vremenski opseg",
+      "statusAndMarket": "Status i tržište",
+      "customer": "Kupac",
+      "engineAndTeam": "Motor, odeljenje i radnici"
+    }
   },
   "admin": {
     "title": "Admin Panel",

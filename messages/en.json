@@ -531,6 +531,7 @@
     "title": "Statistics",
     "subtitle": "Claim metadata statistics and analysis",
     "filters": "Filters",
+    "filterHint": "Adjust criteria by group; where nothing is selected, all matching records are included.",
     "showFilters": "Show Filters",
     "hideFilters": "Hide Filters",
     "clearFilters": "Clear Filters",
@@ -561,7 +562,13 @@
     "market": "Market",
     "exportClaimReason": "Claim reason",
     "workerFilter": "Worker (who built the engine)",
-    "selectWorkers": "Select workers..."
+    "selectWorkers": "Select workers...",
+    "filterSections": {
+      "timeRange": "Time range",
+      "statusAndMarket": "Status & market",
+      "customer": "Customer",
+      "engineAndTeam": "Engine, department & workers"
+    }
   },
   "admin": {
     "title": "Admin Panel",
