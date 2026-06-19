@@ -36,327 +36,179 @@ export async function GET() {
   }
   try {
     const prisma = await getPrisma();
-    
-    // Get total claims count
-    let totalClaims = 0;
-    try {
-      totalClaims = await prisma.claim.count();
-    } catch (error) {
-      console.error("Error counting total claims:", error);
-    }
 
-    // Get claims by status - handle SQLite limitations
-    let claimsByStatus: Array<{ status: string; _count: { id: number } }> = [];
+    // ── One query for all status-derived counts ──────────────────────
+    // total / approved / rejected / in-process / claimsByStatus all come
+    // from a single groupBy instead of 5 separate round-trips to Turso.
+    let claimsByStatusRaw: Array<{ status: string; _count: { id: number } }> = [];
     try {
+      const groupResult = await prisma.claim.groupBy({
+        by: ["status"],
+        _count: { id: true },
+      });
+      claimsByStatusRaw = groupResult as unknown as Array<{ status: string; _count: { id: number } }>;
+    } catch (groupByError) {
+      console.warn("groupBy failed, using fallback:", groupByError);
       try {
-        const result = await prisma.claim.groupBy({
-          by: ["status"],
-          _count: {
-            id: true,
-          },
-        });
-        claimsByStatus = result as Array<{ status: string; _count: { id: number } }>;
-      } catch (groupByError) {
-        // Fallback for SQLite if groupBy fails
-        console.warn("groupBy failed, using fallback:", groupByError);
-        const allClaims = await prisma.claim.findMany({
-          select: { status: true },
-        });
+        const allClaims = await prisma.claim.findMany({ select: { status: true } });
         const statusMap = new Map<string, number>();
-        allClaims.forEach((claim) => {
-          statusMap.set(claim.status, (statusMap.get(claim.status) || 0) + 1);
-        });
-        claimsByStatus = Array.from(statusMap.entries()).map(([status, count]) => ({
+        allClaims.forEach((c) => statusMap.set(c.status, (statusMap.get(c.status) || 0) + 1));
+        claimsByStatusRaw = Array.from(statusMap.entries()).map(([status, count]) => ({
           status,
           _count: { id: count },
         }));
-      }
-    } catch (error) {
-      console.error("Error fetching claims by status:", error);
-    }
-
-    // Get approved claims - based on status = 'APPROVED' (unified status system)
-    let approvedCount = 0;
-    try {
-      approvedCount = await prisma.claim.count({
-        where: {
-          status: "APPROVED",
-        },
-      });
-    } catch (error) {
-      console.warn("Error counting approved claims:", error);
-    }
-
-    // Get rejected claims - based on status = 'REJECTED' (unified status system)
-    let rejectedCount = 0;
-    try {
-      rejectedCount = await prisma.claim.count({
-        where: {
-          status: "REJECTED",
-        },
-      });
-    } catch (error) {
-      console.warn("Error counting rejected claims:", error);
-    }
-
-    // Get resolved claims (APPROVED + REJECTED) - završene reklamacije
-    let resolvedCount = 0;
-    try {
-      resolvedCount = approvedCount + rejectedCount;
-    } catch (error) {
-      console.error("Error calculating resolved count:", error);
-    }
-
-    // Get in process claims (NEW, IN_ANALYSIS) - exclude CLOSED
-    let inProcessCount = 0;
-    try {
-      try {
-        inProcessCount = await prisma.claim.count({
-          where: {
-            status: {
-              in: ["NEW", "IN_ANALYSIS"],
-            },
-          },
-        });
       } catch (error) {
-        // Fallback: count manually if `in` operator fails
-        console.warn("Error counting in-process claims, using fallback:", error);
-        const newCount = await prisma.claim.count({ where: { status: "NEW" } }).catch(() => 0);
-        const analysisCount = await prisma.claim.count({ where: { status: "IN_ANALYSIS" } }).catch(() => 0);
-        inProcessCount = newCount + analysisCount;
+        console.error("Error fetching claims by status:", error);
       }
-    } catch (error) {
-      console.error("Error calculating in-process count:", error);
     }
+    const statusCount = (s: string) =>
+      claimsByStatusRaw.find((r) => r.status === s)?._count.id ?? 0;
+    const claimsByStatus = claimsByStatusRaw;
+    const totalClaims = claimsByStatusRaw.reduce((a, r) => a + r._count.id, 0);
+    const approvedCount = statusCount("APPROVED");
+    const rejectedCount = statusCount("REJECTED");
+    const inProcessCount = statusCount("NEW") + statusCount("IN_ANALYSIS");
+    const resolvedCount = approvedCount + rejectedCount;
 
-    // Get claims by customer - group by company/name (not customerId)
-    // This groups customers with the same company/name together
-    let claimsByCustomerWithNames: Array<{ customerId: string | null; customerName: string; count: number }> = [];
-    try {
-      // Get all claims with customers
-      const allClaimsWithCustomer = await prisma.claim.findMany({
-        where: {
-          customerId: {
-            not: null,
-          },
-        },
-        select: { 
-          customerId: true,
-          customer: {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    // ── Remaining independent queries run in parallel (one round-trip wave) ──
+    const [
+      claimsByCustomerWithNames,
+      recentClaims,
+      unreadEmailsCount,
+      allInAnalysis,
+      monthClaims,
+    ] = await Promise.all([
+      // Claims by customer - grouped by company/name
+      (async (): Promise<Array<{ customerId: string | null; customerName: string; count: number }>> => {
+        try {
+          const allClaimsWithCustomer = await prisma.claim.findMany({
+            where: { customerId: { not: null } },
             select: {
-              id: true,
-              name: true,
-              company: true,
+              customerId: true,
+              customer: { select: { id: true, name: true, company: true } },
             },
-          },
-        },
-      });
-
-      // Group by company/name (normalized)
-      const customerGroupMap = new Map<string, { customerName: string; count: number; customerIds: string[] }>();
-      
-      allClaimsWithCustomer.forEach((claim) => {
-        if (!claim.customer) return;
-        
-        // Use company if available, otherwise name, otherwise "Unknown"
-        const displayName = claim.customer.company?.trim() || claim.customer.name?.trim() || "Unknown";
-        // Normalize: lowercase and trim for grouping
-        const normalizedKey = displayName.toLowerCase().trim();
-        
-        const existing = customerGroupMap.get(normalizedKey);
-        if (existing) {
-          existing.count++;
-          if (!existing.customerIds.includes(claim.customer.id)) {
-            existing.customerIds.push(claim.customer.id);
-          }
-        } else {
-          customerGroupMap.set(normalizedKey, {
-            customerName: displayName,
-            count: 1,
-            customerIds: [claim.customer.id],
           });
+          const customerGroupMap = new Map<string, { customerName: string; count: number; customerIds: string[] }>();
+          allClaimsWithCustomer.forEach((claim) => {
+            if (!claim.customer) return;
+            const displayName = claim.customer.company?.trim() || claim.customer.name?.trim() || "Unknown";
+            const normalizedKey = displayName.toLowerCase().trim();
+            const existing = customerGroupMap.get(normalizedKey);
+            if (existing) {
+              existing.count++;
+              if (!existing.customerIds.includes(claim.customer.id)) existing.customerIds.push(claim.customer.id);
+            } else {
+              customerGroupMap.set(normalizedKey, { customerName: displayName, count: 1, customerIds: [claim.customer.id] });
+            }
+          });
+          return Array.from(customerGroupMap.values())
+            .map((group) => ({ customerId: group.customerIds[0], customerName: group.customerName, count: group.count }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+        } catch (error) {
+          console.error("Error fetching claims by customer:", error);
+          return [];
         }
-      });
-
-      // Convert to array and sort by count (descending)
-      claimsByCustomerWithNames = Array.from(customerGroupMap.values())
-        .map((group) => ({
-          customerId: group.customerIds[0], // Use first customerId for reference
-          customerName: group.customerName,
-          count: group.count,
-        }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10); // Top 10
-    } catch (error) {
-      console.error("Error fetching claims by customer:", error);
-    }
-
-    // Get claims by final status (APPROVED/REJECTED) - unified status system
-    let claimsByAcceptanceStatus: Array<{ acceptanceStatus: string; count: number }> = [];
-    try {
-      claimsByAcceptanceStatus = [
-        { acceptanceStatus: "APPROVED", count: approvedCount },
-        { acceptanceStatus: "REJECTED", count: rejectedCount },
-      ].filter(item => item.count > 0);
-    } catch (error) {
-      console.warn("Error building claims by acceptance status:", error);
-    }
-
-    // Get recent claims (last 10)
-    let recentClaims: Array<{
-      id: string;
-      claimCodeRaw: string | null;
-      status: string;
-      customer: { name: string | null; company: string | null } | null;
-      createdAt: Date;
-    }> = [];
-    try {
-      recentClaims = await prisma.claim.findMany({
-        take: 10,
-        orderBy: {
-          createdAt: "desc",
-        },
-        select: {
-          id: true,
-          claimCodeRaw: true,
-          status: true,
-          createdAt: true,
-          customer: {
-            select: {
-              name: true,
-              company: true,
-            },
+      })(),
+      // Recent claims (last 10)
+      prisma.claim
+        .findMany({
+          take: 10,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            claimCodeRaw: true,
+            status: true,
+            createdAt: true,
+            customer: { select: { name: true, company: true } },
           },
-        },
-      });
-    } catch (error) {
-      console.error("Error fetching recent claims:", error);
-    }
-
-    // Outlook-style unread threads (all)
-    let unreadEmailsCount = 0;
-    try {
-      unreadEmailsCount = await countEffectivelyUnreadThreads(prisma);
-    } catch (error) {
-      console.error("Error fetching unread emails count:", error);
-    }
-
-    // Get urgent claims (IN_ANALYSIS status, older than 7 days)
-    let urgentClaims: Array<{
-      id: string;
-      claimCodeRaw: string | null;
-      status: string;
-      customer: { name: string | null; company: string | null } | null;
-      createdAt: Date;
-      claimArrivalDate: Date | null;
-    }> = [];
-    try {
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      // Hitne reklamacije: samo IN_ANALYSIS status, starije od 7 dana
-      // Koristi claimArrivalDate ako postoji, inače createdAt
-      const allInAnalysis = await prisma.claim.findMany({
-        where: {
-          status: "IN_ANALYSIS",
-        },
-        select: {
-          id: true,
-          claimCodeRaw: true,
-          status: true,
-          createdAt: true,
-          claimArrivalDate: true,
-          customer: {
-            select: {
-              name: true,
-              company: true,
-            },
-          },
-        },
-      });
-      
-      // Filter claims that are older than 7 days (using claimArrivalDate if available, otherwise createdAt)
-      urgentClaims = allInAnalysis
-        .filter((claim) => {
-          const referenceDate = claim.claimArrivalDate 
-            ? new Date(claim.claimArrivalDate) 
-            : new Date(claim.createdAt);
-          return referenceDate < sevenDaysAgo;
         })
-        .slice(0, 10)
-        .sort((a, b) => {
-          const dateA = a.claimArrivalDate ? new Date(a.claimArrivalDate) : new Date(a.createdAt);
-          const dateB = b.claimArrivalDate ? new Date(b.claimArrivalDate) : new Date(b.createdAt);
-          return dateA.getTime() - dateB.getTime(); // Oldest first
-        });
-    } catch (error) {
-      console.error("Error fetching urgent claims:", error);
+        .catch((error) => {
+          console.error("Error fetching recent claims:", error);
+          return [] as Array<{ id: string; claimCodeRaw: string | null; status: string; customer: { name: string | null; company: string | null } | null; createdAt: Date }>;
+        }),
+      // Unread threads (Outlook-style)
+      countEffectivelyUnreadThreads(prisma).catch((error) => {
+        console.error("Error fetching unread emails count:", error);
+        return 0;
+      }),
+      // IN_ANALYSIS claims (urgent computed below)
+      prisma.claim
+        .findMany({
+          where: { status: "IN_ANALYSIS" },
+          select: {
+            id: true,
+            claimCodeRaw: true,
+            status: true,
+            createdAt: true,
+            claimArrivalDate: true,
+            customer: { select: { name: true, company: true } },
+          },
+        })
+        .catch((error) => {
+          console.error("Error fetching urgent claims:", error);
+          return [] as Array<{ id: string; claimCodeRaw: string | null; status: string; createdAt: Date; claimArrivalDate: Date | null; customer: { name: string | null; company: string | null } | null }>;
+        }),
+      // Claims in last 12 months with final status (for trend chart)
+      prisma.claim
+        .findMany({
+          where: { createdAt: { gte: twelveMonthsAgo }, status: { in: ["APPROVED", "REJECTED"] } },
+          select: { status: true, createdAt: true },
+        })
+        .catch((error) => {
+          console.error("Error fetching claims by month:", error);
+          return [] as Array<{ status: string; createdAt: Date }>;
+        }),
+    ]);
+
+    // Final status breakdown (derived, no query)
+    const claimsByAcceptanceStatus = [
+      { acceptanceStatus: "APPROVED", count: approvedCount },
+      { acceptanceStatus: "REJECTED", count: rejectedCount },
+    ].filter((item) => item.count > 0);
+
+    // Urgent: IN_ANALYSIS older than 7 days (arrival date if present, else createdAt)
+    const urgentClaims = allInAnalysis
+      .filter((claim) => {
+        const referenceDate = claim.claimArrivalDate ? new Date(claim.claimArrivalDate) : new Date(claim.createdAt);
+        return referenceDate < sevenDaysAgo;
+      })
+      .sort((a, b) => {
+        const dateA = a.claimArrivalDate ? new Date(a.claimArrivalDate) : new Date(a.createdAt);
+        const dateB = b.claimArrivalDate ? new Date(b.claimArrivalDate) : new Date(b.createdAt);
+        return dateA.getTime() - dateB.getTime();
+      })
+      .slice(0, 10);
+
+    // Claims by month for the trend chart (last 12 months)
+    const monthMap = new Map<string, { accepted: number; rejected: number; label: string }>();
+    const monthNames = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'avg', 'sep', 'okt', 'nov', 'dec'];
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date();
+      date.setMonth(date.getMonth() - i);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}.`;
+      monthMap.set(monthKey, { accepted: 0, rejected: 0, label: monthLabel });
     }
-
-    // Get claims by month for trend chart (last 12 months) - unified status system
-    let claimsByMonth: Array<{
-      month: string;
-      accepted: number;
-      rejected: number;
-    }> = [];
-    try {
-      const now = new Date();
-      const twelveMonthsAgo = new Date();
-      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-      
-      // Get all claims from last 12 months with APPROVED/REJECTED status
-      const claims = await prisma.claim.findMany({
-        where: {
-          createdAt: {
-            gte: twelveMonthsAgo,
-          },
-          status: {
-            in: ["APPROVED", "REJECTED"],
-          },
-        },
-        select: {
-          status: true,
-          createdAt: true,
-        },
-      });
-
-      // Group by month
-      const monthMap = new Map<string, { accepted: number; rejected: number; label: string }>();
-      
-      // Initialize all months (last 12 months) - use Latin month names
-      const monthNames = ['jan', 'feb', 'mar', 'apr', 'maj', 'jun', 'jul', 'avg', 'sep', 'okt', 'nov', 'dec'];
-      for (let i = 11; i >= 0; i--) {
-        const date = new Date();
-        date.setMonth(date.getMonth() - i);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const monthLabel = `${monthNames[date.getMonth()]} ${date.getFullYear()}.`;
-        monthMap.set(monthKey, { accepted: 0, rejected: 0, label: monthLabel });
+    monthClaims.forEach((claim) => {
+      const date = new Date(claim.createdAt);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthData = monthMap.get(monthKey);
+      if (monthData) {
+        if (claim.status === "APPROVED") monthData.accepted++;
+        else if (claim.status === "REJECTED") monthData.rejected++;
       }
-
-      // Count claims by month using unified status
-      claims.forEach((claim) => {
-        const date = new Date(claim.createdAt);
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const monthData = monthMap.get(monthKey);
-        if (monthData) {
-          if (claim.status === "APPROVED") {
-            monthData.accepted++;
-          } else if (claim.status === "REJECTED") {
-            monthData.rejected++;
-          }
-        }
-      });
-
-      // Convert to array format - show all months, even if 0
-      claimsByMonth = Array.from(monthMap.entries())
-        .map(([key, data]) => ({
-          month: data.label,
-          accepted: data.accepted,
-          rejected: data.rejected,
-        }));
-    } catch (error) {
-      console.error("Error fetching claims by month:", error);
-    }
+    });
+    const claimsByMonth = Array.from(monthMap.values()).map((data) => ({
+      month: data.label,
+      accepted: data.accepted,
+      rejected: data.rejected,
+    }));
 
     const stats = {
       totalClaims,
