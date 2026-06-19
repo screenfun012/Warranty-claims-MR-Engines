@@ -2,7 +2,6 @@
  * Load email bodies from NAS .eml when DB fields were cleared after raw archive save.
  */
 
-import { simpleParser } from "mailparser";
 import { readAttachmentFile } from "@/lib/files/fileStorage";
 
 export type MessageWithRawFields = {
@@ -13,6 +12,10 @@ export type MessageWithRawFields = {
 };
 
 export async function parseEmlBuffer(buffer: Buffer): Promise<{ text?: string; html?: string }> {
+  // Lazy import: keep the heavy mailparser dependency out of the cold-start
+  // bundle of routes that include this file (e.g. claim detail) — it only
+  // loads when we actually need to parse a .eml from NAS.
+  const { simpleParser } = await import("mailparser");
   const parsed = await simpleParser(buffer);
   const text = typeof parsed.text === "string" ? parsed.text : undefined;
   const html = typeof parsed.html === "string" ? parsed.html : undefined;
