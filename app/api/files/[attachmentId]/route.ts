@@ -40,9 +40,7 @@ export async function GET(
     }
 
     try {
-      console.log(`[files/${attachmentId}] Reading file: ${attachment.filePath} (isWebDAV: ${isWebDAV})`);
       const fileBuffer = await readAttachmentFile(attachment.filePath);
-      console.log(`[files/${attachmentId}] Successfully read ${fileBuffer.length} bytes`);
       return new NextResponse(new Uint8Array(fileBuffer), {
         headers: {
           "Content-Type": attachment.mimeType,

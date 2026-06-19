@@ -182,24 +182,9 @@ export async function GET(request: NextRequest) {
       ]);
     }
 
+    // enrichClaimsForListView now also returns claimAcceptanceStatus, so the
+    // previous separate batch query for it is no longer needed (one fewer round-trip).
     claims = (await enrichClaimsForListView(prisma, claims)) as typeof claims;
-
-    // If claimAcceptanceStatus is not returned by Prisma, fetch in one batch
-    const missingStatus = claims.filter((c) => (c as any).claimAcceptanceStatus === undefined);
-    if (missingStatus.length > 0) {
-      const ids = missingStatus.map((c) => c.id);
-      const placeholders = ids.map(() => "?").join(",");
-      const statusRows = await prisma.$queryRawUnsafe<Array<{ id: string; claimAcceptanceStatus: string | null }>>(
-        `SELECT id, claimAcceptanceStatus FROM Claim WHERE id IN (${placeholders})`,
-        ...ids
-      );
-      const statusById = new Map(statusRows.map((r) => [r.id, r.claimAcceptanceStatus]));
-      for (const claim of claims) {
-        if ((claim as any).claimAcceptanceStatus === undefined) {
-          (claim as any).claimAcceptanceStatus = statusById.get(claim.id) ?? null;
-        }
-      }
-    }
 
     // Calculate pagination info
     const totalPages = Math.ceil(total / limit);

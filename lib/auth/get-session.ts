@@ -1,8 +1,13 @@
+import { cache } from "react";
 import { auth0 } from "@/lib/auth0";
 import { getUserRoles } from "@/lib/auth0-management";
 import { normalizeAuth0Role } from "@/lib/auth/roles";
 
-export async function getSession() {
+// Memoized per-request: within a single API request / render, repeated
+// getSession() calls reuse one cookie decrypt instead of decrypting each time.
+// cache() is request-scoped in the Next.js App Router, so it never leaks
+// session state between requests/users.
+export const getSession = cache(async function getSession() {
   const session = await auth0.getSession();
   if (!session) return null;
   
@@ -67,4 +72,4 @@ export async function getSession() {
     },
     expires: session.expires,
   };
-}
+});

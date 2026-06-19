@@ -1003,31 +1003,22 @@ export async function readAttachmentFile(relativePathOrUrl: string): Promise<Buf
     }
     const relativePath = relativePathOrUrl.replace('webdav:', '');
     const webdavPath = getWebDAVPath(relativePath);
-    
-    console.log("[readAttachmentFile] Reading from WebDAV", { 
-      relativePath, 
-      webdavPath,
-      webdavUrl: env.WEBDAV_URL?.substring(0, 30) + "...",
-    });
-    
+
+    // Read directly without a separate exists() pre-check. The pre-check doubled
+    // the NAS round-trips on every file/image load; a missing file simply throws
+    // here and we surface the same "not found on NAS" message the caller expects.
     try {
-      const exists = await webdavClient.exists(webdavPath);
-      if (!exists) {
-        console.error("[readAttachmentFile] File not found on NAS", { webdavPath });
+      const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
+      return Buffer.from(buffer as ArrayBuffer);
+    } catch (error) {
+      const status = (error as { status?: number })?.status;
+      if (status === 404) {
         throw new Error(`File not found on NAS: ${webdavPath}`);
       }
-      const buffer = await webdavClient.getFileContents(webdavPath, { format: 'binary' });
-      const bufferData = Buffer.from(buffer as ArrayBuffer);
-      console.log("[readAttachmentFile] Successfully read file", { 
-        webdavPath, 
-        size: bufferData.length 
-      });
-      return bufferData;
-    } catch (error) {
       console.error("[readAttachmentFile] WebDAV error", {
         webdavPath,
+        status,
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
     }

@@ -19,6 +19,7 @@ export async function enrichClaimsForListView(
     customerReference: string | null;
     invoiceNumber: string | null;
     assignedWorkerName: string | null;
+    claimAcceptanceStatus: string | null;
     dateEngineDone: Date | null;
     yearEngineDone: number | null;
     workOrderId: string | null;
@@ -39,6 +40,7 @@ export async function enrichClaimsForListView(
       c."customerReference",
       c."invoiceNumber",
       c."assignedWorkerName",
+      c."claimAcceptanceStatus",
       c."dateEngineDone",
       c."yearEngineDone",
       c."workOrderId",
@@ -93,6 +95,7 @@ export async function enrichClaimsForListView(
       customerReference: r.customerReference ?? c.customerReference ?? null,
       invoiceNumber: r.invoiceNumber ?? c.invoiceNumber ?? null,
       assignedWorkerName: r.assignedWorkerName ?? c.assignedWorkerName ?? null,
+      claimAcceptanceStatus: r.claimAcceptanceStatus ?? c.claimAcceptanceStatus ?? null,
       dateEngineDone: r.dateEngineDone ?? c.dateEngineDone ?? null,
       yearEngineDone: r.yearEngineDone ?? c.yearEngineDone ?? null,
       assignedTo,

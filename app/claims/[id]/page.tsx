@@ -144,8 +144,8 @@ const StatusBadge = ({ status, label }: { status: string; label: string }) => {
   );
 };
 
-const fetchClaimData = async (claimId: string): Promise<Claim> => {
-  const res = await fetch(`/api/claims/${claimId}`);
+const fetchClaimData = async (claimId: string, light = false): Promise<Claim> => {
+  const res = await fetch(`/api/claims/${claimId}${light ? "?light=1" : ""}`);
   if (!res.ok) throw new Error(`Failed to fetch claim: ${res.status}`);
   const data = await res.json();
   if (!data.claim) throw new Error("Claim not found");
@@ -198,7 +198,8 @@ export default function ClaimDetailPage() {
     refetch,
   } = useQuery({
     queryKey: ["claim", claimId],
-    queryFn: () => fetchClaimData(claimId),
+    // Light fetch: fast open without hydrating every email body from NAS.
+    queryFn: () => fetchClaimData(claimId, true),
     enabled: !!claimId,
     staleTime: Infinity,
     gcTime: 5 * 60 * 1000,
@@ -206,6 +207,18 @@ export default function ClaimDetailPage() {
     retry: 2,
     retryDelay: 1000,
   });
+
+  // Full (email-hydrated) claim — fetched only when the Emails tab is opened,
+  // so opening a claim never waits on NAS reads for every message body.
+  const { data: claimEmailsFull } = useQuery({
+    queryKey: ["claim", claimId, "emails-full"],
+    queryFn: () => fetchClaimData(claimId, false),
+    enabled: !!claimId && activeTab === "emails",
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+  const claimForEmails = claimEmailsFull ?? claim;
 
   const isClaimLocked = claim?.isLocked === true;
   const isReadOnly = !isSuperAdmin && isClaimLocked;
@@ -555,7 +568,7 @@ export default function ClaimDetailPage() {
             </TabsContent>
             <TabsContent value="emails" className="mt-4">
               <ClaimEmails
-                claim={claim}
+                claim={claimForEmails}
                 onUpdate={updateClaim}
                 isReadOnly={!canEdit || (isReadOnly ?? false)}
               />

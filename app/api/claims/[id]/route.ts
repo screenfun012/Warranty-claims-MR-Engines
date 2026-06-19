@@ -127,14 +127,36 @@ export async function GET(
       (claim as any).claimAcceptanceStatus = statusResult[0].claimAcceptanceStatus;
     }
 
-    console.log(`[GET /api/claims/${id}] Successfully fetched claim`);
+    // light=1 (used by list hover-prefetch and the initial detail open) avoids
+    // hydrating every email body from NAS. We still hydrate the FIRST inbound
+    // message of the FIRST thread, because the Overview tab shows it as a summary
+    // fallback. The Emails tab fetches the full (fully-hydrated) claim on demand.
+    const light = request.nextUrl.searchParams.get("light") === "1";
 
-    const emailThreadsHydrated = await Promise.all(
-      claim.emailThreads.map(async (et) => ({
-        ...et,
-        messages: await hydrateEmailMessages(et.messages),
-      }))
-    );
+    let emailThreadsHydrated: typeof claim.emailThreads;
+    if (light) {
+      emailThreadsHydrated = claim.emailThreads;
+      const firstThread = claim.emailThreads[0];
+      if (firstThread?.messages?.length) {
+        const idx = firstThread.messages.findIndex((m) => m.direction === "INBOUND");
+        if (idx >= 0) {
+          const [hydrated] = await hydrateEmailMessages([firstThread.messages[idx]]);
+          const messages = [...firstThread.messages];
+          messages[idx] = hydrated;
+          emailThreadsHydrated = [
+            { ...firstThread, messages },
+            ...claim.emailThreads.slice(1),
+          ];
+        }
+      }
+    } else {
+      emailThreadsHydrated = await Promise.all(
+        claim.emailThreads.map(async (et) => ({
+          ...et,
+          messages: await hydrateEmailMessages(et.messages),
+        }))
+      );
+    }
     return NextResponse.json({ claim: { ...claim, emailThreads: emailThreadsHydrated } });
   } catch (error) {
     console.error("Error fetching claim:", error);

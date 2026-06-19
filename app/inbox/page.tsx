@@ -1467,9 +1467,10 @@ function ThreadDetail({
                           <div className="relative">
                             {isImage ? (
                               <AspectRatio ratio={1} className="mb-2">
-                                <img 
+                                <img
                                   src={`/api/files/${attachment.id}`}
                                   alt={fn}
+                                  decoding="async"
                                   className="w-full h-full object-cover rounded"
                                   onError={(e) => {
                                     // Fallback to placeholder if image fails to load

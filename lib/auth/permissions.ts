@@ -19,45 +19,50 @@ export { ROLES, PERMISSIONS };
 export type { Role, Permission };
 
 /**
- * Get current user role from session (server-side)
+ * Derive a validated Role from an already-loaded session object.
+ * Pure (no I/O) so callers can resolve the session once and reuse it.
  */
-export async function getUserRole(): Promise<Role | null> {
-  const session = await getSession();
+type SessionShape = Awaited<ReturnType<typeof getSession>>;
+function roleFromSession(session: SessionShape): Role | null {
   const user = session?.user as { role?: string; roles?: string[] } | undefined;
-  
+
   // Check for role in different locations
   const role = user?.role || user?.roles?.[0] || null;
-  
+
   // Validate that role is one of our defined roles
   if (role && (Object.values(ROLES) as string[]).includes(role)) {
     return role as Role;
   }
-  
+
   return null;
+}
+
+/**
+ * Get current user role from session (server-side)
+ */
+export async function getUserRole(): Promise<Role | null> {
+  return roleFromSession(await getSession());
 }
 
 /**
  * Check if current user is super admin (server-side)
  */
 export async function isSuperAdmin(): Promise<boolean> {
-  const role = await getUserRole();
-  return checkSuperAdmin(role);
+  return checkSuperAdmin(roleFromSession(await getSession()));
 }
 
 /**
  * Check if current user has specific permission (server-side)
  */
 export async function userHasPermission(permission: string): Promise<boolean> {
-  const role = await getUserRole();
-  return checkPermission(role, permission);
+  return checkPermission(roleFromSession(await getSession()), permission);
 }
 
 /**
  * Check if current user has minimum role level (server-side)
  */
 export async function userHasMinimumRole(minimumRole: Role): Promise<boolean> {
-  const role = await getUserRole();
-  return checkMinimumRole(role, minimumRole);
+  return checkMinimumRole(roleFromSession(await getSession()), minimumRole);
 }
 
 /**
@@ -74,10 +79,11 @@ export async function requireAuth(): Promise<void> {
  * Require super admin permission - throws error if not super admin
  */
 export async function requireSuperAdmin(): Promise<void> {
-  await requireAuth();
-  
-  const isAdmin = await isSuperAdmin();
-  if (!isAdmin) {
+  const session = await getSession();
+  if (!session) {
+    throw new Error("Unauthorized: Authentication required");
+  }
+  if (!checkSuperAdmin(roleFromSession(session))) {
     console.warn("[Permission] Super admin access denied for user");
     throw new Error("Forbidden: Super admin access required");
   }
@@ -87,12 +93,12 @@ export async function requireSuperAdmin(): Promise<void> {
  * Require specific permission - throws error if user doesn't have it
  */
 export async function requirePermission(permission: string): Promise<void> {
-  await requireAuth();
-  
-  const role = await getUserRole();
-  const hasPerm = await userHasPermission(permission);
-  
-  if (!hasPerm) {
+  const session = await getSession();
+  if (!session) {
+    throw new Error("Unauthorized: Authentication required");
+  }
+  const role = roleFromSession(session);
+  if (!checkPermission(role, permission)) {
     console.warn(`[Permission] Permission '${permission}' denied for user with role '${role}'`);
     throw new Error(`Forbidden: Permission '${permission}' required`);
   }
@@ -102,10 +108,11 @@ export async function requirePermission(permission: string): Promise<void> {
  * Require minimum role level - throws error if user's role is lower
  */
 export async function requireMinimumRole(minimumRole: Role): Promise<void> {
-  await requireAuth();
-  
-  const hasRole = await userHasMinimumRole(minimumRole);
-  if (!hasRole) {
+  const session = await getSession();
+  if (!session) {
+    throw new Error("Unauthorized: Authentication required");
+  }
+  if (!checkMinimumRole(roleFromSession(session), minimumRole)) {
     console.warn(`[Permission] Minimum role '${minimumRole}' denied for user`);
     throw new Error(`Forbidden: Minimum role '${minimumRole}' required`);
   }

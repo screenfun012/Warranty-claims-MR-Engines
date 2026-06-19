@@ -383,6 +383,8 @@ export function ClaimPhotos({ claim, isReadOnly = false, onRefresh }: ClaimPhoto
                         <img
                           src={`/api/files/${file.id}`}
                           alt={file.fileName || "Image"}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
                           onClick={() => handleImageClick(images.findIndex((f: any) => f.id === file.id))}
                         />
